@@ -64,7 +64,7 @@ PlasmoidItem {
     }
 
     function pollScript() {
-        return `import sys, json, ssl, re, urllib.request, urllib.parse
+        return `import sys, json, ssl, urllib.request, urllib.parse
 geohash = sys.argv[1]
 q = sys.argv[2]
 base = "https://api.weather.bom.gov.au/v1"
@@ -77,12 +77,10 @@ def get(u):
 try:
     o = {"ok": True}
     if not geohash:
-        # BoM search doesn't accept state suffixes — strip them before querying,
-        # then prefer the result that matches the stated state code.
-        m = re.search(r"\b([A-Z]{2,3})\s*$", q)
-        state = m.group(1) if m else None
-        term = q[:m.start()].strip() if m else q
-        d = get(base + "/locations?search=" + urllib.parse.quote(term or q))
+        parts = q.strip().rsplit(None, 1)
+        state = parts[-1] if len(parts) > 1 and parts[-1].isalpha() and parts[-1].isupper() and 2 <= len(parts[-1]) <= 3 else None
+        term = parts[0].strip() if state else q.strip()
+        d = get(base + "/locations?search=" + urllib.parse.quote(term))
         locs = d.get("data", [])
         if not locs:
             print(json.dumps({"ok": False, "error": "Location not found: " + q}))
