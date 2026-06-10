@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+                          http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+    <kcfgfile name=""/>
+    <group name="General">
+        <!-- BoM location search string, e.g. "Seaford VIC". -->
+        <entry name="locationSearch" type="String">
+            <default>Seaford VIC</default>
+        </entry>
+        <!-- BoM radar station ID, e.g. IDR022 = Melbourne 64 km. -->
+        <entry name="radarStation" type="String">
+            <default>IDR022</default>
+        </entry>
+        <!-- Poll interval in milliseconds. -->
+        <entry name="pollInterval" type="Int">
+            <default>600000</default>
+        </entry>
+    </group>
+</kcfg>

@@ -1,0 +1,14 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [{"Name": "mch"}],
+        "Category": "Weather",
+        "Description": "Current conditions, 7-day forecast, and animated rain radar from the Australian Bureau of Meteorology",
+        "Icon": "weather-clear-symbolic",
+        "Id": "net.tropism.plasma.bomweather",
+        "License": "GPL-2.0-or-later",
+        "Name": "BoM Weather",
+        "Version": "1.0"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}

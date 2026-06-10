@@ -1,0 +1,623 @@
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls as QQC2
+import org.kde.plasma.plasmoid
+import org.kde.plasma.components 3.0 as PlasmaComponents
+import org.kde.plasma.plasma5support as P5Support
+import org.kde.kirigami as Kirigami
+
+import "helpers.js" as Helpers
+
+PlasmoidItem {
+    id: root
+
+    FontMetrics {
+        id: panelFm
+        font.pointSize: Kirigami.Theme.smallFont.pointSize
+    }
+    Layout.minimumWidth:  Kirigami.Units.iconSizes.smallMedium
+    Layout.preferredWidth: Kirigami.Units.iconSizes.smallMedium
+        + (panelText !== ""
+            ? Kirigami.Units.smallSpacing
+              + Math.ceil(panelFm.advanceWidth(panelText))
+              + Kirigami.Units.smallSpacing
+            : 0)
+
+    // ── State ─────────────────────────────────────────────────────────────
+    property bool   pollOk:       false
+    property string errorText:    ""
+    property var    observations: null
+    property var    forecast:     []
+    property var    warnings:     []
+    property string locationName: plasmoid.configuration.locationSearch
+    property string lastUpdated:  ""
+    property string _geohash:     ""
+
+    readonly property string locationSearch: plasmoid.configuration.locationSearch
+    onLocationSearchChanged: {
+        _geohash     = ""
+        locationName = locationSearch
+        pollOk       = false
+        errorText    = ""
+    }
+
+    readonly property string panelText: pollOk ? Helpers.formatTemp(observations ? observations.temp : null) : ""
+
+    readonly property string currentIcon: {
+        if (!pollOk || !forecast || forecast.length === 0)
+            return "weather-none-available"
+        return Helpers.bomIcon(forecast[0].icon_descriptor, false)
+    }
+
+    readonly property bool hasWarnings: Array.isArray(warnings) && warnings.length > 0
+
+    Plasmoid.icon: currentIcon
+    toolTipMainText: "BoM — " + locationName
+    toolTipSubText: pollOk
+        ? (Helpers.formatTemp(observations ? observations.temp : null)
+           + (forecast.length > 0 ? "  " + Helpers.titleCase(forecast[0].short_text || forecast[0].icon_descriptor || "") : ""))
+        : (errorText || i18n("Connecting…"))
+
+    // ── Python poll script ────────────────────────────────────────────────
+    function shellQuote(s) {
+        return "\"" + String(s || "").replace(/[\\\"`$]/g, "\\$&") + "\""
+    }
+
+    function pollScript() {
+        return `import sys, json, ssl, re, urllib.request, urllib.parse
+geohash = sys.argv[1]
+q = sys.argv[2]
+base = "https://api.weather.bom.gov.au/v1"
+ctx = ssl.create_default_context()
+ctx.check_hostname = False
+ctx.verify_mode = ssl.CERT_NONE
+hdrs = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
+def get(u):
+    return json.load(urllib.request.urlopen(urllib.request.Request(u, headers=hdrs), timeout=15, context=ctx))
+try:
+    o = {"ok": True}
+    if not geohash:
+        # BoM search doesn't accept state suffixes — strip them before querying,
+        # then prefer the result that matches the stated state code.
+        m = re.search(r"\b([A-Z]{2,3})\s*$", q)
+        state = m.group(1) if m else None
+        term = q[:m.start()].strip() if m else q
+        d = get(base + "/locations?search=" + urllib.parse.quote(term or q))
+        locs = d.get("data", [])
+        if not locs:
+            print(json.dumps({"ok": False, "error": "Location not found: " + q}))
+            raise SystemExit(0)
+        if state:
+            preferred = [l for l in locs if l.get("state", "").upper() == state.upper()]
+            if preferred:
+                locs = preferred
+        loc = locs[0]
+        geohash = loc.get("geohash", "")[:6]
+        o["geohash"] = geohash
+        o["locationName"] = loc.get("name", "") + ", " + loc.get("state", "")
+    obs = get(base + "/locations/" + geohash + "/observations")
+    o["observations"] = obs.get("data", {})
+    fc = get(base + "/locations/" + geohash + "/forecasts/daily")
+    o["forecast"] = fc.get("data", [])[:7]
+    try:
+        w = get(base + "/locations/" + geohash + "/warnings")
+        o["warnings"] = w.get("data", [])
+    except Exception:
+        o["warnings"] = []
+    print(json.dumps(o))
+except SystemExit:
+    pass
+except Exception as e:
+    print(json.dumps({"ok": False, "error": str(e)}))
+`
+    }
+
+    function buildPollCommand() {
+        return "python3 -c '" + pollScript() + "' "
+             + shellQuote(_geohash) + " "
+             + shellQuote(locationSearch)
+    }
+
+    function _handlePoll(out) {
+        var d
+        try { d = JSON.parse(out) }
+        catch (e) { d = { ok: false, error: i18n("Bad response") } }
+
+        if (!d || !d.ok) {
+            pollOk    = false
+            errorText = (d && d.error) ? d.error : i18n("Unreachable")
+            return
+        }
+
+        if (d.geohash)      _geohash      = d.geohash
+        if (d.locationName) locationName  = d.locationName
+        observations = d.observations || null
+        forecast     = d.forecast     || []
+        warnings     = d.warnings     || []
+        lastUpdated  = Qt.formatTime(new Date(), "h:mm ap")
+        errorText    = ""
+        pollOk       = true
+    }
+
+    // ── Poll plumbing ─────────────────────────────────────────────────────
+    P5Support.DataSource {
+        id: poller
+        engine: "executable"
+        connectedSources: []
+        onNewData: (sourceName, data) => {
+            poller.disconnectSource(sourceName)
+            root._handlePoll((data["stdout"] || "").trim())
+        }
+    }
+
+    function refresh() { poller.connectSource(buildPollCommand()) }
+
+    Timer {
+        interval: Math.max(60000, plasmoid.configuration.pollInterval)
+        running: true
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: root.refresh()
+    }
+
+    // Radar cache-busting key — updates every 6 minutes
+    property int radarCacheKey: 0
+    Component.onCompleted: radarCacheKey = Math.floor(Date.now() / 1000)
+    Timer {
+        interval: 360000
+        repeat: true
+        running: true
+        onTriggered: root.radarCacheKey = Math.floor(Date.now() / 1000)
+    }
+
+    // ── Compact (panel) ───────────────────────────────────────────────────
+    compactRepresentation: Item {
+        clip: true
+        MouseArea {
+            anchors.fill: parent
+            onClicked: root.expanded = !root.expanded
+        }
+        Kirigami.Icon {
+            id: compactIco
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            width:  Kirigami.Units.iconSizes.smallMedium
+            height: width
+            source: root.currentIcon
+        }
+        PlasmaComponents.Label {
+            anchors.left:         compactIco.right
+            anchors.leftMargin:   Kirigami.Units.smallSpacing
+            anchors.right:        parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            visible: root.panelText !== ""
+            text:    root.panelText
+            font.pointSize: Kirigami.Theme.smallFont.pointSize
+            elide:   Text.ElideRight
+        }
+    }
+
+    // ── Full representation (popup) ───────────────────────────────────────
+    fullRepresentation: ColumnLayout {
+        spacing: 0
+        Layout.minimumWidth:  Kirigami.Units.gridUnit * 22
+        Layout.preferredWidth: Kirigami.Units.gridUnit * 28
+
+        // Tab bar
+        PlasmaComponents.TabBar {
+            id: tabBar
+            Layout.fillWidth: true
+            PlasmaComponents.TabButton { text: i18n("Weather") }
+            PlasmaComponents.TabButton { text: i18n("Radar")   }
+        }
+
+        // ── Weather tab ───────────────────────────────────────────────────
+        ColumnLayout {
+            visible: tabBar.currentIndex === 0
+            Layout.fillWidth: true
+            Layout.maximumHeight: visible ? 99999 : 0
+            spacing: Kirigami.Units.smallSpacing
+
+            // Severe weather warning banner
+            Rectangle {
+                visible: root.hasWarnings
+                Layout.fillWidth: true
+                implicitHeight: warnLabel.implicitHeight + Kirigami.Units.smallSpacing * 2
+                color: Kirigami.Theme.neutralTextColor
+                opacity: 0.18
+                radius: 3
+            }
+            PlasmaComponents.Label {
+                id: warnLabel
+                visible: root.hasWarnings
+                Layout.fillWidth: true
+                Layout.topMargin:   Kirigami.Units.smallSpacing
+                Layout.leftMargin:  Kirigami.Units.smallSpacing
+                Layout.rightMargin: Kirigami.Units.smallSpacing
+                wrapMode: Text.WordWrap
+                color: Kirigami.Theme.neutralTextColor
+                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                text: {
+                    if (!root.hasWarnings) return ""
+                    return "⚠  " + root.warnings.map(function(w) {
+                        return w.title || w.type || "Warning"
+                    }).join("  ·  ")
+                }
+            }
+
+            // Current conditions — large icon + temperature
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin:  Kirigami.Units.smallSpacing
+                Layout.leftMargin: Kirigami.Units.smallSpacing
+                spacing: Kirigami.Units.largeSpacing
+
+                Kirigami.Icon {
+                    width:  Kirigami.Units.iconSizes.large
+                    height: width
+                    source: root.currentIcon
+                    visible: root.pollOk
+                }
+
+                ColumnLayout {
+                    spacing: 2
+                    Layout.fillWidth: true
+
+                    PlasmaComponents.Label {
+                        visible: root.pollOk
+                        text: root.observations ? Helpers.formatTemp(root.observations.temp) : "—"
+                        font.pointSize: Kirigami.Theme.defaultFont.pointSize * 3
+                        font.weight: Font.Bold
+                    }
+                    PlasmaComponents.Label {
+                        visible: root.pollOk && root.observations !== null
+                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        opacity: 0.7
+                        text: {
+                            if (!root.observations) return ""
+                            var parts = []
+                            var fl = root.observations.temp_feels_like
+                            if (fl !== null && fl !== undefined)
+                                parts.push(i18n("Feels like %1", Helpers.formatTemp(fl)))
+                            var desc = root.forecast.length > 0
+                                ? Helpers.titleCase(root.forecast[0].short_text
+                                                    || root.forecast[0].icon_descriptor || "")
+                                : ""
+                            if (desc) parts.push(desc)
+                            return parts.join("  ·  ")
+                        }
+                    }
+                }
+
+                // Today's high / low from forecast
+                ColumnLayout {
+                    visible: root.pollOk && root.forecast.length > 0
+                    spacing: 0
+                    Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+
+                    PlasmaComponents.Label {
+                        Layout.alignment: Qt.AlignRight
+                        text: Helpers.formatTemp(root.forecast.length > 0 ? root.forecast[0].temp_max : null)
+                        font.pointSize: Kirigami.Theme.defaultFont.pointSize + 1
+                        font.weight: Font.Bold
+                        color: {
+                            var key = Helpers.tempColorKey(root.forecast.length > 0 ? root.forecast[0].temp_max : null)
+                            if (key === "hot")  return Kirigami.Theme.negativeTextColor
+                            if (key === "warm") return Kirigami.Theme.neutralTextColor
+                            return Kirigami.Theme.textColor
+                        }
+                    }
+                    PlasmaComponents.Label {
+                        Layout.alignment: Qt.AlignRight
+                        text: Helpers.formatTemp(root.forecast.length > 0 ? root.forecast[0].temp_min : null)
+                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        opacity: 0.55
+                    }
+                    PlasmaComponents.Label {
+                        Layout.alignment: Qt.AlignRight
+                        visible: root.forecast.length > 0 && root.forecast[0].rain
+                        text: (root.forecast.length > 0 && root.forecast[0].rain)
+                            ? (root.forecast[0].rain.chance || 0) + "%"
+                            : ""
+                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        color: {
+                            var key = root.forecast.length > 0 && root.forecast[0].rain
+                                ? Helpers.rainColorKey(root.forecast[0].rain.chance || 0) : "none"
+                            if (key === "heavy")    return Kirigami.Theme.negativeTextColor
+                            if (key === "moderate") return Kirigami.Theme.neutralTextColor
+                            return Kirigami.Theme.disabledTextColor
+                        }
+                    }
+                }
+
+                Item { width: Kirigami.Units.smallSpacing }
+            }
+
+            // Detail stats: wind · humidity · pressure · rain
+            GridLayout {
+                visible: root.pollOk && root.observations !== null
+                Layout.fillWidth: true
+                Layout.leftMargin:  Kirigami.Units.smallSpacing
+                Layout.rightMargin: Kirigami.Units.smallSpacing
+                columns: 2
+                rowSpacing: 2
+                columnSpacing: Kirigami.Units.largeSpacing
+
+                PlasmaComponents.Label {
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    text: {
+                        if (!root.observations) return ""
+                        var w = root.observations.wind || {}
+                        var g = root.observations.gust || {}
+                        var s = "💨  " + Helpers.windStr(w.speed_kilometre, w.direction)
+                        if (g.speed_kilometre) s += "  (gusts " + Math.round(g.speed_kilometre) + ")"
+                        return s
+                    }
+                }
+                PlasmaComponents.Label {
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    visible: root.observations && root.observations.humidity !== undefined
+                    text: root.observations ? ("💧  " + Math.round(root.observations.humidity || 0) + "% RH") : ""
+                }
+                PlasmaComponents.Label {
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    visible: root.observations && root.observations.pressure !== undefined
+                    text: root.observations
+                        ? ("⬤  " + Helpers.pressureStr(root.observations.pressure,
+                                                        root.observations.pressure_tendency))
+                        : ""
+                }
+                PlasmaComponents.Label {
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    visible: root.observations && root.observations.rain_since_9am !== undefined
+                    text: root.observations
+                        ? ("🌧  " + (root.observations.rain_since_9am || 0) + " mm since 9 am")
+                        : ""
+                }
+            }
+
+            // Dew point if available
+            PlasmaComponents.Label {
+                visible: root.pollOk && root.observations && root.observations.dew_point !== undefined
+                Layout.leftMargin: Kirigami.Units.smallSpacing
+                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                opacity: 0.65
+                text: root.observations
+                    ? (i18n("Dew point %1", Helpers.formatTemp(root.observations.dew_point))
+                       + (root.observations.cloud ? "  ·  " + root.observations.cloud : ""))
+                    : ""
+            }
+
+            Kirigami.Separator {
+                Layout.fillWidth: true
+                visible: root.pollOk && root.forecast.length > 0
+                Layout.topMargin: Kirigami.Units.smallSpacing / 2
+            }
+
+            // 7-day forecast
+            PlasmaComponents.Label {
+                visible: root.pollOk && root.forecast.length > 0
+                Layout.leftMargin: Kirigami.Units.smallSpacing
+                text: i18n("7-Day Forecast")
+                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                font.weight: Font.Bold
+                opacity: 0.55
+            }
+
+            RowLayout {
+                visible: root.pollOk && root.forecast.length > 0
+                Layout.fillWidth: true
+                Layout.leftMargin:  Kirigami.Units.smallSpacing
+                Layout.rightMargin: Kirigami.Units.smallSpacing
+                spacing: 0
+
+                Repeater {
+                    model: root.forecast
+                    delegate: ColumnLayout {
+                        required property var modelData
+                        required property int index
+                        Layout.fillWidth: true
+                        spacing: 1
+
+                        PlasmaComponents.Label {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: index === 0 ? i18n("Today") : Helpers.shortDay(modelData.date)
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize - 1
+                            font.weight: index === 0 ? Font.Bold : Font.Normal
+                            opacity: 0.65
+                        }
+                        Kirigami.Icon {
+                            Layout.alignment: Qt.AlignHCenter
+                            width:  Kirigami.Units.iconSizes.smallMedium
+                            height: width
+                            source: Helpers.bomIcon(modelData.icon_descriptor, false)
+                        }
+                        PlasmaComponents.Label {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: Helpers.formatTemp(modelData.temp_max)
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                            font.weight: Font.DemiBold
+                            color: {
+                                var key = Helpers.tempColorKey(modelData.temp_max)
+                                if (key === "hot")  return Kirigami.Theme.negativeTextColor
+                                if (key === "warm") return Kirigami.Theme.neutralTextColor
+                                return Kirigami.Theme.textColor
+                            }
+                        }
+                        PlasmaComponents.Label {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: Helpers.formatTemp(modelData.temp_min)
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize - 1
+                            opacity: 0.5
+                        }
+                        PlasmaComponents.Label {
+                            Layout.alignment: Qt.AlignHCenter
+                            visible: modelData.rain !== undefined && modelData.rain !== null
+                            text: {
+                                var c = (modelData.rain && modelData.rain.chance !== undefined)
+                                    ? modelData.rain.chance : null
+                                return c !== null ? c + "%" : ""
+                            }
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize - 1
+                            color: {
+                                var c = (modelData.rain && modelData.rain.chance !== undefined)
+                                    ? modelData.rain.chance : 0
+                                var key = Helpers.rainColorKey(c)
+                                if (key === "heavy")    return Kirigami.Theme.negativeTextColor
+                                if (key === "moderate") return Kirigami.Theme.neutralTextColor
+                                if (key === "low")      return Kirigami.Theme.textColor
+                                return Kirigami.Theme.disabledTextColor
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Error / loading state
+            PlasmaComponents.Label {
+                visible: !root.pollOk
+                Layout.fillWidth: true
+                Layout.margins: Kirigami.Units.largeSpacing
+                wrapMode: Text.WordWrap
+                horizontalAlignment: Text.AlignHCenter
+                opacity: 0.7
+                text: root.errorText
+                    ? i18n("Cannot reach BoM:\n%1", root.errorText)
+                    : i18n("Waiting for data…")
+            }
+
+            Item { Layout.fillHeight: true }
+            Kirigami.Separator { Layout.fillWidth: true }
+
+            // Footer
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.leftMargin:   Kirigami.Units.smallSpacing
+                Layout.rightMargin:  Kirigami.Units.smallSpacing
+                Layout.bottomMargin: Kirigami.Units.smallSpacing
+
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    opacity: 0.5
+                    elide: Text.ElideRight
+                    text: {
+                        var parts = [root.locationName]
+                        if (root.pollOk && root.observations && root.observations.station) {
+                            var st = root.observations.station
+                            var km = st.distance ? (st.distance / 1000).toFixed(1) : null
+                            parts.push(st.name + (km ? " (" + km + " km)" : ""))
+                        }
+                        if (root.lastUpdated) parts.push(root.lastUpdated)
+                        return parts.join("  ·  ")
+                    }
+                }
+                PlasmaComponents.Button {
+                    icon.name: "view-refresh-symbolic"
+                    onClicked: root.refresh()
+                }
+                PlasmaComponents.Button {
+                    icon.name: "internet-web-browser-symbolic"
+                    text: "BoM"
+                    onClicked: Qt.openUrlExternally("https://www.bom.gov.au/vic/")
+                }
+            }
+        }
+
+        // ── Radar tab ─────────────────────────────────────────────────────
+        ColumnLayout {
+            visible: tabBar.currentIndex === 1
+            Layout.fillWidth: true
+            Layout.maximumHeight: visible ? 99999 : 0
+            spacing: Kirigami.Units.smallSpacing
+
+            // Composited radar: topography + animated loop + overlays
+            Item {
+                id: radarFrame
+                Layout.fillWidth: true
+                // Keep square; cap at 20 grid units so it doesn't overflow screens
+                implicitHeight: Math.min(width, Kirigami.Units.gridUnit * 28)
+
+                // Geographic background (topography)
+                Image {
+                    anchors.fill: parent
+                    source: "http://www.bom.gov.au/products/radar_transparencies/"
+                          + plasmoid.configuration.radarStation + ".topography.png"
+                    fillMode: Image.Stretch
+                    asynchronous: true
+                    cache: false
+                }
+
+                // Animated radar loop — cache-busted every 6 min
+                AnimatedImage {
+                    anchors.fill: parent
+                    source: "http://www.bom.gov.au/radar/"
+                          + plasmoid.configuration.radarStation + ".gif?t="
+                          + root.radarCacheKey
+                    fillMode: Image.Stretch
+                    asynchronous: true
+                    cache: false
+                    playing: tabBar.currentIndex === 1
+                }
+
+                // Locations label overlay
+                Image {
+                    anchors.fill: parent
+                    source: "http://www.bom.gov.au/products/radar_transparencies/"
+                          + plasmoid.configuration.radarStation + ".locations.png"
+                    fillMode: Image.Stretch
+                    asynchronous: true
+                    cache: false
+                }
+
+                // Range rings overlay
+                Image {
+                    anchors.fill: parent
+                    source: "http://www.bom.gov.au/products/radar_transparencies/"
+                          + plasmoid.configuration.radarStation + ".range.png"
+                    fillMode: Image.Stretch
+                    asynchronous: true
+                    cache: false
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.leftMargin:  Kirigami.Units.smallSpacing
+                Layout.rightMargin: Kirigami.Units.smallSpacing
+
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    opacity: 0.55
+                    text: i18n("Radar: %1  ·  Updated every 6 min",
+                               plasmoid.configuration.radarStation)
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.leftMargin:   Kirigami.Units.smallSpacing
+                Layout.rightMargin:  Kirigami.Units.smallSpacing
+                Layout.bottomMargin: Kirigami.Units.smallSpacing
+                spacing: Kirigami.Units.smallSpacing
+
+                PlasmaComponents.Button {
+                    Layout.fillWidth: true
+                    icon.name: "internet-web-browser-symbolic"
+                    text: i18n("Full radar loop")
+                    onClicked: Qt.openUrlExternally(
+                        "https://www.bom.gov.au/products/"
+                        + plasmoid.configuration.radarStation + ".loop.shtml")
+                }
+                PlasmaComponents.Button {
+                    Layout.fillWidth: true
+                    icon.name: "internet-web-browser-symbolic"
+                    text: i18n("Weather maps")
+                    onClicked: Qt.openUrlExternally(
+                        "https://www.bom.gov.au/weather-and-climate/rain-radar-and-weather-maps")
+                }
+            }
+        }
+    }
+}
