@@ -213,7 +213,6 @@ except Exception as e:
         ColumnLayout {
             visible: tabBar.currentIndex === 0
             Layout.fillWidth: true
-            Layout.maximumHeight: visible ? 99999 : 0
             spacing: Kirigami.Units.smallSpacing
 
             // Severe weather warning banner
@@ -280,6 +279,7 @@ except Exception as e:
                             var desc = root.forecast.length > 0
                                 ? Helpers.titleCase(root.forecast[0].short_text
                                                     || root.forecast[0].icon_descriptor || "")
+                                      .replace(/\.$/, "")
                                 : ""
                             if (desc) parts.push(desc)
                             return parts.join("  ·  ")
@@ -484,7 +484,6 @@ except Exception as e:
                     : i18n("Waiting for data…")
             }
 
-            Item { Layout.fillHeight: true }
             Kirigami.Separator { Layout.fillWidth: true }
 
             // Footer
@@ -526,7 +525,6 @@ except Exception as e:
         ColumnLayout {
             visible: tabBar.currentIndex === 1
             Layout.fillWidth: true
-            Layout.maximumHeight: visible ? 99999 : 0
             spacing: Kirigami.Units.smallSpacing
 
             // Composited radar: topography + animated loop + overlays
