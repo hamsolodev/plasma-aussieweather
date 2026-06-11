@@ -897,7 +897,24 @@ except Exception as e:
                 Layout.fillWidth: true
                 implicitHeight: Kirigami.Units.gridUnit * 22
 
-                // Geographic background (topography)
+                // Opaque base map. BoM's overlays (locations, range) use black
+                // text/lines, so the base must stay light regardless of the
+                // desktop theme — the Rectangle matches background.png's land
+                // colour and covers loading/failure.
+                Rectangle {
+                    anchors.fill: parent
+                    color: "#e7dcbd"
+                }
+                Image {
+                    anchors.fill: parent
+                    source: "http://www.bom.gov.au/products/radar_transparencies/"
+                          + plasmoid.configuration.radarStation + ".background.png"
+                    fillMode: Image.Stretch
+                    asynchronous: true
+                    cache: false
+                }
+
+                // Terrain shading (partially transparent)
                 Image {
                     anchors.fill: parent
                     source: "http://www.bom.gov.au/products/radar_transparencies/"
