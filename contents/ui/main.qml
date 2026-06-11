@@ -315,12 +315,26 @@ except Exception as e:
         Layout.minimumWidth:   Kirigami.Units.gridUnit * 20
         Layout.preferredWidth: Kirigami.Units.gridUnit * 22
 
-        // Tab bar
+        // Tab bar — the Warnings tab only exists while warnings are in effect.
+        // TabBar doesn't collapse invisible buttons, so width must be zeroed too.
         PlasmaComponents.TabBar {
             id: tabBar
             Layout.fillWidth: true
             PlasmaComponents.TabButton { text: i18n("Weather") }
             PlasmaComponents.TabButton { text: i18n("Radar")   }
+            PlasmaComponents.TabButton {
+                visible: root.hasWarnings
+                width: root.hasWarnings ? tabBar.width / 3 : 0
+                text: i18n("⚠ Warnings (%1)", root.warnings.length)
+            }
+        }
+
+        Connections {
+            target: root
+            function onHasWarningsChanged() {
+                if (!root.hasWarnings && tabBar.currentIndex === 2)
+                    tabBar.currentIndex = 0
+            }
         }
 
         // Both tab bodies live in a StackLayout so the popup height is always
@@ -335,12 +349,11 @@ except Exception as e:
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
 
-            // Severe weather warning banner — click to expand/collapse details
+            // Severe weather warning banner — click to open the Warnings tab
             Item {
                 id: warningBanner
                 visible: root.hasWarnings
                 Layout.fillWidth: true
-                property bool expanded: false
                 implicitHeight: warnHeaderRow.implicitHeight + Kirigami.Units.smallSpacing * 2
 
                 Rectangle {
@@ -373,64 +386,13 @@ except Exception as e:
                     Kirigami.Icon {
                         width: Kirigami.Units.iconSizes.small; height: width
                         color: Kirigami.Theme.neutralTextColor
-                        source: warningBanner.expanded ? "go-up-symbolic" : "go-down-symbolic"
+                        source: "go-next-symbolic"
                     }
                 }
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: warningBanner.expanded = !warningBanner.expanded
-                }
-            }
-
-            // Expanded warning details
-            ColumnLayout {
-                visible: root.hasWarnings && warningBanner.expanded
-                Layout.fillWidth: true
-                Layout.leftMargin:  Kirigami.Units.smallSpacing
-                Layout.rightMargin: Kirigami.Units.smallSpacing
-                spacing: Kirigami.Units.smallSpacing
-
-                Repeater {
-                    model: root.warnings
-                    delegate: ColumnLayout {
-                        required property var modelData
-                        Layout.fillWidth: true
-                        spacing: 2
-
-                        PlasmaComponents.Label {
-                            Layout.fillWidth: true
-                            wrapMode: Text.WordWrap
-                            color: Kirigami.Theme.neutralTextColor
-                            font.pointSize: Kirigami.Theme.defaultFont.pointSize
-                            font.weight: Font.Bold
-                            text: modelData.title || modelData.type || "Warning"
-                        }
-                        PlasmaComponents.Label {
-                            Layout.fillWidth: true
-                            wrapMode: Text.WordWrap
-                            font.pointSize: Kirigami.Theme.defaultFont.pointSize
-                            visible: (modelData.text || modelData.description || modelData.message || "").length > 0
-                            text: modelData.text || modelData.description || modelData.message || ""
-                        }
-                        PlasmaComponents.Label {
-                            Layout.fillWidth: true
-                            wrapMode: Text.WordWrap
-                            font.pointSize: Kirigami.Theme.defaultFont.pointSize
-                            opacity: 0.6
-                            visible: !!(modelData.valid_from)
-                            text: {
-                                if (!modelData.valid_from) return ""
-                                var from = Qt.formatDateTime(new Date(modelData.valid_from), "d MMM h:mm ap")
-                                if (!modelData.valid_to) return "From: " + from
-                                return "Valid: " + from + " – " + Qt.formatDateTime(new Date(modelData.valid_to), "d MMM h:mm ap")
-                            }
-                        }
-                        Kirigami.Separator {
-                            Layout.fillWidth: true
-                            visible: index < root.warnings.length - 1
-                        }
-                    }
+                    onClicked: tabBar.currentIndex = 2
                 }
             }
 
@@ -1022,6 +984,67 @@ except Exception as e:
                     text: i18n("Weather maps")
                     onClicked: Qt.openUrlExternally(
                         "https://www.bom.gov.au/weather-and-climate/rain-radar-and-weather-maps")
+                }
+            }
+        }
+
+        // ── Warnings tab ──────────────────────────────────────────────────
+        QQC2.ScrollView {
+            id: warningsTab
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            contentWidth: availableWidth
+            clip: true
+
+            ColumnLayout {
+                width: warningsTab.availableWidth
+                spacing: Kirigami.Units.smallSpacing
+
+                Repeater {
+                    model: root.warnings
+                    delegate: ColumnLayout {
+                        required property var modelData
+                        required property int index
+                        Layout.fillWidth: true
+                        Layout.leftMargin:  Kirigami.Units.smallSpacing
+                        Layout.rightMargin: Kirigami.Units.smallSpacing
+                        spacing: 2
+
+                        PlasmaComponents.Label {
+                            Layout.fillWidth: true
+                            Layout.topMargin: Kirigami.Units.smallSpacing
+                            wrapMode: Text.WordWrap
+                            color: Kirigami.Theme.neutralTextColor
+                            font.pointSize: Kirigami.Theme.defaultFont.pointSize
+                            font.weight: Font.Bold
+                            text: modelData.title || modelData.type || "Warning"
+                        }
+                        PlasmaComponents.Label {
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            font.pointSize: Kirigami.Theme.defaultFont.pointSize
+                            visible: (modelData.text || modelData.description || modelData.message || "").length > 0
+                            text: modelData.text || modelData.description || modelData.message || ""
+                        }
+                        PlasmaComponents.Label {
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            font.pointSize: Kirigami.Theme.defaultFont.pointSize
+                            opacity: 0.6
+                            visible: !!(modelData.valid_from)
+                            text: {
+                                if (!modelData.valid_from) return ""
+                                var from = Qt.formatDateTime(new Date(modelData.valid_from), "d MMM h:mm ap")
+                                if (!modelData.valid_to) return "From: " + from
+                                return "Valid: " + from + " – " + Qt.formatDateTime(new Date(modelData.valid_to), "d MMM h:mm ap")
+                            }
+                        }
+                        Kirigami.Separator {
+                            Layout.fillWidth: true
+                            Layout.topMargin: Kirigami.Units.smallSpacing
+                            visible: index < root.warnings.length - 1
+                        }
+                    }
                 }
             }
         }
