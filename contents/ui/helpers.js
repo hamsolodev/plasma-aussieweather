@@ -43,7 +43,7 @@ function bomIcon(descriptor, isNight) {
 function formatTemp(t) {
     var n = Number(t)
     if (t === null || t === undefined || isNaN(n)) return "—"
-    return Math.round(n) + "°"
+    return Math.round(n) + "°C"
 }
 
 function windStr(speed, dir) {

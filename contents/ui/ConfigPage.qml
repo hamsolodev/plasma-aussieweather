@@ -5,6 +5,7 @@ import org.kde.kirigami as Kirigami
 
 Kirigami.FormLayout {
     id: page
+    Layout.margins: Kirigami.Units.largeSpacing
 
     property alias cfg_locationSearch: locationField.text
     property alias cfg_radarStation:   radarField.text

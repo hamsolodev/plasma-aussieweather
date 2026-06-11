@@ -99,7 +99,21 @@ try:
     o["forecast"] = fc.get("data", [])[:7]
     try:
         w = get(base + "/locations/" + geohash + "/warnings")
-        o["warnings"] = w.get("data", [])
+        raw = w.get("data", [])
+        warnings = []
+        for warn in raw:
+            wid = (warn.get("id") or "").strip()
+            if wid:
+                try:
+                    detail = get(base + "/warnings/" + urllib.parse.quote(wid, safe=""))
+                    merged = dict(warn)
+                    merged.update(detail.get("data", {}))
+                    warnings.append(merged)
+                except Exception:
+                    warnings.append(warn)
+            else:
+                warnings.append(warn)
+        o["warnings"] = warnings
     except Exception:
         o["warnings"] = []
     print(json.dumps(o))
@@ -158,14 +172,58 @@ except Exception as e:
         onTriggered: root.refresh()
     }
 
-    // Radar cache-busting key — updates every 6 minutes
-    property int radarCacheKey: 0
-    Component.onCompleted: radarCacheKey = Math.floor(Date.now() / 1000)
+    // ── Radar frame animation ─────────────────────────────────────────────
+    property var radarFrameUrls: []
+    property int radarFrameIdx:  0
+
+    function radarFrameScript() {
+        return `import sys, json, ftplib
+station = sys.argv[1]
+try:
+    ftp = ftplib.FTP("ftp.bom.gov.au", timeout=15)
+    ftp.login()
+    ftp.cwd("/anon/gen/radar")
+    files = []
+    ftp.retrlines("NLST", files.append)
+    ftp.quit()
+    prefix = station + ".T."
+    matching = sorted([f for f in files if f.startswith(prefix) and f.endswith(".png")])[-6:]
+    urls = ["https://www.bom.gov.au/radar/" + f for f in matching]
+    print(json.dumps({"ok": True, "frames": urls}))
+except Exception as e:
+    print(json.dumps({"ok": False, "error": str(e)}))
+`
+    }
+
+    P5Support.DataSource {
+        id: radarPoller
+        engine: "executable"
+        connectedSources: []
+        onNewData: (sourceName, data) => {
+            radarPoller.disconnectSource(sourceName)
+            try {
+                var d = JSON.parse((data["stdout"] || "").trim())
+                if (d.ok && d.frames && d.frames.length > 0) {
+                    root.radarFrameUrls = d.frames
+                    root.radarFrameIdx  = 0
+                }
+            } catch(e) {}
+        }
+    }
+
+    function refreshRadarFrames() {
+        radarPoller.connectSource("python3 -c '"
+            + radarFrameScript() + "' "
+            + shellQuote(plasmoid.configuration.radarStation))
+    }
+
+    // BoM radar scans every 5 minutes — keep frames fresh in the background
     Timer {
-        interval: 360000
-        repeat: true
+        interval: 300000
         running: true
-        onTriggered: root.radarCacheKey = Math.floor(Date.now() / 1000)
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: root.refreshRadarFrames()
     }
 
     // ── Compact (panel) ───────────────────────────────────────────────────
@@ -198,8 +256,8 @@ except Exception as e:
     // ── Full representation (popup) ───────────────────────────────────────
     fullRepresentation: ColumnLayout {
         spacing: 0
-        Layout.minimumWidth:  Kirigami.Units.gridUnit * 22
-        Layout.preferredWidth: Kirigami.Units.gridUnit * 28
+        Layout.minimumWidth:  Kirigami.Units.gridUnit * 20
+        Layout.preferredWidth: Kirigami.Units.gridUnit * 22
 
         // Tab bar
         PlasmaComponents.TabBar {
@@ -215,39 +273,111 @@ except Exception as e:
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
 
-            // Severe weather warning banner
-            Rectangle {
+            // Severe weather warning banner — click to expand/collapse details
+            Item {
+                id: warningBanner
                 visible: root.hasWarnings
                 Layout.fillWidth: true
-                implicitHeight: warnLabel.implicitHeight + Kirigami.Units.smallSpacing * 2
-                color: Kirigami.Theme.neutralTextColor
-                opacity: 0.18
-                radius: 3
-            }
-            PlasmaComponents.Label {
-                id: warnLabel
-                visible: root.hasWarnings
-                Layout.fillWidth: true
-                Layout.topMargin:   Kirigami.Units.smallSpacing
-                Layout.leftMargin:  Kirigami.Units.smallSpacing
-                Layout.rightMargin: Kirigami.Units.smallSpacing
-                wrapMode: Text.WordWrap
-                color: Kirigami.Theme.neutralTextColor
-                font.pointSize: Kirigami.Theme.smallFont.pointSize
-                text: {
-                    if (!root.hasWarnings) return ""
-                    return "⚠  " + root.warnings.map(function(w) {
-                        return w.title || w.type || "Warning"
-                    }).join("  ·  ")
+                property bool expanded: false
+                implicitHeight: warnHeaderRow.implicitHeight + Kirigami.Units.smallSpacing * 2
+
+                Rectangle {
+                    anchors.fill: parent
+                    color: Kirigami.Theme.neutralTextColor
+                    opacity: 0.18
+                    radius: 3
+                }
+                RowLayout {
+                    id: warnHeaderRow
+                    anchors {
+                        left: parent.left; right: parent.right
+                        verticalCenter: parent.verticalCenter
+                        leftMargin:  Kirigami.Units.smallSpacing
+                        rightMargin: Kirigami.Units.smallSpacing
+                    }
+                    spacing: Kirigami.Units.smallSpacing
+                    PlasmaComponents.Label {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        color: Kirigami.Theme.neutralTextColor
+                        font.pointSize: Kirigami.Theme.defaultFont.pointSize
+                        text: {
+                            if (!root.hasWarnings) return ""
+                            return "⚠  " + root.warnings.map(function(w) {
+                                return w.title || w.type || "Warning"
+                            }).join("  ·  ")
+                        }
+                    }
+                    Kirigami.Icon {
+                        width: Kirigami.Units.iconSizes.small; height: width
+                        color: Kirigami.Theme.neutralTextColor
+                        source: warningBanner.expanded ? "go-up-symbolic" : "go-down-symbolic"
+                    }
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: warningBanner.expanded = !warningBanner.expanded
                 }
             }
 
-            // Current conditions — large icon + temperature
+            // Expanded warning details
+            ColumnLayout {
+                visible: root.hasWarnings && warningBanner.expanded
+                Layout.fillWidth: true
+                Layout.leftMargin:  Kirigami.Units.smallSpacing
+                Layout.rightMargin: Kirigami.Units.smallSpacing
+                spacing: Kirigami.Units.smallSpacing
+
+                Repeater {
+                    model: root.warnings
+                    delegate: ColumnLayout {
+                        required property var modelData
+                        Layout.fillWidth: true
+                        spacing: 2
+
+                        PlasmaComponents.Label {
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            color: Kirigami.Theme.neutralTextColor
+                            font.pointSize: Kirigami.Theme.defaultFont.pointSize
+                            font.weight: Font.Bold
+                            text: modelData.title || modelData.type || "Warning"
+                        }
+                        PlasmaComponents.Label {
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            font.pointSize: Kirigami.Theme.defaultFont.pointSize
+                            visible: (modelData.text || modelData.description || modelData.message || "").length > 0
+                            text: modelData.text || modelData.description || modelData.message || ""
+                        }
+                        PlasmaComponents.Label {
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            font.pointSize: Kirigami.Theme.defaultFont.pointSize
+                            opacity: 0.6
+                            visible: !!(modelData.valid_from)
+                            text: {
+                                if (!modelData.valid_from) return ""
+                                var from = Qt.formatDateTime(new Date(modelData.valid_from), "d MMM h:mm ap")
+                                if (!modelData.valid_to) return "From: " + from
+                                return "Valid: " + from + " – " + Qt.formatDateTime(new Date(modelData.valid_to), "d MMM h:mm ap")
+                            }
+                        }
+                        Kirigami.Separator {
+                            Layout.fillWidth: true
+                            visible: index < root.warnings.length - 1
+                        }
+                    }
+                }
+            }
+
+            // Current conditions: icon | big temp | description(fillWidth) | today hi/lo
             RowLayout {
                 Layout.fillWidth: true
                 Layout.topMargin:  Kirigami.Units.smallSpacing
                 Layout.leftMargin: Kirigami.Units.smallSpacing
-                spacing: Kirigami.Units.largeSpacing
+                spacing: Kirigami.Units.smallSpacing
 
                 Kirigami.Icon {
                     width:  Kirigami.Units.iconSizes.large
@@ -256,34 +386,33 @@ except Exception as e:
                     visible: root.pollOk
                 }
 
-                ColumnLayout {
-                    spacing: 2
-                    Layout.fillWidth: true
+                PlasmaComponents.Label {
+                    visible: root.pollOk
+                    text: root.observations ? Helpers.formatTemp(root.observations.temp) : "—"
+                    font.pointSize: Kirigami.Theme.defaultFont.pointSize * 3
+                    font.weight: Font.Bold
+                }
 
-                    PlasmaComponents.Label {
-                        visible: root.pollOk
-                        text: root.observations ? Helpers.formatTemp(root.observations.temp) : "—"
-                        font.pointSize: Kirigami.Theme.defaultFont.pointSize * 3
-                        font.weight: Font.Bold
-                    }
-                    PlasmaComponents.Label {
-                        visible: root.pollOk && root.observations !== null
-                        font.pointSize: Kirigami.Theme.smallFont.pointSize
-                        opacity: 0.7
-                        text: {
-                            if (!root.observations) return ""
-                            var parts = []
-                            var fl = root.observations.temp_feels_like
-                            if (fl !== null && fl !== undefined)
-                                parts.push(i18n("Feels like %1", Helpers.formatTemp(fl)))
-                            var desc = root.forecast.length > 0
-                                ? Helpers.titleCase(root.forecast[0].short_text
-                                                    || root.forecast[0].icon_descriptor || "")
-                                      .replace(/\.$/, "")
-                                : ""
-                            if (desc) parts.push(desc)
-                            return parts.join("  ·  ")
-                        }
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignVCenter
+                    visible: root.pollOk && root.observations !== null
+                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
+                    opacity: 0.7
+                    wrapMode: Text.WordWrap
+                    text: {
+                        if (!root.observations) return ""
+                        var parts = []
+                        var fl = root.observations.temp_feels_like
+                        if (fl !== null && fl !== undefined)
+                            parts.push(i18n("Feels like %1", Helpers.formatTemp(fl)))
+                        var desc = root.forecast.length > 0
+                            ? Helpers.titleCase(root.forecast[0].short_text
+                                                || root.forecast[0].icon_descriptor || "")
+                                  .replace(/\.$/, "")
+                            : ""
+                        if (desc) parts.push(desc)
+                        return parts.join("  ·  ")
                     }
                 }
 
@@ -291,7 +420,8 @@ except Exception as e:
                 ColumnLayout {
                     visible: root.pollOk && root.forecast.length > 0
                     spacing: 0
-                    Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+                    Layout.alignment: Qt.AlignVCenter
+                    Layout.rightMargin: Kirigami.Units.smallSpacing
 
                     PlasmaComponents.Label {
                         Layout.alignment: Qt.AlignRight
@@ -308,7 +438,7 @@ except Exception as e:
                     PlasmaComponents.Label {
                         Layout.alignment: Qt.AlignRight
                         text: Helpers.formatTemp(root.forecast.length > 0 ? root.forecast[0].temp_min : null)
-                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        font.pointSize: Kirigami.Theme.defaultFont.pointSize
                         opacity: 0.55
                     }
                     PlasmaComponents.Label {
@@ -317,7 +447,7 @@ except Exception as e:
                         text: (root.forecast.length > 0 && root.forecast[0].rain)
                             ? (root.forecast[0].rain.chance || 0) + "%"
                             : ""
-                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        font.pointSize: Kirigami.Theme.defaultFont.pointSize
                         color: {
                             var key = root.forecast.length > 0 && root.forecast[0].rain
                                 ? Helpers.rainColorKey(root.forecast[0].rain.chance || 0) : "none"
@@ -327,22 +457,18 @@ except Exception as e:
                         }
                     }
                 }
-
-                Item { width: Kirigami.Units.smallSpacing }
             }
 
-            // Detail stats: wind · humidity · pressure · rain
-            GridLayout {
+            // Detail stats — row 1: wind (left) | filler | humidity · pressure (right)
+            RowLayout {
                 visible: root.pollOk && root.observations !== null
                 Layout.fillWidth: true
                 Layout.leftMargin:  Kirigami.Units.smallSpacing
                 Layout.rightMargin: Kirigami.Units.smallSpacing
-                columns: 2
-                rowSpacing: 2
-                columnSpacing: Kirigami.Units.largeSpacing
+                spacing: Kirigami.Units.smallSpacing
 
                 PlasmaComponents.Label {
-                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     text: {
                         if (!root.observations) return ""
                         var w = root.observations.wind || {}
@@ -352,38 +478,55 @@ except Exception as e:
                         return s
                     }
                 }
+                Item { Layout.fillWidth: true }
                 PlasmaComponents.Label {
-                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     visible: root.observations && root.observations.humidity !== undefined
                     text: root.observations ? ("💧  " + Math.round(root.observations.humidity || 0) + "% RH") : ""
                 }
                 PlasmaComponents.Label {
-                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     visible: root.observations && root.observations.pressure !== undefined
                     text: root.observations
                         ? ("⬤  " + Helpers.pressureStr(root.observations.pressure,
                                                         root.observations.pressure_tendency))
                         : ""
                 }
+            }
+
+            // Detail stats — row 2: rain (left) | filler | dew point / cloud (right)
+            RowLayout {
+                visible: root.pollOk && root.observations !== null
+                         && (root.observations.rain_since_9am !== undefined
+                             || root.observations.dew_point !== undefined
+                             || root.observations.cloud)
+                Layout.fillWidth: true
+                Layout.leftMargin:  Kirigami.Units.smallSpacing
+                Layout.rightMargin: Kirigami.Units.smallSpacing
+                spacing: Kirigami.Units.smallSpacing
+
                 PlasmaComponents.Label {
-                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     visible: root.observations && root.observations.rain_since_9am !== undefined
                     text: root.observations
                         ? ("🌧  " + (root.observations.rain_since_9am || 0) + " mm since 9 am")
                         : ""
                 }
-            }
-
-            // Dew point if available
-            PlasmaComponents.Label {
-                visible: root.pollOk && root.observations && root.observations.dew_point !== undefined
-                Layout.leftMargin: Kirigami.Units.smallSpacing
-                font.pointSize: Kirigami.Theme.smallFont.pointSize
-                opacity: 0.65
-                text: root.observations
-                    ? (i18n("Dew point %1", Helpers.formatTemp(root.observations.dew_point))
-                       + (root.observations.cloud ? "  ·  " + root.observations.cloud : ""))
-                    : ""
+                Item { Layout.fillWidth: true }
+                PlasmaComponents.Label {
+                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
+                    opacity: 0.65
+                    visible: root.observations
+                             && (root.observations.dew_point !== undefined || root.observations.cloud)
+                    text: {
+                        if (!root.observations) return ""
+                        var parts = []
+                        if (root.observations.dew_point !== undefined)
+                            parts.push(i18n("Dew pt %1", Helpers.formatTemp(root.observations.dew_point)))
+                        if (root.observations.cloud) parts.push(root.observations.cloud)
+                        return parts.join("  ·  ")
+                    }
+                }
             }
 
             Kirigami.Separator {
@@ -397,43 +540,46 @@ except Exception as e:
                 visible: root.pollOk && root.forecast.length > 0
                 Layout.leftMargin: Kirigami.Units.smallSpacing
                 text: i18n("7-Day Forecast")
-                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                font.pointSize: Kirigami.Theme.defaultFont.pointSize
                 font.weight: Font.Bold
                 opacity: 0.55
             }
 
-            RowLayout {
+            // Row positioner: each delegate gets explicit width = 1/N of row width.
+            // RowLayout + Repeater + Layout.fillWidth is unreliable when the model
+            // populates after initial layout; Row with explicit widths is not.
+            Row {
+                id: forecastRow
                 visible: root.pollOk && root.forecast.length > 0
                 Layout.fillWidth: true
                 Layout.leftMargin:  Kirigami.Units.smallSpacing
                 Layout.rightMargin: Kirigami.Units.smallSpacing
-                spacing: 0
 
                 Repeater {
                     model: root.forecast
                     delegate: ColumnLayout {
                         required property var modelData
                         required property int index
-                        Layout.fillWidth: true
+                        width: forecastRow.width / Math.max(root.forecast.length, 1)
                         spacing: 1
 
                         PlasmaComponents.Label {
                             Layout.alignment: Qt.AlignHCenter
                             text: index === 0 ? i18n("Today") : Helpers.shortDay(modelData.date)
-                            font.pointSize: Kirigami.Theme.smallFont.pointSize - 1
+                            font.pointSize: Kirigami.Theme.defaultFont.pointSize
                             font.weight: index === 0 ? Font.Bold : Font.Normal
                             opacity: 0.65
                         }
                         Kirigami.Icon {
                             Layout.alignment: Qt.AlignHCenter
-                            width:  Kirigami.Units.iconSizes.smallMedium
+                            width:  Kirigami.Units.iconSizes.large
                             height: width
                             source: Helpers.bomIcon(modelData.icon_descriptor, false)
                         }
                         PlasmaComponents.Label {
                             Layout.alignment: Qt.AlignHCenter
                             text: Helpers.formatTemp(modelData.temp_max)
-                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                            font.pointSize: Kirigami.Theme.defaultFont.pointSize
                             font.weight: Font.DemiBold
                             color: {
                                 var key = Helpers.tempColorKey(modelData.temp_max)
@@ -445,7 +591,7 @@ except Exception as e:
                         PlasmaComponents.Label {
                             Layout.alignment: Qt.AlignHCenter
                             text: Helpers.formatTemp(modelData.temp_min)
-                            font.pointSize: Kirigami.Theme.smallFont.pointSize - 1
+                            font.pointSize: Kirigami.Theme.defaultFont.pointSize
                             opacity: 0.5
                         }
                         PlasmaComponents.Label {
@@ -456,7 +602,7 @@ except Exception as e:
                                     ? modelData.rain.chance : null
                                 return c !== null ? c + "%" : ""
                             }
-                            font.pointSize: Kirigami.Theme.smallFont.pointSize - 1
+                            font.pointSize: Kirigami.Theme.defaultFont.pointSize
                             color: {
                                 var c = (modelData.rain && modelData.rain.chance !== undefined)
                                     ? modelData.rain.chance : 0
@@ -495,7 +641,7 @@ except Exception as e:
 
                 PlasmaComponents.Label {
                     Layout.fillWidth: true
-                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     opacity: 0.5
                     elide: Text.ElideRight
                     text: {
@@ -523,9 +669,17 @@ except Exception as e:
 
         // ── Radar tab ─────────────────────────────────────────────────────
         ColumnLayout {
+            id: radarTab
             visible: tabBar.currentIndex === 1
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
+
+            Timer {
+                interval: 400
+                running: root.radarFrameUrls.length > 0
+                repeat: true
+                onTriggered: root.radarFrameIdx = (root.radarFrameIdx + 1) % root.radarFrameUrls.length
+            }
 
             // Composited radar: topography + animated loop + overlays
             Item {
@@ -544,16 +698,20 @@ except Exception as e:
                     cache: false
                 }
 
-                // Animated radar loop — cache-busted every 6 min
-                AnimatedImage {
-                    anchors.fill: parent
-                    source: "http://www.bom.gov.au/radar/"
-                          + plasmoid.configuration.radarStation + ".gif?t="
-                          + root.radarCacheKey
-                    fillMode: Image.Stretch
-                    asynchronous: true
-                    cache: false
-                    playing: tabBar.currentIndex === 1
+                // Animated radar loop — all frames pre-loaded, only current frame visible.
+                // cache: false so replaced frames are released when the model updates.
+                Repeater {
+                    model: root.radarFrameUrls
+                    Image {
+                        required property string modelData
+                        required property int index
+                        anchors.fill: parent
+                        source: modelData
+                        fillMode: Image.Stretch
+                        asynchronous: true
+                        cache: false
+                        visible: index === root.radarFrameIdx
+                    }
                 }
 
                 // Locations label overlay
@@ -584,10 +742,21 @@ except Exception as e:
 
                 PlasmaComponents.Label {
                     Layout.fillWidth: true
-                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     opacity: 0.55
-                    text: i18n("Radar: %1  ·  Updated every 6 min",
+                    text: root.radarFrameUrls.length > 0
+                        ? i18n("Radar: %1  ·  %2 frames",
+                               plasmoid.configuration.radarStation,
+                               root.radarFrameUrls.length)
+                        : i18n("Radar: %1  ·  Loading…",
                                plasmoid.configuration.radarStation)
+                }
+                PlasmaComponents.Button {
+                    icon.name: "view-refresh-symbolic"
+                    onClicked: {
+                        root.radarFrameUrls = []
+                        root.refreshRadarFrames()
+                    }
                 }
             }
 
