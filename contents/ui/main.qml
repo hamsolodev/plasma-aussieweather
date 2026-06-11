@@ -866,6 +866,10 @@ except Exception as e:
                 onTriggered: root.radarFrameIdx = (root.radarFrameIdx + 1) % root.radarFrameUrls.length
             }
 
+            // Equal stretch above and below centres the radar vertically;
+            // the buttons row stays pinned to the bottom.
+            Item { Layout.fillHeight: true }
+
             // Composited radar: topography + animated loop + overlays
             Item {
                 id: radarFrame
