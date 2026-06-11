@@ -47,7 +47,25 @@ PlasmoidItem {
     readonly property string currentIcon: {
         if (!pollOk || !forecast || forecast.length === 0)
             return "weather-none-available"
-        return Helpers.bomIcon(forecast[0].icon_descriptor, false)
+        var now = root.currentTime
+        // Use the hourly entry whose hour-bucket matches or most recently precedes now
+        if (hourlyForecast && hourlyForecast.length > 0) {
+            var nowBucket = Math.floor(now.getTime() / 3600000)
+            var best = null
+            for (var i = 0; i < hourlyForecast.length; i++) {
+                var bucket = Math.floor(new Date(hourlyForecast[i].time).getTime() / 3600000)
+                if (bucket <= nowBucket) best = hourlyForecast[i]
+            }
+            if (best) return Helpers.bomIcon(best.icon_descriptor, best.is_night)
+        }
+        // Fall back: derive night from astronomical sunrise/sunset
+        var isNight = false
+        if (forecast[0].astronomical) {
+            var sunrise = new Date(forecast[0].astronomical.sunrise_time)
+            var sunset  = new Date(forecast[0].astronomical.sunset_time)
+            isNight = now < sunrise || now >= sunset
+        }
+        return Helpers.bomIcon(forecast[0].icon_descriptor, isNight)
     }
 
     readonly property bool hasWarnings: Array.isArray(warnings) && warnings.length > 0
@@ -179,6 +197,33 @@ except Exception as e:
     // ── Radar frame animation ─────────────────────────────────────────────
     property var radarFrameUrls: []
     property int radarFrameIdx:  0
+
+    // Minute-resolution clock snapped to wall-clock minute boundaries.
+    // currentIcon and any is_night bindings reference this so they re-evaluate on the hour.
+    property var currentTime: new Date()
+
+    Timer {
+        id: clockSync
+        running: false
+        repeat: false
+        onTriggered: {
+            root.currentTime = new Date()
+            clockTick.start()
+        }
+        Component.onCompleted: {
+            var now = new Date()
+            var ms = (60 - now.getSeconds()) * 1000 - now.getMilliseconds()
+            interval = ms > 100 ? ms : ms + 60000
+            start()
+        }
+    }
+    Timer {
+        id: clockTick
+        interval: 60000
+        repeat: true
+        running: false
+        onTriggered: root.currentTime = new Date()
+    }
 
     function radarFrameScript() {
         return `import sys, json, ftplib
@@ -733,25 +778,21 @@ except Exception as e:
                 text: root.forecast.length > 0 ? (root.forecast[0].extended_text || "") : ""
             }
 
-            // UV index row
+            // UV · Sunrise/Sunset · Moon phase (merged row)
             RowLayout {
-                visible: root.pollOk && root.forecast.length > 0 && !!root.forecast[0].uv
+                visible: root.pollOk && root.forecast.length > 0
                 Layout.fillWidth: true
                 Layout.leftMargin:  Kirigami.Units.smallSpacing
                 Layout.rightMargin: Kirigami.Units.smallSpacing
                 spacing: Kirigami.Units.smallSpacing
 
                 Kirigami.Icon {
+                    visible: !!root.forecast[0].uv
                     width: Kirigami.Units.iconSizes.small; height: width
                     source: "weather-clear-symbolic"
                 }
                 PlasmaComponents.Label {
-                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
-                    opacity: 0.65
-                    text: i18n("UV Index")
-                }
-                Item { Layout.fillWidth: true }
-                PlasmaComponents.Label {
+                    visible: !!root.forecast[0].uv
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     font.weight: Font.DemiBold
                     text: {
@@ -770,6 +811,30 @@ except Exception as e:
                             case "low":       return Kirigami.Theme.positiveTextColor
                             default:          return Kirigami.Theme.textColor
                         }
+                    }
+                }
+
+                Item { Layout.fillWidth: true }
+
+                PlasmaComponents.Label {
+                    visible: !!root.forecast[0].astronomical
+                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
+                    opacity: 0.65
+                    text: {
+                        if (!root.forecast.length || !root.forecast[0].astronomical) return ""
+                        var a = root.forecast[0].astronomical
+                        return "🌅 " + Qt.formatTime(new Date(a.sunrise_time), "h:mm ap").replace(" ", "")
+                               + "  ·  🌇 " + Qt.formatTime(new Date(a.sunset_time), "h:mm ap").replace(" ", "")
+                    }
+                }
+
+                Item { Layout.fillWidth: true }
+
+                PlasmaComponents.Label {
+                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
+                    text: {
+                        var mp = Helpers.moonPhase(root.currentTime)
+                        return mp.emoji + "  " + mp.name
                     }
                 }
             }

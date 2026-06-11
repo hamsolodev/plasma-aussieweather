@@ -87,3 +87,21 @@ function rainColorKey(chance) {
     if (n >= 40) return "moderate"
     return "low"
 }
+
+// Moon phase from date — returns {emoji, name}
+// Reference: known new moon 2000-01-06T18:14:00Z; synodic month 29.530588853 days
+function moonPhase(date) {
+    var knownNewMoon = new Date("2000-01-06T18:14:00Z")
+    var synodicMonth = 29.530588853
+    var daysSince = (date.getTime() - knownNewMoon.getTime()) / 86400000
+    var phase = ((daysSince % synodicMonth) + synodicMonth) % synodicMonth
+    if (phase <  1.85) return {emoji: "🌑", name: "New Moon"}
+    if (phase <  7.38) return {emoji: "🌒", name: "Waxing Crescent"}
+    if (phase < 11.08) return {emoji: "🌓", name: "First Quarter"}
+    if (phase < 14.77) return {emoji: "🌔", name: "Waxing Gibbous"}
+    if (phase < 16.62) return {emoji: "🌕", name: "Full Moon"}
+    if (phase < 22.15) return {emoji: "🌖", name: "Waning Gibbous"}
+    if (phase < 25.85) return {emoji: "🌗", name: "Last Quarter"}
+    if (phase < 27.69) return {emoji: "🌘", name: "Waning Crescent"}
+    return {emoji: "🌑", name: "New Moon"}
+}
