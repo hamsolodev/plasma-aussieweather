@@ -64,16 +64,13 @@ PlasmoidItem {
     }
 
     function pollScript() {
-        return `import sys, json, ssl, urllib.request, urllib.parse
+        return `import sys, json, urllib.request, urllib.parse
 geohash = sys.argv[1]
 q = sys.argv[2]
 base = "https://api.weather.bom.gov.au/v1"
-ctx = ssl.create_default_context()
-ctx.check_hostname = False
-ctx.verify_mode = ssl.CERT_NONE
 hdrs = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
 def get(u):
-    return json.load(urllib.request.urlopen(urllib.request.Request(u, headers=hdrs), timeout=15, context=ctx))
+    return json.load(urllib.request.urlopen(urllib.request.Request(u, headers=hdrs), timeout=15))
 try:
     o = {"ok": True}
     if not geohash:
