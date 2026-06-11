@@ -260,7 +260,7 @@ except Exception as e:
     // ── Full representation (popup) ───────────────────────────────────────
     fullRepresentation: ColumnLayout {
         spacing: 0
-        Layout.minimumWidth:  Kirigami.Units.gridUnit * 20
+        Layout.minimumWidth:   Kirigami.Units.gridUnit * 20
         Layout.preferredWidth: Kirigami.Units.gridUnit * 22
 
         // Tab bar
@@ -713,6 +713,67 @@ except Exception as e:
                     : i18n("Waiting for data…")
             }
 
+            Kirigami.Separator {
+                Layout.fillWidth: true
+                visible: root.pollOk && root.forecast.length > 0
+                Layout.topMargin: Kirigami.Units.smallSpacing / 2
+            }
+
+            // Extended forecast text
+            PlasmaComponents.Label {
+                visible: root.pollOk && root.forecast.length > 0
+                             && (root.forecast[0].extended_text || "") !== ""
+                Layout.fillWidth: true
+                Layout.leftMargin:  Kirigami.Units.smallSpacing
+                Layout.rightMargin: Kirigami.Units.smallSpacing
+                Layout.topMargin:   Kirigami.Units.smallSpacing / 2
+                wrapMode: Text.WordWrap
+                font.pointSize: Kirigami.Theme.defaultFont.pointSize
+                opacity: 0.75
+                text: root.forecast.length > 0 ? (root.forecast[0].extended_text || "") : ""
+            }
+
+            // UV index row
+            RowLayout {
+                visible: root.pollOk && root.forecast.length > 0 && !!root.forecast[0].uv
+                Layout.fillWidth: true
+                Layout.leftMargin:  Kirigami.Units.smallSpacing
+                Layout.rightMargin: Kirigami.Units.smallSpacing
+                spacing: Kirigami.Units.smallSpacing
+
+                Kirigami.Icon {
+                    width: Kirigami.Units.iconSizes.small; height: width
+                    source: "weather-clear-symbolic"
+                }
+                PlasmaComponents.Label {
+                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
+                    opacity: 0.65
+                    text: i18n("UV Index")
+                }
+                Item { Layout.fillWidth: true }
+                PlasmaComponents.Label {
+                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
+                    font.weight: Font.DemiBold
+                    text: {
+                        if (!root.forecast.length || !root.forecast[0].uv) return ""
+                        var uv = root.forecast[0].uv
+                        var label = Helpers.titleCase((uv.category || "").replace(/_/g, " "))
+                        var idx = (uv.max_index !== null && uv.max_index !== undefined) ? uv.max_index : ""
+                        return label + (idx !== "" ? "  " + idx : "")
+                    }
+                    color: {
+                        if (!root.forecast.length || !root.forecast[0].uv) return Kirigami.Theme.textColor
+                        switch ((root.forecast[0].uv.category || "").toLowerCase()) {
+                            case "extreme":
+                            case "very_high": return Kirigami.Theme.negativeTextColor
+                            case "high":      return Kirigami.Theme.neutralTextColor
+                            case "low":       return Kirigami.Theme.positiveTextColor
+                            default:          return Kirigami.Theme.textColor
+                        }
+                    }
+                }
+            }
+
             Item { Layout.fillHeight: true }
 
             Kirigami.Separator { Layout.fillWidth: true }
@@ -769,7 +830,7 @@ except Exception as e:
             Item {
                 id: radarFrame
                 Layout.fillWidth: true
-                Layout.fillHeight: true
+                implicitHeight: Kirigami.Units.gridUnit * 22
 
                 // Geographic background (topography)
                 Image {
@@ -842,6 +903,8 @@ except Exception as e:
                     }
                 }
             }
+
+            Item { Layout.fillHeight: true }
 
             RowLayout {
                 Layout.fillWidth: true
