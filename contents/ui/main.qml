@@ -197,6 +197,9 @@ except Exception as e:
     // ── Radar frame animation ─────────────────────────────────────────────
     property var radarFrameUrls: []
     property int radarFrameIdx:  0
+    // True only while the popup is open on the Radar tab — gates all radar
+    // network activity. Written by a Binding inside the radar tab.
+    property bool radarActive: false
 
     // Minute-resolution clock snapped to wall-clock minute boundaries.
     // currentIcon and any is_night bindings reference this so they re-evaluate on the hour.
@@ -252,7 +255,8 @@ except Exception as e:
             radarPoller.disconnectSource(sourceName)
             try {
                 var d = JSON.parse((data["stdout"] || "").trim())
-                if (d.ok && d.frames && d.frames.length > 0) {
+                if (d.ok && d.frames && d.frames.length > 0
+                        && JSON.stringify(d.frames) !== JSON.stringify(root.radarFrameUrls)) {
                     root.radarFrameUrls = d.frames
                     root.radarFrameIdx  = 0
                 }
@@ -266,10 +270,13 @@ except Exception as e:
             + shellQuote(plasmoid.configuration.radarStation))
     }
 
-    // BoM radar scans every 5 minutes — keep frames fresh in the background
+    // BoM radar scans every 5 minutes — refresh only while the Radar tab is
+    // being viewed. triggeredOnStart re-checks the frame list each time the
+    // tab becomes active; unchanged lists are dropped in onNewData, so
+    // already-loaded frames are not re-downloaded.
     Timer {
         interval: 300000
-        running: true
+        running: root.radarActive
         repeat: true
         triggeredOnStart: true
         onTriggered: root.refreshRadarFrames()
@@ -884,9 +891,15 @@ except Exception as e:
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
 
+            Binding {
+                target: root
+                property: "radarActive"
+                value: root.expanded && tabBar.currentIndex === 1
+            }
+
             Timer {
                 interval: 400
-                running: root.radarFrameUrls.length > 0
+                running: root.radarActive && root.radarFrameUrls.length > 0
                 repeat: true
                 onTriggered: root.radarFrameIdx = (root.radarFrameIdx + 1) % root.radarFrameUrls.length
             }
