@@ -29,6 +29,7 @@ PlasmoidItem {
     property var    observations: null
     property var    forecast:     []
     property var    warnings:     []
+    property var    hourlyForecast: []
     property string locationName: plasmoid.configuration.locationSearch
     property string lastUpdated:  ""
     property string _geohash:     ""
@@ -95,6 +96,11 @@ try:
     fc = get(base + "/locations/" + geohash + "/forecasts/daily")
     o["forecast"] = fc.get("data", [])[:7]
     try:
+        hr = get(base + "/locations/" + geohash + "/forecasts/hourly")
+        o["hourly"] = hr.get("data", [])[:8]
+    except Exception:
+        o["hourly"] = []
+    try:
         w = get(base + "/locations/" + geohash + "/warnings")
         raw = w.get("data", [])
         warnings = []
@@ -140,9 +146,10 @@ except Exception as e:
 
         if (d.geohash)      _geohash      = d.geohash
         if (d.locationName) locationName  = d.locationName
-        observations = d.observations || null
-        forecast     = d.forecast     || []
-        warnings     = d.warnings     || []
+        observations    = d.observations || null
+        forecast        = d.forecast     || []
+        warnings        = d.warnings     || []
+        hourlyForecast  = d.hourly       || []
         lastUpdated  = Qt.formatTime(new Date(), "h:mm ap")
         errorText    = ""
         pollOk       = true
@@ -264,9 +271,15 @@ except Exception as e:
             PlasmaComponents.TabButton { text: i18n("Radar")   }
         }
 
+        // Both tab bodies live in a StackLayout so the popup height is always
+        // the taller of the two — no resize jump when switching tabs.
+        StackLayout {
+            currentIndex: tabBar.currentIndex
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+
         // ── Weather tab ───────────────────────────────────────────────────
         ColumnLayout {
-            visible: tabBar.currentIndex === 0
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
 
@@ -528,8 +541,81 @@ except Exception as e:
 
             Kirigami.Separator {
                 Layout.fillWidth: true
-                visible: root.pollOk && root.forecast.length > 0
+                visible: root.pollOk && (root.hourlyForecast.length > 0 || root.forecast.length > 0)
                 Layout.topMargin: Kirigami.Units.smallSpacing / 2
+            }
+
+            // Hourly forecast
+            PlasmaComponents.Label {
+                visible: root.pollOk && root.hourlyForecast.length > 0
+                Layout.leftMargin: Kirigami.Units.smallSpacing
+                text: i18n("Next 8 Hours")
+                font.pointSize: Kirigami.Theme.defaultFont.pointSize
+                font.weight: Font.Bold
+                opacity: 0.55
+            }
+
+            Row {
+                id: hourlyRow
+                visible: root.pollOk && root.hourlyForecast.length > 0
+                Layout.fillWidth: true
+                Layout.leftMargin:  Kirigami.Units.smallSpacing
+                Layout.rightMargin: Kirigami.Units.smallSpacing
+
+                Repeater {
+                    model: root.hourlyForecast
+                    delegate: ColumnLayout {
+                        required property var modelData
+                        required property int index
+                        width: hourlyRow.width / Math.max(root.hourlyForecast.length, 1)
+                        spacing: 1
+
+                        PlasmaComponents.Label {
+                            Layout.alignment: Qt.AlignHCenter
+                            font.pointSize: Kirigami.Theme.defaultFont.pointSize
+                            font.weight: index === 0 ? Font.Bold : Font.Normal
+                            opacity: 0.65
+                            text: {
+                                var d = new Date(modelData.time)
+                                var now = new Date()
+                                if (Math.floor(d.getTime() / 3600000) === Math.floor(now.getTime() / 3600000))
+                                    return i18n("Now")
+                                return Qt.formatTime(d, "h ap").replace(" ", "")
+                            }
+                        }
+                        Kirigami.Icon {
+                            Layout.alignment: Qt.AlignHCenter
+                            width:  Kirigami.Units.iconSizes.medium
+                            height: width
+                            source: Helpers.bomIcon(modelData.icon_descriptor, modelData.is_night)
+                        }
+                        PlasmaComponents.Label {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: Helpers.formatTemp(modelData.temp)
+                            font.pointSize: Kirigami.Theme.defaultFont.pointSize
+                            font.weight: Font.DemiBold
+                        }
+                        PlasmaComponents.Label {
+                            Layout.alignment: Qt.AlignHCenter
+                            visible: modelData.rain && (modelData.rain.chance || 0) > 0
+                            font.pointSize: Kirigami.Theme.defaultFont.pointSize
+                            text: modelData.rain ? ((modelData.rain.chance || 0) + "%") : ""
+                            color: {
+                                var c = modelData.rain ? (modelData.rain.chance || 0) : 0
+                                var key = Helpers.rainColorKey(c)
+                                if (key === "heavy")    return Kirigami.Theme.negativeTextColor
+                                if (key === "moderate") return Kirigami.Theme.neutralTextColor
+                                if (key === "low")      return Kirigami.Theme.textColor
+                                return Kirigami.Theme.disabledTextColor
+                            }
+                        }
+                    }
+                }
+            }
+
+            Kirigami.Separator {
+                Layout.fillWidth: true
+                visible: root.pollOk && root.hourlyForecast.length > 0 && root.forecast.length > 0
             }
 
             // 7-day forecast
@@ -627,6 +713,8 @@ except Exception as e:
                     : i18n("Waiting for data…")
             }
 
+            Item { Layout.fillHeight: true }
+
             Kirigami.Separator { Layout.fillWidth: true }
 
             // Footer
@@ -667,7 +755,6 @@ except Exception as e:
         // ── Radar tab ─────────────────────────────────────────────────────
         ColumnLayout {
             id: radarTab
-            visible: tabBar.currentIndex === 1
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
 
@@ -682,8 +769,7 @@ except Exception as e:
             Item {
                 id: radarFrame
                 Layout.fillWidth: true
-                // Keep square; cap at 20 grid units so it doesn't overflow screens
-                implicitHeight: Math.min(width, Kirigami.Units.gridUnit * 28)
+                Layout.fillHeight: true
 
                 // Geographic background (topography)
                 Image {
@@ -781,5 +867,6 @@ except Exception as e:
                 }
             }
         }
+        } // StackLayout
     }
 }
