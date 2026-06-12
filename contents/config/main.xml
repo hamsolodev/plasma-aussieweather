@@ -17,5 +17,13 @@
         <entry name="pollInterval" type="Int">
             <default>600000</default>
         </entry>
+        <!-- Cached geohash from last successful location resolve. -->
+        <entry name="lastGeohash" type="String">
+            <default></default>
+        </entry>
+        <!-- Cached resolved location name, e.g. "Seaford, VIC". -->
+        <entry name="lastLocationName" type="String">
+            <default></default>
+        </entry>
     </group>
 </kcfg>

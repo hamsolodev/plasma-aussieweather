@@ -34,10 +34,21 @@ PlasmoidItem {
     property string lastUpdated:  ""
     property string _geohash:     ""
 
+    // Seed from last successful resolve so the widget works across restarts
+    // without waiting for a fresh location lookup.
+    Component.onCompleted: {
+        var gh = plasmoid.configuration.lastGeohash
+        var ln = plasmoid.configuration.lastLocationName
+        if (gh) _geohash = gh
+        if (ln) locationName = ln
+    }
+
     readonly property string locationSearch: plasmoid.configuration.locationSearch
     onLocationSearchChanged: {
         _geohash     = ""
         locationName = locationSearch
+        plasmoid.configuration.lastGeohash      = ""
+        plasmoid.configuration.lastLocationName = ""
         pollOk       = false
         errorText    = ""
     }
@@ -87,7 +98,7 @@ PlasmoidItem {
 geohash = sys.argv[1]
 q = sys.argv[2]
 base = "https://api.weather.bom.gov.au/v1"
-hdrs = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
+hdrs = {"User-Agent": "net.tropism.plasma.bomweather/1.1", "Accept": "application/json"}
 def get(u):
     return json.load(urllib.request.urlopen(urllib.request.Request(u, headers=hdrs), timeout=15))
 try:
@@ -162,8 +173,14 @@ except Exception as e:
             return
         }
 
-        if (d.geohash)      _geohash      = d.geohash
-        if (d.locationName) locationName  = d.locationName
+        if (d.geohash) {
+            _geohash = d.geohash
+            plasmoid.configuration.lastGeohash = d.geohash
+        }
+        if (d.locationName) {
+            locationName = d.locationName
+            plasmoid.configuration.lastLocationName = d.locationName
+        }
         observations    = d.observations || null
         forecast        = d.forecast     || []
         warnings        = d.warnings     || []
