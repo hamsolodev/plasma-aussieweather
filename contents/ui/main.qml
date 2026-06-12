@@ -116,7 +116,7 @@ PlasmoidItem {
 geohash = sys.argv[1]
 q = sys.argv[2]
 base = "https://api.weather.bom.gov.au/v1"
-hdrs = {"User-Agent": "net.tropism.plasma.bomweather/${root._widgetVersion}", "Accept": "application/json"}
+hdrs = {"User-Agent": "net.tropism.plasma.aussieweather/${root._widgetVersion}", "Accept": "application/json"}
 def get(u):
     return json.load(urllib.request.urlopen(urllib.request.Request(u, headers=hdrs), timeout=15))
 try:
