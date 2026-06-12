@@ -24,7 +24,7 @@ PlasmoidItem {
             : 0)
 
     // Keep in sync with metadata.json — Plasma 6 QML exposes no version API.
-    readonly property string _widgetVersion: "1.2"
+    readonly property string _widgetVersion: "1.3"
 
     // ── State ─────────────────────────────────────────────────────────────
     property bool   pollOk:       false
@@ -64,20 +64,22 @@ PlasmoidItem {
 
     readonly property string panelText: pollOk ? Helpers.formatTemp(observations ? observations.temp : null) : ""
 
+    // Night by astronomical sunrise/sunset (minute precision, reactive to
+    // currentTime). The hourly is_night flag describes the slot's timestamp
+    // instant, so using it for "now" quantises the day/night flip to the
+    // hour mark — up to ~59 min after actual sunset.
+    readonly property bool hasAstro: pollOk && forecast.length > 0 && !!forecast[0].astronomical
+    readonly property bool isNight: {
+        if (!hasAstro) return false
+        var sunrise = new Date(forecast[0].astronomical.sunrise_time)
+        var sunset  = new Date(forecast[0].astronomical.sunset_time)
+        return currentTime < sunrise || currentTime >= sunset
+    }
+
     readonly property string currentIcon: {
         if (!pollOk || !forecast || forecast.length === 0)
             return "weather-none-available"
         var now = root.currentTime
-        // Night by astronomical sunrise/sunset (minute precision). The hourly
-        // is_night flag describes the slot's timestamp instant, so using it
-        // here quantises the day/night flip to the hour mark — up to ~59 min
-        // after actual sunset.
-        var isNight = false
-        if (forecast[0].astronomical) {
-            var sunrise = new Date(forecast[0].astronomical.sunrise_time)
-            var sunset  = new Date(forecast[0].astronomical.sunset_time)
-            isNight = now < sunrise || now >= sunset
-        }
         // Descriptor from the hourly entry whose hour-bucket matches or most
         // recently precedes now; its is_night is hourly-quantised, so only
         // used when astronomical times are missing.
@@ -90,9 +92,9 @@ PlasmoidItem {
             }
             if (best)
                 return Helpers.bomIcon(best.icon_descriptor,
-                                       forecast[0].astronomical ? isNight : best.is_night)
+                                       root.hasAstro ? root.isNight : best.is_night)
         }
-        return Helpers.bomIcon(forecast[0].icon_descriptor, isNight)
+        return Helpers.bomIcon(forecast[0].icon_descriptor, root.isNight)
     }
 
     readonly property bool hasWarnings: Array.isArray(warnings) && warnings.length > 0
@@ -656,6 +658,36 @@ except Exception as e:
                             width:  Kirigami.Units.iconSizes.medium
                             height: width
                             source: Helpers.bomIcon(modelData.icon_descriptor, modelData.is_night)
+
+                            HoverHandler { id: hourHover }
+                            PlasmaComponents.ToolTip {
+                                visible: hourHover.hovered && text !== ""
+                                delay: Kirigami.Units.toolTipDelay
+                                text: {
+                                    var lines = []
+                                    if (modelData.temp_feels_like !== null && modelData.temp_feels_like !== undefined)
+                                        lines.push(i18n("Feels like %1", Helpers.formatTemp(modelData.temp_feels_like)))
+                                    var w = modelData.wind || {}
+                                    if (w.speed_kilometre !== undefined) {
+                                        var ws = i18n("Wind %1", Helpers.windStr(w.speed_kilometre, w.direction))
+                                        if (w.gust_speed_kilometre)
+                                            ws += i18n(" (gusts %1)", Math.round(w.gust_speed_kilometre))
+                                        lines.push(ws)
+                                    }
+                                    var hd = []
+                                    if (modelData.relative_humidity !== null && modelData.relative_humidity !== undefined)
+                                        hd.push(i18n("Humidity %1%", Math.round(modelData.relative_humidity)))
+                                    if (modelData.dew_point !== null && modelData.dew_point !== undefined)
+                                        hd.push(i18n("Dew pt %1", Helpers.formatTemp(modelData.dew_point)))
+                                    if (hd.length) lines.push(hd.join("  ·  "))
+                                    if (modelData.uv)
+                                        lines.push(i18n("UV %1", modelData.uv))
+                                    var ra = modelData.rain && modelData.rain.amount
+                                    if (ra && ra.max)
+                                        lines.push(i18n("Rain %1–%2 mm", ra.min || 0, ra.max))
+                                    return lines.join("\n")
+                                }
+                            }
                         }
                         PlasmaComponents.Label {
                             Layout.alignment: Qt.AlignHCenter
@@ -816,13 +848,21 @@ except Exception as e:
                 Layout.rightMargin: Kirigami.Units.smallSpacing
                 spacing: Kirigami.Units.smallSpacing
 
+                // At night UV is always 0 — show a happy moon instead; the
+                // sun icon + UV reading return at sunrise (isNight is
+                // minute-reactive via currentTime).
+                PlasmaComponents.Label {
+                    visible: root.isNight
+                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
+                    text: "🌛"
+                }
                 Kirigami.Icon {
-                    visible: !!root.forecast[0].uv
+                    visible: !root.isNight && !!root.forecast[0].uv
                     width: Kirigami.Units.iconSizes.small; height: width
                     source: "weather-clear-symbolic"
                 }
                 PlasmaComponents.Label {
-                    visible: !!root.forecast[0].uv
+                    visible: !root.isNight && !!root.forecast[0].uv
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     font.weight: Font.DemiBold
                     text: {
