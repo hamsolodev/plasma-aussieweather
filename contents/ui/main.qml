@@ -726,6 +726,13 @@ except Exception as e:
                             width:  Kirigami.Units.iconSizes.large
                             height: width
                             source: Helpers.bomIcon(modelData.icon_descriptor, false)
+
+                            HoverHandler { id: dayHover }
+                            PlasmaComponents.ToolTip {
+                                visible: dayHover.hovered && text !== ""
+                                delay: Kirigami.Units.toolTipDelay
+                                text: modelData.extended_text || modelData.short_text || ""
+                            }
                         }
                         PlasmaComponents.Label {
                             Layout.alignment: Qt.AlignHCenter
