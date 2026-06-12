@@ -49,8 +49,14 @@ PlasmoidItem {
         locationName = locationSearch
         plasmoid.configuration.lastGeohash      = ""
         plasmoid.configuration.lastLocationName = ""
-        pollOk       = false
-        errorText    = ""
+        observations   = null
+        forecast       = []
+        warnings       = []
+        hourlyForecast = []
+        lastUpdated    = ""
+        pollOk         = false
+        errorText      = ""
+        root.refresh()
     }
 
     readonly property string panelText: pollOk ? Helpers.formatTemp(observations ? observations.temp : null) : ""
