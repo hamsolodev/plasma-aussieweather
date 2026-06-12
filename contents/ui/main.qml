@@ -207,7 +207,12 @@ except Exception as e:
         }
     }
 
-    function refresh() { poller.connectSource(buildPollCommand()) }
+    property real _lastPollMs: 0
+
+    function refresh() {
+        _lastPollMs = Date.now()
+        poller.connectSource(buildPollCommand())
+    }
 
     Timer {
         interval: Math.max(60000, plasmoid.configuration.pollInterval)
@@ -215,6 +220,22 @@ except Exception as e:
         repeat: true
         triggeredOnStart: true
         onTriggered: root.refresh()
+    }
+
+    // Qt timers don't advance during system sleep. This watchdog uses
+    // wall-clock time (Date.now() = CLOCK_REALTIME, which does advance
+    // during sleep) to detect that data is stale after a wake and
+    // triggers an immediate refresh rather than waiting out the
+    // remaining timer interval.
+    Timer {
+        interval: 30000
+        running: true
+        repeat: true
+        onTriggered: {
+            if (root._lastPollMs > 0
+                    && (Date.now() - root._lastPollMs) > plasmoid.configuration.pollInterval)
+                root.refresh()
+        }
     }
 
     // ── Radar frame animation ─────────────────────────────────────────────
