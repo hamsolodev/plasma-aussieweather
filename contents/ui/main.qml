@@ -1039,6 +1039,20 @@ except Exception as e:
                     asynchronous: true
                     cache: false
                 }
+
+                // Frame counter — shows where the loop starts. Black to match
+                // BoM's own overlay text; the base map is always light.
+                PlasmaComponents.Label {
+                    anchors {
+                        left: parent.left
+                        bottom: parent.bottom
+                        margins: Kirigami.Units.smallSpacing
+                    }
+                    visible: root.radarFrameUrls.length > 0
+                    text: (root.radarFrameIdx + 1) + "/" + root.radarFrameUrls.length
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    color: "black"
+                }
             }
 
             RowLayout {
