@@ -68,7 +68,19 @@ PlasmoidItem {
         if (!pollOk || !forecast || forecast.length === 0)
             return "weather-none-available"
         var now = root.currentTime
-        // Use the hourly entry whose hour-bucket matches or most recently precedes now
+        // Night by astronomical sunrise/sunset (minute precision). The hourly
+        // is_night flag describes the slot's timestamp instant, so using it
+        // here quantises the day/night flip to the hour mark — up to ~59 min
+        // after actual sunset.
+        var isNight = false
+        if (forecast[0].astronomical) {
+            var sunrise = new Date(forecast[0].astronomical.sunrise_time)
+            var sunset  = new Date(forecast[0].astronomical.sunset_time)
+            isNight = now < sunrise || now >= sunset
+        }
+        // Descriptor from the hourly entry whose hour-bucket matches or most
+        // recently precedes now; its is_night is hourly-quantised, so only
+        // used when astronomical times are missing.
         if (hourlyForecast && hourlyForecast.length > 0) {
             var nowBucket = Math.floor(now.getTime() / 3600000)
             var best = null
@@ -76,14 +88,9 @@ PlasmoidItem {
                 var bucket = Math.floor(new Date(hourlyForecast[i].time).getTime() / 3600000)
                 if (bucket <= nowBucket) best = hourlyForecast[i]
             }
-            if (best) return Helpers.bomIcon(best.icon_descriptor, best.is_night)
-        }
-        // Fall back: derive night from astronomical sunrise/sunset
-        var isNight = false
-        if (forecast[0].astronomical) {
-            var sunrise = new Date(forecast[0].astronomical.sunrise_time)
-            var sunset  = new Date(forecast[0].astronomical.sunset_time)
-            isNight = now < sunrise || now >= sunset
+            if (best)
+                return Helpers.bomIcon(best.icon_descriptor,
+                                       forecast[0].astronomical ? isNight : best.is_night)
         }
         return Helpers.bomIcon(forecast[0].icon_descriptor, isNight)
     }
