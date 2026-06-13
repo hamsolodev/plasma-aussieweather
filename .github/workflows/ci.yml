@@ -20,7 +20,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             gettext jq zip \
-            qt6-declarative-dev-tools qml6-module-qttest qml6-module-qtquick
+            qt6-declarative-dev-tools qml6-module-qttest qml6-module-qtquick \
+            qml6-module-qtquick-window qml6-module-qtqml-workerscript
 
       - name: Shell script syntax
         run: |
