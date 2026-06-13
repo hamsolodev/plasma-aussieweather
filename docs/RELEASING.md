@@ -5,38 +5,50 @@
 1. `metadata.json` → `KPlugin.Version`
 2. `contents/ui/main.qml` → `_widgetVersion` (must match; no QML API exposes
    the package version at runtime — this also feeds the User-Agent)
-3. `CHANGELOG.md` → new section
+3. `CHANGELOG.md` → new section with date
 4. If strings changed: `./translate/merge.sh` and commit the updated
    `template.pot`
 
 ## Release
 
-1. `./translate/build.sh` (compiles any `.po` into `contents/locale/`)
-2. Package: `zip -qr net.tropism.plasma.aussieweather-<version>.plasmoid metadata.json contents/`
-3. Tag `v<version>`, push the tag — the release workflow (Phase 6, pending)
-   builds the package and attaches it to a GitHub Release. Until then, attach
-   manually.
+1. Commit and push all changes to `main`.
+2. Tag `v<version>` and push the tag:
 
-## KDE Store (manual until the publish workflow exists)
+   ```sh
+   git tag v1.x
+   git push origin v1.x
+   ```
 
-Initial listing (one-time):
+3. The release workflow runs automatically: builds the `.plasmoid` (with
+   compiled translations), extracts the CHANGELOG section, and creates a
+   GitHub Release with the artifact attached.
+4. Upload to the KDE Store manually (see below).
+5. Bump the submodule pointer in the `plasmoids` repo.
 
-1. Account on https://store.kde.org (Pling).
-2. Add Product → category **Plasma 6 Applets / Plasma 6 Widgets**.
-3. Upload the `.plasmoid`, screenshots, description (reuse README features +
-   the BoM disclaimer — the disclaimer is mandatory in the listing).
-4. Record the product content-ID here and as the `PLING_CONTENT_ID` repo
-   variable (used by the future publish workflow).
+## KDE Store upload (manual)
 
-**Product content-ID:** _not yet created_
+The automated store-publish workflow exists but the OCS v1 API authentication
+does not work with username + account password — opendesktop.org appears to
+require a separate API key that is not exposed in the account UI. Until that
+is resolved, upload manually after each release:
 
-Updates: edit the product → Files → upload the new `.plasmoid`, update the
-changelog text.
+1. Go to the [product page](https://www.opendesktop.org/p/2362509/).
+2. **Files** tab → **Upload a new file** → pick the `.plasmoid` from the
+   [GitHub Release assets](https://github.com/hamsolodev/plasma-aussieweather/releases/latest).
+3. Update the changelog / description text if needed.
 
-## OCS API notes (for the future store-publish workflow)
+**Product content-ID:** `2362509`
 
-- Endpoint: `https://api.pling.com/ocs/v1/` — basic auth with Pling username
-  + API token (account settings → API). Secrets: `PLING_USERNAME`,
-  `PLING_TOKEN`.
-- Upload: `POST content/edit/<content-id>` with the file; lightly documented,
-  treat failures as non-fatal in CI and fall back to manual upload.
+## OCS API (automated publish — currently non-functional)
+
+- `PLING_CONTENT_ID` repo variable: `2362509`
+- Secrets `PLING_USERNAME` / `PLING_TOKEN`: set in repo secrets.
+- The workflow (`store-publish.yml`) triggers on release published and can
+  also be dispatched manually (`workflow_dispatch`, `tag` input).
+- As of 2026-06-13, all OCS v1 endpoints return `statuscode: 999 — unknown
+  request` for content operations, and `person/self` returns
+  `102 Not Authorized` with Basic Auth. The API may require an API key
+  separate from the account password; check account settings → API if
+  opendesktop.org adds this in future.
+- The workflow has `continue-on-error: true` — a failed store publish never
+  blocks the GitHub Release.
