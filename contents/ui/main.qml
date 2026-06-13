@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Mark Hellewell <aussieweather.sandlot200@passinbox.com>
+//
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
@@ -25,7 +29,7 @@ PlasmoidItem {
             : 0)
 
     // Keep in sync with metadata.json — Plasma 6 QML exposes no version API.
-    readonly property string _widgetVersion: "1.4"
+    readonly property string _widgetVersion: "1.5"
 
     // ── State ─────────────────────────────────────────────────────────────
     property bool   pollOk:       false

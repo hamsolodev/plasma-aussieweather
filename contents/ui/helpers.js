@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Mark Hellewell <aussieweather.sandlot200@passinbox.com>
+//
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 .pragma library
 
 // BoM icon_descriptor → Breeze icon name

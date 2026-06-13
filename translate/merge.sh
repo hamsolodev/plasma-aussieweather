@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+
+# SPDX-FileCopyrightText: 2026 Mark Hellewell <aussieweather.sandlot200@passinbox.com>
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 # Extract translatable strings from the widget's QML/JS into template.pot,
 # then merge updates into any existing .po files.
 # Per https://develop.kde.org/docs/plasma/widget/translations-i18n/

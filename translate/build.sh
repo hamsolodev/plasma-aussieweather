@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+
+# SPDX-FileCopyrightText: 2026 Mark Hellewell <aussieweather.sandlot200@passinbox.com>
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 # Compile .po translations into contents/locale/<lang>/LC_MESSAGES/*.mo so
 # they ship inside the .plasmoid package. Run before packaging (CI does this).
 set -euo pipefail
