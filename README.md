@@ -9,6 +9,13 @@ UV index, severe weather warnings, and an animated rain radar loop.
 > Meteorology. The widget identifies itself to BoM services with a versioned
 > User-Agent and polls no faster than every 10 minutes.
 
+## Screenshots
+
+| Weather | Radar | Warnings |
+| --- | --- | --- |
+| ![Weather tab](docs/screenshots/light-weather.png) | ![Radar tab](docs/screenshots/light-radar.png) | ![Warnings tab](docs/screenshots/light-warnings.png) |
+| ![Weather tab, dark](docs/screenshots/dark-weather.png) | ![Radar tab, dark](docs/screenshots/dark-radar.png) | ![Warnings tab, dark](docs/screenshots/dark-warnings.png) |
+
 ## Features
 
 - **Panel:** condition icon (day/night switches at actual sunset/sunrise,
