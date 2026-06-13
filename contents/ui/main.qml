@@ -101,7 +101,8 @@ PlasmoidItem {
     readonly property bool hasWarnings: Array.isArray(warnings) && warnings.length > 0
 
     Plasmoid.icon: currentIcon
-    toolTipMainText: "BoM — " + locationName
+    toolTipMainText: i18nc("BoM is the Bureau of Meteorology; %1 is the location",
+                           "BoM — %1", locationName)
     toolTipSubText: pollOk
         ? (Helpers.formatTemp(observations ? observations.temp : null)
            + (forecast.length > 0 ? "  " + Helpers.titleCase(forecast[0].short_text || forecast[0].icon_descriptor || "") : ""))
@@ -572,16 +573,20 @@ except Exception as e:
                         if (!root.observations) return ""
                         var w = root.observations.wind || {}
                         var g = root.observations.gust || {}
-                        var s = "💨  " + Helpers.windStr(w.speed_kilometre, w.direction)
-                        if (g.speed_kilometre) s += "  (gusts " + Math.round(g.speed_kilometre) + ")"
-                        return s
+                        var ws = Helpers.windStr(w.speed_kilometre, w.direction)
+                        return "💨  " + (g.speed_kilometre
+                            ? i18n("%1  (gusts %2)", ws, Math.round(g.speed_kilometre))
+                            : ws)
                     }
                 }
                 Item { Layout.fillWidth: true }
                 PlasmaComponents.Label {
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     visible: root.observations && root.observations.humidity !== undefined
-                    text: root.observations ? ("💧  " + Math.round(root.observations.humidity || 0) + "% RH") : ""
+                    text: root.observations
+                        ? "💧  " + i18nc("relative humidity", "%1% RH",
+                                         Math.round(root.observations.humidity || 0))
+                        : ""
                 }
                 PlasmaComponents.Label {
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
@@ -608,7 +613,7 @@ except Exception as e:
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     visible: root.observations && root.observations.rain_since_9am !== undefined
                     text: root.observations
-                        ? ("🌧  " + (root.observations.rain_since_9am || 0) + " mm since 9 am")
+                        ? "🌧  " + i18n("%1 mm since 9 am", root.observations.rain_since_9am || 0)
                         : ""
                 }
                 Item { Layout.fillWidth: true }
@@ -621,7 +626,8 @@ except Exception as e:
                         if (!root.observations) return ""
                         var parts = []
                         if (root.observations.dew_point !== undefined)
-                            parts.push(i18n("Dew pt %1", Helpers.formatTemp(root.observations.dew_point)))
+                            parts.push(i18nc("abbreviated dew point", "Dew pt %1",
+                                             Helpers.formatTemp(root.observations.dew_point)))
                         if (root.observations.cloud) parts.push(root.observations.cloud)
                         return parts.join("  ·  ")
                     }
@@ -688,16 +694,17 @@ except Exception as e:
                                         lines.push(i18n("Feels like %1", Helpers.formatTemp(modelData.temp_feels_like)))
                                     var w = modelData.wind || {}
                                     if (w.speed_kilometre !== undefined) {
-                                        var ws = i18n("Wind %1", Helpers.windStr(w.speed_kilometre, w.direction))
-                                        if (w.gust_speed_kilometre)
-                                            ws += i18n(" (gusts %1)", Math.round(w.gust_speed_kilometre))
-                                        lines.push(ws)
+                                        var ws = Helpers.windStr(w.speed_kilometre, w.direction)
+                                        lines.push(w.gust_speed_kilometre
+                                            ? i18n("Wind %1 (gusts %2)", ws, Math.round(w.gust_speed_kilometre))
+                                            : i18n("Wind %1", ws))
                                     }
                                     var hd = []
                                     if (modelData.relative_humidity !== null && modelData.relative_humidity !== undefined)
                                         hd.push(i18n("Humidity %1%", Math.round(modelData.relative_humidity)))
                                     if (modelData.dew_point !== null && modelData.dew_point !== undefined)
-                                        hd.push(i18n("Dew pt %1", Helpers.formatTemp(modelData.dew_point)))
+                                        hd.push(i18nc("abbreviated dew point", "Dew pt %1",
+                                                      Helpers.formatTemp(modelData.dew_point)))
                                     if (hd.length) lines.push(hd.join("  ·  "))
                                     if (modelData.uv)
                                         lines.push(i18n("UV %1", modelData.uv))
@@ -1021,7 +1028,8 @@ except Exception as e:
                         var idx = RadarStations.indexOfSite(p.site)
                         var name = idx >= 0 ? RadarStations.stations[idx].name
                                             : root.activeRadarStation
-                        return name + "  ·  " + p.km + " km"
+                        return i18nc("radar loop title: station name, range",
+                                     "%1  ·  %2 km", name, p.km)
                     }
                 }
 
@@ -1042,7 +1050,7 @@ except Exception as e:
                     Layout.preferredWidth: Kirigami.Units.gridUnit * 5
                     model: quickStation.currentIndex >= 0
                         ? RadarStations.stations[quickStation.currentIndex].ranges.map(
-                              function(r) { return r + " km" })
+                              function(r) { return i18n("%1 km", r) })
                         : []
                     onActivated: {
                         var st = RadarStations.stations[quickStation.currentIndex]

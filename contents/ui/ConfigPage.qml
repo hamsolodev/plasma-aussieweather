@@ -64,7 +64,7 @@ Kirigami.FormLayout {
         Layout.minimumWidth: Kirigami.Units.gridUnit * 18
         model: stationCombo.currentIndex >= 0
             ? RadarStations.stations[stationCombo.currentIndex].ranges.map(
-                  function(r) { return r + " km" })
+                  function(r) { return i18n("%1 km", r) })
             : []
         onActivated: page.applySelection()
     }
@@ -76,7 +76,7 @@ Kirigami.FormLayout {
         to: 60
         value: cfg_pollInterval / 60000
         onValueModified: cfg_pollInterval = value * 60000
-        textFromValue: function(v) { return v + " min" }
+        textFromValue: function(v) { return i18nc("minutes", "%1 min", v) }
         valueFromText: function(t) { return parseInt(t) || 10 }
     }
 

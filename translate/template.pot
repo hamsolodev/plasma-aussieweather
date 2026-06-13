@@ -1,0 +1,175 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the plasma_applet_net.tropism.plasma.aussieweather package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: plasma_applet_net.tropism.plasma.aussieweather\n"
+"Report-Msgid-Bugs-To: https://github.com/hamsolodev/plasma-aussieweather/"
+"issues\n"
+"POT-Creation-Date: 2026-06-13 11:06+1000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: contents/config/config.qml:6
+msgid "General"
+msgstr ""
+
+#: contents/ui/ConfigPage.qml:42
+msgid "Location:"
+msgstr ""
+
+#: contents/ui/ConfigPage.qml:49
+msgid "Radar station:"
+msgstr ""
+
+#: contents/ui/ConfigPage.qml:63
+msgid "Radar range:"
+msgstr ""
+
+#: contents/ui/ConfigPage.qml:67 contents/ui/main.qml:1053
+msgid "%1 km"
+msgstr ""
+
+#: contents/ui/ConfigPage.qml:74
+msgid "Update interval:"
+msgstr ""
+
+#: contents/ui/ConfigPage.qml:79
+msgctxt "minutes"
+msgid "%1 min"
+msgstr ""
+
+#: contents/ui/ConfigPage.qml:90
+msgid ""
+"Location: use 'Suburb STATE', e.g. 'Seaford VIC' or 'Sydney NSW'.\n"
+"Pick the radar station nearest your location; smaller ranges show more "
+"detail."
+msgstr ""
+
+#: contents/ui/main.qml:105
+msgctxt "BoM is the Bureau of Meteorology; %1 is the location"
+msgid "BoM — %1"
+msgstr ""
+
+#: contents/ui/main.qml:109
+msgid "Connecting…"
+msgstr ""
+
+#: contents/ui/main.qml:188
+msgid "Bad response"
+msgstr ""
+
+#: contents/ui/main.qml:192
+msgid "Unreachable"
+msgstr ""
+
+#: contents/ui/main.qml:399
+msgid "Weather"
+msgstr ""
+
+#: contents/ui/main.qml:400
+msgid "Radar"
+msgstr ""
+
+#: contents/ui/main.qml:404
+msgid "⚠ Warnings (%1)"
+msgstr ""
+
+#: contents/ui/main.qml:508 contents/ui/main.qml:694
+msgid "Feels like %1"
+msgstr ""
+
+#: contents/ui/main.qml:578
+msgid "%1  (gusts %2)"
+msgstr ""
+
+#: contents/ui/main.qml:587
+#, javascript-format
+msgctxt "relative humidity"
+msgid "%1% RH"
+msgstr ""
+
+#: contents/ui/main.qml:616
+msgid "%1 mm since 9 am"
+msgstr ""
+
+#: contents/ui/main.qml:629 contents/ui/main.qml:706
+msgctxt "abbreviated dew point"
+msgid "Dew pt %1"
+msgstr ""
+
+#: contents/ui/main.qml:647
+msgid "Next 8 Hours"
+msgstr ""
+
+#: contents/ui/main.qml:677
+msgid "Now"
+msgstr ""
+
+#: contents/ui/main.qml:699
+msgid "Wind %1 (gusts %2)"
+msgstr ""
+
+#: contents/ui/main.qml:700
+msgid "Wind %1"
+msgstr ""
+
+#: contents/ui/main.qml:704
+#, javascript-format
+msgid "Humidity %1%"
+msgstr ""
+
+#: contents/ui/main.qml:710
+msgid "UV %1"
+msgstr ""
+
+#: contents/ui/main.qml:713
+msgid "Rain %1–%2 mm"
+msgstr ""
+
+#: contents/ui/main.qml:751
+msgid "7-Day Forecast"
+msgstr ""
+
+#: contents/ui/main.qml:777
+msgid "Today"
+msgstr ""
+
+#: contents/ui/main.qml:845
+msgid ""
+"Cannot reach BoM:\n"
+"%1"
+msgstr ""
+
+#: contents/ui/main.qml:846
+msgid "Waiting for data…"
+msgstr ""
+
+#: contents/ui/main.qml:1032
+msgctxt "radar loop title: station name, range"
+msgid "%1  ·  %2 km"
+msgstr ""
+
+#: contents/ui/main.qml:1173
+msgid "Radar: %1  ·  %2 frames"
+msgstr ""
+
+#: contents/ui/main.qml:1176
+msgid "Radar: %1  ·  Loading…"
+msgstr ""
+
+#: contents/ui/main.qml:1200
+msgid "Full radar loop"
+msgstr ""
+
+#: contents/ui/main.qml:1208
+msgid "Weather maps"
+msgstr ""
