@@ -64,6 +64,8 @@ PlasmoidItem {
         lastUpdated    = ""
         pollOk         = false
         errorText      = ""
+        _retryCount    = 0
+        retryTimer.stop()
         root.refresh()
     }
 
@@ -134,7 +136,7 @@ try:
         d = get(base + "/locations?search=" + urllib.parse.quote(term))
         locs = d.get("data", [])
         if not locs:
-            print(json.dumps({"ok": False, "error": "Location not found: " + q}))
+            print(json.dumps({"ok": False, "permanent": True, "error": "Location not found: " + q}))
             raise SystemExit(0)
         if state:
             preferred = [l for l in locs if l.get("state", "").upper() == state.upper()]
@@ -192,10 +194,24 @@ except Exception as e:
         catch (e) { d = { ok: false, error: i18n("Bad response") } }
 
         if (!d || !d.ok) {
-            pollOk    = false
             errorText = (d && d.error) ? d.error : i18n("Unreachable")
+            // Keep showing the last good data through a transient failure —
+            // a missed poll shouldn't blank a working widget.
+            if (!observations) pollOk = false
+            // Transient failures (e.g. DNS not yet up after wake from
+            // sleep) are retried with exponential backoff: 5s..160s, ~5.3
+            // min total, then the regular poll cycle takes over. Definitive
+            // answers (permanent: location not found) are not retried.
+            if (!d.permanent && _retryCount < 6) {
+                retryTimer.interval = 5000 * Math.pow(2, _retryCount)
+                _retryCount++
+                retryTimer.restart()
+            }
             return
         }
+
+        _retryCount = 0
+        retryTimer.stop()
 
         if (d.geohash) {
             _geohash = d.geohash
@@ -226,6 +242,13 @@ except Exception as e:
     }
 
     property real _lastPollMs: 0
+    property int  _retryCount: 0
+
+    Timer {
+        id: retryTimer
+        repeat: false
+        onTriggered: root.refresh()
+    }
 
     // Floor of 10 minutes regardless of config — matches BoM's own
     // observation update cadence; polling faster gains nothing.
