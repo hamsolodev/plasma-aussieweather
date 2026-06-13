@@ -32,8 +32,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/jekyll-build-pages@v1
         with:
-          path: docs/
+          source: docs/
+          destination: _site
+      - uses: actions/upload-pages-artifact@v3
       - id: deployment
         uses: actions/deploy-pages@v4
