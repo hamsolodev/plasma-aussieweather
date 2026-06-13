@@ -7,6 +7,7 @@ import org.kde.plasma.plasma5support as P5Support
 import org.kde.kirigami as Kirigami
 
 import "helpers.js" as Helpers
+import "radarstations.js" as RadarStations
 
 PlasmoidItem {
     id: root
@@ -24,7 +25,7 @@ PlasmoidItem {
             : 0)
 
     // Keep in sync with metadata.json — Plasma 6 QML exposes no version API.
-    readonly property string _widgetVersion: "1.3"
+    readonly property string _widgetVersion: "1.4"
 
     // ── State ─────────────────────────────────────────────────────────────
     property bool   pollOk:       false
@@ -221,13 +222,18 @@ except Exception as e:
 
     property real _lastPollMs: 0
 
+    // Floor of 10 minutes regardless of config — matches BoM's own
+    // observation update cadence; polling faster gains nothing.
+    readonly property int effectivePollInterval:
+        Math.max(600000, plasmoid.configuration.pollInterval)
+
     function refresh() {
         _lastPollMs = Date.now()
         poller.connectSource(buildPollCommand())
     }
 
     Timer {
-        interval: Math.max(60000, plasmoid.configuration.pollInterval)
+        interval: root.effectivePollInterval
         running: true
         repeat: true
         triggeredOnStart: true
@@ -245,7 +251,7 @@ except Exception as e:
         repeat: true
         onTriggered: {
             if (root._lastPollMs > 0
-                    && (Date.now() - root._lastPollMs) > plasmoid.configuration.pollInterval)
+                    && (Date.now() - root._lastPollMs) > root.effectivePollInterval)
                 root.refresh()
         }
     }
@@ -256,6 +262,19 @@ except Exception as e:
     // True only while the popup is open on the Radar tab — gates all radar
     // network activity. Written by a Binding inside the radar tab.
     property bool radarActive: false
+
+    // Ephemeral station override from the radar tab's quick picker. Cleared
+    // when the tab is left, reverting to the station configured in settings.
+    property string radarOverride: ""
+    readonly property string activeRadarStation:
+        radarOverride !== "" ? radarOverride : plasmoid.configuration.radarStation
+
+    onActiveRadarStationChanged: {
+        radarFrameUrls = []
+        radarFrameIdx  = 0
+        if (radarActive) refreshRadarFrames()
+    }
+    onRadarActiveChanged: if (!radarActive) radarOverride = ""
 
     // Minute-resolution clock snapped to wall-clock minute boundaries.
     // currentIcon and any is_night bindings reference this so they re-evaluate on the hour.
@@ -323,7 +342,7 @@ except Exception as e:
     function refreshRadarFrames() {
         radarPoller.connectSource("python3 -c '"
             + radarFrameScript() + "' "
-            + shellQuote(plasmoid.configuration.radarStation))
+            + shellQuote(activeRadarStation))
     }
 
     // BoM radar scans every 5 minutes — refresh only while the Radar tab is
@@ -954,6 +973,17 @@ except Exception as e:
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
 
+            function syncQuickPickers() {
+                var p = RadarStations.parseId(root.activeRadarStation)
+                if (!p) return
+                var stIdx = RadarStations.indexOfSite(p.site)
+                if (stIdx < 0) return
+                quickStation.currentIndex = stIdx
+                var rIdx = RadarStations.stations[stIdx].ranges.indexOf(p.km)
+                quickRange.currentIndex = rIdx >= 0 ? rIdx : 0
+            }
+            Component.onCompleted: syncQuickPickers()
+
             Binding {
                 target: root
                 property: "radarActive"
@@ -971,11 +1001,77 @@ except Exception as e:
             // the buttons row stays pinned to the bottom.
             Item { Layout.fillHeight: true }
 
+            // Quick station/range picker. Selections set root.radarOverride,
+            // which is cleared on leaving the tab — the configured station is
+            // the sticky default.
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.leftMargin:  Kirigami.Units.smallSpacing
+                Layout.rightMargin: Kirigami.Units.smallSpacing
+                spacing: Kirigami.Units.smallSpacing
+
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    elide: Text.ElideRight
+                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
+                    font.weight: Font.Bold
+                    text: {
+                        var p = RadarStations.parseId(root.activeRadarStation)
+                        if (!p) return root.activeRadarStation
+                        var idx = RadarStations.indexOfSite(p.site)
+                        var name = idx >= 0 ? RadarStations.stations[idx].name
+                                            : root.activeRadarStation
+                        return name + "  ·  " + p.km + " km"
+                    }
+                }
+
+                QQC2.ComboBox {
+                    id: quickStation
+                    Layout.preferredWidth: Kirigami.Units.gridUnit * 8
+                    model: RadarStations.stations.map(function(s) { return s.name })
+                    onActivated: {
+                        var st = RadarStations.stations[currentIndex]
+                        var p  = RadarStations.parseId(root.activeRadarStation)
+                        var km = p && st.ranges.indexOf(p.km) >= 0
+                            ? p.km : st.ranges[st.ranges.length - 1]
+                        root.radarOverride = RadarStations.stationId(st.site, km)
+                    }
+                }
+                QQC2.ComboBox {
+                    id: quickRange
+                    Layout.preferredWidth: Kirigami.Units.gridUnit * 5
+                    model: quickStation.currentIndex >= 0
+                        ? RadarStations.stations[quickStation.currentIndex].ranges.map(
+                              function(r) { return r + " km" })
+                        : []
+                    onActivated: {
+                        var st = RadarStations.stations[quickStation.currentIndex]
+                        root.radarOverride = RadarStations.stationId(
+                            st.site, st.ranges[currentIndex])
+                    }
+                }
+            }
+
+            // Keep the pickers tracking the active station — both when the
+            // override reverts on tab exit and when settings change.
+            Connections {
+                target: root
+                function onActiveRadarStationChanged() { radarTab.syncQuickPickers() }
+            }
+
             // Composited radar: topography + animated loop + overlays
             Item {
                 id: radarFrame
                 Layout.fillWidth: true
                 implicitHeight: Kirigami.Units.gridUnit * 22
+
+                // BoM radar imagery is square (512×512). All layers live in
+                // this centred square so they are never stretched, whatever
+                // shape the popup or a plasmawindowed window takes.
+                Item {
+                anchors.centerIn: parent
+                width:  Math.min(radarFrame.width, radarFrame.height)
+                height: width
 
                 // Opaque base map. BoM's overlays (locations, range) use black
                 // text/lines, so the base must stay light regardless of the
@@ -988,7 +1084,7 @@ except Exception as e:
                 Image {
                     anchors.fill: parent
                     source: "http://www.bom.gov.au/products/radar_transparencies/"
-                          + plasmoid.configuration.radarStation + ".background.png"
+                          + root.activeRadarStation + ".background.png"
                     fillMode: Image.Stretch
                     asynchronous: true
                     cache: false
@@ -998,7 +1094,7 @@ except Exception as e:
                 Image {
                     anchors.fill: parent
                     source: "http://www.bom.gov.au/products/radar_transparencies/"
-                          + plasmoid.configuration.radarStation + ".topography.png"
+                          + root.activeRadarStation + ".topography.png"
                     fillMode: Image.Stretch
                     asynchronous: true
                     cache: false
@@ -1024,7 +1120,7 @@ except Exception as e:
                 Image {
                     anchors.fill: parent
                     source: "http://www.bom.gov.au/products/radar_transparencies/"
-                          + plasmoid.configuration.radarStation + ".locations.png"
+                          + root.activeRadarStation + ".locations.png"
                     fillMode: Image.Stretch
                     asynchronous: true
                     cache: false
@@ -1034,7 +1130,7 @@ except Exception as e:
                 Image {
                     anchors.fill: parent
                     source: "http://www.bom.gov.au/products/radar_transparencies/"
-                          + plasmoid.configuration.radarStation + ".range.png"
+                          + root.activeRadarStation + ".range.png"
                     fillMode: Image.Stretch
                     asynchronous: true
                     cache: false
@@ -1053,6 +1149,7 @@ except Exception as e:
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                     color: "black"
                 }
+                } // square layer container
             }
 
             RowLayout {
@@ -1066,10 +1163,10 @@ except Exception as e:
                     opacity: 0.55
                     text: root.radarFrameUrls.length > 0
                         ? i18n("Radar: %1  ·  %2 frames",
-                               plasmoid.configuration.radarStation,
+                               root.activeRadarStation,
                                root.radarFrameUrls.length)
                         : i18n("Radar: %1  ·  Loading…",
-                               plasmoid.configuration.radarStation)
+                               root.activeRadarStation)
                 }
                 PlasmaComponents.Button {
                     icon.name: "view-refresh-symbolic"
@@ -1095,7 +1192,7 @@ except Exception as e:
                     text: i18n("Full radar loop")
                     onClicked: Qt.openUrlExternally(
                         "https://www.bom.gov.au/products/"
-                        + plasmoid.configuration.radarStation + ".loop.shtml")
+                        + root.activeRadarStation + ".loop.shtml")
                 }
                 PlasmaComponents.Button {
                     Layout.fillWidth: true
