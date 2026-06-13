@@ -39,7 +39,7 @@ UV index, severe weather warnings, and an animated rain radar loop.
 ## Install
 
 **From the KDE Store:** right-click your panel → *Add Widgets* → *Get New
-Widgets* → search "Aussie Weather". *(Listing pending first public release.)*
+Widgets* → search "Aussie Weather".
 
 **From a release package:**
 

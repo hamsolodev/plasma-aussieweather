@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.5 — unreleased (first public release)
+## 1.5 — 2026-06-13 (first public release)
 
 - Public metadata (website, bug tracker, author contact)
 - i18n infrastructure: `template.pot`, translation build scripts, fixes to
