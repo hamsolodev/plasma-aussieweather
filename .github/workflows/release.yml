@@ -1,0 +1,55 @@
+# SPDX-FileCopyrightText: 2026 Mark Hellewell <aussieweather.sandlot200@passinbox.com>
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gettext jq zip
+
+      - name: Version checks
+        run: |
+          bash scripts/check-version.sh
+          version="$(jq -r '.KPlugin.Version' metadata.json)"
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$version" != "$tag" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match metadata version $version" >&2
+            exit 1
+          fi
+
+      - name: Build .plasmoid (with compiled translations)
+        run: |
+          bash translate/build.sh
+          version="$(jq -r '.KPlugin.Version' metadata.json)"
+          zip -qr "net.tropism.plasma.aussieweather-${version}.plasmoid" metadata.json contents/
+
+      - name: Extract changelog section
+        run: |
+          version="$(jq -r '.KPlugin.Version' metadata.json)"
+          awk -v ver="$version" '
+            $0 ~ "^## " ver " " { found=1; next }
+            found && /^## /     { exit }
+            found               { print }
+          ' CHANGELOG.md > release-notes.md
+          cat release-notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes.md
+          files: net.tropism.plasma.aussieweather-*.plasmoid

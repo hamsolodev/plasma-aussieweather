@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 Mark Hellewell <aussieweather.sandlot200@passinbox.com>
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+# Deploys docs/ to GitHub Pages. Note: Pages cannot deploy while the repo is
+# private (free plan) — this workflow becomes effective once the repo is
+# public and Pages is enabled (Settings → Pages → Source: GitHub Actions).
+
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ['docs/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/
+      - id: deployment
+        uses: actions/deploy-pages@v4

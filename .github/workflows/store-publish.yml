@@ -1,0 +1,50 @@
+# SPDX-FileCopyrightText: 2026 Mark Hellewell <aussieweather.sandlot200@passinbox.com>
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+# Uploads the released .plasmoid to the KDE Store (Pling) product via the
+# OCS v1 API. Requires:
+#   - repo variable  PLING_CONTENT_ID  (product content-ID; created manually,
+#     see docs/RELEASING.md)
+#   - secrets        PLING_USERNAME, PLING_TOKEN
+# The OCS upload endpoint is lightly documented — failure here is non-fatal;
+# fall back to a manual upload (docs/RELEASING.md).
+
+name: Publish to KDE Store
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Check configuration
+        id: cfg
+        run: |
+          if [ -z "${{ vars.PLING_CONTENT_ID }}" ]; then
+            echo "PLING_CONTENT_ID not set — skipping store publish (see docs/RELEASING.md)"
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download release asset
+        if: steps.cfg.outputs.configured == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "${{ github.event.release.tag_name }}" \
+            --repo "${{ github.repository }}" --pattern '*.plasmoid'
+
+      - name: Upload to Pling (OCS v1)
+        if: steps.cfg.outputs.configured == 'true'
+        run: |
+          file="$(ls net.tropism.plasma.aussieweather-*.plasmoid)"
+          curl --fail-with-body \
+            -u "${{ secrets.PLING_USERNAME }}:${{ secrets.PLING_TOKEN }}" \
+            -F "localfile=@${file}" \
+            "https://api.pling.com/ocs/v1/content/uploaddownload/${{ vars.PLING_CONTENT_ID }}" \
+            || { echo "::warning::OCS upload failed — upload manually (docs/RELEASING.md)"; exit 1; }

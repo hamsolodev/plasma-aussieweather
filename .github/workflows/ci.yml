@@ -1,0 +1,56 @@
+# SPDX-FileCopyrightText: 2026 Mark Hellewell <aussieweather.sandlot200@passinbox.com>
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gettext jq zip \
+            qt6-declarative-dev-tools qml6-module-qttest qml6-module-qtquick
+
+      - name: Shell script syntax
+        run: |
+          find . -name '*.sh' -not -path './.git/*' -print0 | xargs -0 -n1 bash -n
+
+      - name: Validate metadata.json
+        run: |
+          jq -e '.KPlugin.Id == "net.tropism.plasma.aussieweather"' metadata.json
+          jq -e '.KPlugin.Version | test("^[0-9]+\\.[0-9]+")' metadata.json
+          jq -e '.KPackageStructure == "Plasma/Applet"' metadata.json
+
+      - name: Version sync (metadata.json vs _widgetVersion)
+        run: bash scripts/check-version.sh
+
+      # qmllint with KDE imports is not available on stock ubuntu runners;
+      # tests cover the pure-JS helpers only (no Plasma runtime needed).
+      - name: Run QML tests
+        run: |
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner -input tests/
+
+      - name: Compile translations
+        run: bash translate/build.sh
+
+      - name: Build .plasmoid
+        run: |
+          version="$(jq -r '.KPlugin.Version' metadata.json)"
+          zip -qr "net.tropism.plasma.aussieweather-${version}.plasmoid" metadata.json contents/
+          unzip -l "net.tropism.plasma.aussieweather-${version}.plasmoid"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plasmoid
+          path: net.tropism.plasma.aussieweather-*.plasmoid
