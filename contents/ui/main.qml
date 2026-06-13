@@ -464,7 +464,8 @@ except Exception as e:
                         }
                     }
                     Kirigami.Icon {
-                        width: Kirigami.Units.iconSizes.small; height: width
+                        Layout.preferredWidth:  Kirigami.Units.iconSizes.small
+                        Layout.preferredHeight: Kirigami.Units.iconSizes.small
                         color: Kirigami.Theme.neutralTextColor
                         source: "go-next-symbolic"
                     }
@@ -484,8 +485,8 @@ except Exception as e:
                 spacing: Kirigami.Units.smallSpacing
 
                 Kirigami.Icon {
-                    width:  Kirigami.Units.iconSizes.large
-                    height: width
+                    Layout.preferredWidth:  Kirigami.Units.iconSizes.large
+                    Layout.preferredHeight: Kirigami.Units.iconSizes.large
                     source: root.currentIcon
                     visible: root.pollOk
                 }
@@ -684,8 +685,8 @@ except Exception as e:
                         }
                         Kirigami.Icon {
                             Layout.alignment: Qt.AlignHCenter
-                            width:  Kirigami.Units.iconSizes.medium
-                            height: width
+                            Layout.preferredWidth:  Kirigami.Units.iconSizes.medium
+                            Layout.preferredHeight: Kirigami.Units.iconSizes.medium
                             source: Helpers.bomIcon(modelData.icon_descriptor, modelData.is_night)
 
                             HoverHandler { id: hourHover }
@@ -785,8 +786,8 @@ except Exception as e:
                         }
                         Kirigami.Icon {
                             Layout.alignment: Qt.AlignHCenter
-                            width:  Kirigami.Units.iconSizes.large
-                            height: width
+                            Layout.preferredWidth:  Kirigami.Units.iconSizes.large
+                            Layout.preferredHeight: Kirigami.Units.iconSizes.large
                             source: Helpers.bomIcon(modelData.icon_descriptor, false)
 
                             HoverHandler { id: dayHover }
@@ -888,7 +889,8 @@ except Exception as e:
                 }
                 Kirigami.Icon {
                     visible: !root.isNight && !!root.forecast[0].uv
-                    width: Kirigami.Units.iconSizes.small; height: width
+                    Layout.preferredWidth:  Kirigami.Units.iconSizes.small
+                    Layout.preferredHeight: Kirigami.Units.iconSizes.small
                     source: "weather-clear-symbolic"
                 }
                 PlasmaComponents.Label {

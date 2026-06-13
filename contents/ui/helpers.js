@@ -93,19 +93,23 @@ function rainColorKey(chance) {
 }
 
 // Moon phase from date — returns {emoji, name}
-// Reference: known new moon 2000-01-06T18:14:00Z; synodic month 29.530588853 days
+// Reference: known new moon 2000-01-06T18:14:00Z; synodic month 29.530588853 days.
+// Eight equal bands CENTRED on the principal phase instants (new = 0,
+// first quarter = ¼ month, full = ½ month, last quarter = ¾ month) — a real
+// full moon must report "Full Moon", not the band that merely starts there.
 function moonPhase(date) {
     var knownNewMoon = new Date("2000-01-06T18:14:00Z")
     var synodicMonth = 29.530588853
+    var band = synodicMonth / 8
     var daysSince = (date.getTime() - knownNewMoon.getTime()) / 86400000
     var phase = ((daysSince % synodicMonth) + synodicMonth) % synodicMonth
-    if (phase <  1.85) return {emoji: "🌑", name: "New Moon"}
-    if (phase <  7.38) return {emoji: "🌒", name: "Waxing Crescent"}
-    if (phase < 11.08) return {emoji: "🌓", name: "First Quarter"}
-    if (phase < 14.77) return {emoji: "🌔", name: "Waxing Gibbous"}
-    if (phase < 16.62) return {emoji: "🌕", name: "Full Moon"}
-    if (phase < 22.15) return {emoji: "🌖", name: "Waning Gibbous"}
-    if (phase < 25.85) return {emoji: "🌗", name: "Last Quarter"}
-    if (phase < 27.69) return {emoji: "🌘", name: "Waning Crescent"}
+    if (phase < band * 0.5) return {emoji: "🌑", name: "New Moon"}
+    if (phase < band * 1.5) return {emoji: "🌒", name: "Waxing Crescent"}
+    if (phase < band * 2.5) return {emoji: "🌓", name: "First Quarter"}
+    if (phase < band * 3.5) return {emoji: "🌔", name: "Waxing Gibbous"}
+    if (phase < band * 4.5) return {emoji: "🌕", name: "Full Moon"}
+    if (phase < band * 5.5) return {emoji: "🌖", name: "Waning Gibbous"}
+    if (phase < band * 6.5) return {emoji: "🌗", name: "Last Quarter"}
+    if (phase < band * 7.5) return {emoji: "🌘", name: "Waning Crescent"}
     return {emoji: "🌑", name: "New Moon"}
 }
