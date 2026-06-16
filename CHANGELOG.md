@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6.2 — 2026-06-16
+
+- Radar tab: replaced the redundant station/range title label with a
+  "time since last refresh" indicator, since the dropdowns right next to it
+  already show the station and range
+
 ## 1.6.1 — 2026-06-16
 
 - Fix extended forecast text leaving dead space when content shrinks to fewer lines

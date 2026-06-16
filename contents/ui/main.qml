@@ -29,7 +29,7 @@ PlasmoidItem {
             : 0)
 
     // Keep in sync with metadata.json — Plasma 6 QML exposes no version API.
-    readonly property string _widgetVersion: "1.6.1"
+    readonly property string _widgetVersion: "1.6.2"
 
     // ── State ─────────────────────────────────────────────────────────────
     property bool   pollOk:       false
@@ -285,8 +285,9 @@ except Exception as e:
     }
 
     // ── Radar frame animation ─────────────────────────────────────────────
-    property var radarFrameUrls: []
-    property int radarFrameIdx:  0
+    property var radarFrameUrls:    []
+    property int radarFrameIdx:     0
+    property var _radarLastRefreshMs: 0
     // True only while the popup is open on the Radar tab — gates all radar
     // network activity. Written by a Binding inside the radar tab.
     property bool radarActive: false
@@ -298,8 +299,9 @@ except Exception as e:
         radarOverride !== "" ? radarOverride : plasmoid.configuration.radarStation
 
     onActiveRadarStationChanged: {
-        radarFrameUrls = []
-        radarFrameIdx  = 0
+        radarFrameUrls       = []
+        radarFrameIdx        = 0
+        _radarLastRefreshMs  = 0
         if (radarActive) refreshRadarFrames()
     }
     onRadarActiveChanged: if (!radarActive) radarOverride = ""
@@ -360,8 +362,9 @@ except Exception as e:
                 var d = JSON.parse((data["stdout"] || "").trim())
                 if (d.ok && d.frames && d.frames.length > 0
                         && JSON.stringify(d.frames) !== JSON.stringify(root.radarFrameUrls)) {
-                    root.radarFrameUrls = d.frames
-                    root.radarFrameIdx  = 0
+                    root.radarFrameUrls      = d.frames
+                    root.radarFrameIdx       = 0
+                    root._radarLastRefreshMs = Date.now()
                 }
             } catch(e) {}
         }
@@ -1067,16 +1070,14 @@ except Exception as e:
                 PlasmaComponents.Label {
                     Layout.fillWidth: true
                     elide: Text.ElideRight
-                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
-                    font.weight: Font.Bold
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    opacity: 0.7
                     text: {
-                        var p = RadarStations.parseId(root.activeRadarStation)
-                        if (!p) return root.activeRadarStation
-                        var idx = RadarStations.indexOfSite(p.site)
-                        var name = idx >= 0 ? RadarStations.stations[idx].name
-                                            : root.activeRadarStation
-                        return i18nc("radar loop title: station name, range",
-                                     "%1  ·  %2 km", name, p.km)
+                        if (!root._radarLastRefreshMs) return i18n("Fetching…")
+                        var ageSecs = Math.floor(
+                            (root.currentTime.getTime() - root._radarLastRefreshMs) / 1000)
+                        if (ageSecs < 60) return i18n("Updated just now")
+                        return i18n("Updated %1m ago", Math.floor(ageSecs / 60))
                     }
                 }
 
