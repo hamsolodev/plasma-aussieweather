@@ -29,7 +29,7 @@ PlasmoidItem {
             : 0)
 
     // Keep in sync with metadata.json — Plasma 6 QML exposes no version API.
-    readonly property string _widgetVersion: "1.6.3"
+    readonly property string _widgetVersion: "1.6.4"
 
     // ── State ─────────────────────────────────────────────────────────────
     property bool   pollOk:       false
@@ -360,11 +360,12 @@ except Exception as e:
             radarPoller.disconnectSource(sourceName)
             try {
                 var d = JSON.parse((data["stdout"] || "").trim())
-                if (d.ok && d.frames && d.frames.length > 0
-                        && JSON.stringify(d.frames) !== JSON.stringify(root.radarFrameUrls)) {
-                    root.radarFrameUrls      = d.frames
-                    root.radarFrameIdx       = 0
+                if (d.ok && d.frames && d.frames.length > 0) {
                     root._radarLastRefreshMs = Date.now()
+                    if (JSON.stringify(d.frames) !== JSON.stringify(root.radarFrameUrls)) {
+                        root.radarFrameUrls = d.frames
+                        root.radarFrameIdx  = 0
+                    }
                 }
             } catch(e) {}
         }

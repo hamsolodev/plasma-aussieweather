@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.4 — 2026-06-16
+
+- Fix radar refetching on every tab switch: the "last refreshed" timestamp
+  was only updated when the fetched frames differed from what was already
+  loaded, so an unchanged-but-successful poll never advanced it — leaving
+  the update-interval gate looking at a stale timestamp and refetching on
+  every re-entry to the Radar tab
+
 ## 1.6.3 — 2026-06-16
 
 - Radar tab refresh now respects the configured "Update interval" instead
