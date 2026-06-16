@@ -29,7 +29,7 @@ PlasmoidItem {
             : 0)
 
     // Keep in sync with metadata.json — Plasma 6 QML exposes no version API.
-    readonly property string _widgetVersion: "1.7.0"
+    readonly property string _widgetVersion: "1.7.1"
 
     // ── State ─────────────────────────────────────────────────────────────
     property bool   pollOk:       false
@@ -470,7 +470,6 @@ except Exception as e:
         StackLayout {
             currentIndex: tabBar.currentIndex
             Layout.fillWidth: true
-            Layout.fillHeight: true
 
         // ── Weather tab ───────────────────────────────────────────────────
         ColumnLayout {

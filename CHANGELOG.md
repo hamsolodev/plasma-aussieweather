@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.7.1 — 2026-06-17
+
+- Fix popup expanding to full screen height on first open; caused by
+  `Layout.fillHeight` on the StackLayout creating an unconstrained height
+  cycle before content implicit heights were computed
+
+## 1.7.0 — 2026-06-17
+
+- Warning text rendered as HTML instead of escaped plain text, preserving
+  BoM formatting (paragraphs, bold headings)
+- Links in warning text open in the default browser
+
 ## 1.6.4 — 2026-06-16
 
 - Fix radar refetching on every tab switch: the "last refreshed" timestamp
