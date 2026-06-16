@@ -29,7 +29,7 @@ PlasmoidItem {
             : 0)
 
     // Keep in sync with metadata.json — Plasma 6 QML exposes no version API.
-    readonly property string _widgetVersion: "1.6.2"
+    readonly property string _widgetVersion: "1.6.3"
 
     // ── State ─────────────────────────────────────────────────────────────
     property bool   pollOk:       false
@@ -376,16 +376,20 @@ except Exception as e:
             + shellQuote(activeRadarStation))
     }
 
-    // BoM radar scans every 5 minutes — refresh only while the Radar tab is
-    // being viewed. triggeredOnStart re-checks the frame list each time the
-    // tab becomes active; unchanged lists are dropped in onNewData, so
-    // already-loaded frames are not re-downloaded.
+    // Refresh only while the Radar tab is being viewed, no sooner than the
+    // configured update interval — triggeredOnStart re-checks on every
+    // tab-enter, but a recent fetch (per _radarLastRefreshMs) is skipped so
+    // switching tabs back and forth doesn't refetch on every switch.
     Timer {
-        interval: 300000
+        interval: root.effectivePollInterval
         running: root.radarActive
         repeat: true
         triggeredOnStart: true
-        onTriggered: root.refreshRadarFrames()
+        onTriggered: {
+            if (!root._radarLastRefreshMs
+                    || (Date.now() - root._radarLastRefreshMs) >= root.effectivePollInterval)
+                root.refreshRadarFrames()
+        }
     }
 
     // ── Compact (panel) ───────────────────────────────────────────────────

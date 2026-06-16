@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6.3 — 2026-06-16
+
+- Radar tab refresh now respects the configured "Update interval" instead
+  of refetching every time the tab is reopened; re-entering within the
+  interval reuses the already-loaded frames
+
 ## 1.6.2 — 2026-06-16
 
 - Radar tab: replaced the redundant station/range title label with a
