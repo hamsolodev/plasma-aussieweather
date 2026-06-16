@@ -1301,11 +1301,12 @@ except Exception as e:
                             wrapMode: Text.WordWrap
                             font.pointSize: Kirigami.Theme.defaultFont.pointSize
                             visible: (modelData.text || modelData.description || modelData.message || "").length > 0
-                            // External text → escaped RichText with bare URLs
-                            // linkified; only http/https links are opened.
+                            // BoM detail is an HTML product (rendered as-is);
+                            // plain-text fallbacks are escaped + linkified.
+                            // Only http/https links are ever opened.
                             textFormat: Text.RichText
                             linkColor: Kirigami.Theme.linkColor
-                            text: Helpers.linkify(modelData.text || modelData.description || modelData.message || "")
+                            text: Helpers.warningHtml(modelData.text || modelData.description || modelData.message || "")
                             onLinkActivated: (link) => { if (Helpers.isSafeUrl(link)) Qt.openUrlExternally(link) }
                             HoverHandler {
                                 enabled: parent.hoveredLink !== ""

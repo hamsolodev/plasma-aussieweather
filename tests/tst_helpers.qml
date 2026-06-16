@@ -200,4 +200,26 @@ TestCase {
         compare(Helpers.linkify("nothing here"), "nothing here")
         compare(Helpers.linkify(null), "")
     }
+
+    // ── looksLikeHtml / warningHtml ───────────────────────────────────────
+
+    function test_looksLikeHtml() {
+        verify(Helpers.looksLikeHtml('<div class="product"><p>x</p></div>'))
+        verify(Helpers.looksLikeHtml("text with <a href=\"http://x\">link</a>"))
+        verify(!Helpers.looksLikeHtml("Strong wind warning for Port Phillip."))
+        verify(!Helpers.looksLikeHtml("see http://bom.gov.au/x"))
+        verify(!Helpers.looksLikeHtml(""))
+    }
+
+    function test_warningHtml_passes_html_through() {
+        // Real HTML product must NOT be escaped (so it renders, not shows tags)
+        var html = '<div class="product"><p>IDV20600</p><a href="http://bom.gov.au/x">map</a></div>'
+        compare(Helpers.warningHtml(html), html)
+    }
+
+    function test_warningHtml_linkifies_plain_text() {
+        compare(Helpers.warningHtml("See http://bom.gov.au/x now"),
+                'See <a href="http://bom.gov.au/x">http://bom.gov.au/x</a> now')
+        compare(Helpers.warningHtml("plain & simple"), "plain &amp; simple")
+    }
 }

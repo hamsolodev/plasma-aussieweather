@@ -86,6 +86,20 @@ function linkify(s) {
     return out
 }
 
+// Heuristic: does this string already contain HTML tags? BoM warning detail
+// is a full HTML product; summary fallbacks are plain text.
+function looksLikeHtml(s) {
+    return /<[a-z!\/][\s\S]*>/i.test(String(s == null ? "" : s))
+}
+
+// Warning body for display as RichText. HTML products are passed through
+// as-is (already markup); plain text is escaped and linkified so bare URLs
+// still become clickable. Link *activation* is gated separately by isSafeUrl.
+function warningHtml(s) {
+    var t = String(s == null ? "" : s)
+    return looksLikeHtml(t) ? t : linkify(t)
+}
+
 function formatTemp(t) {
     var n = Number(t)
     if (t === null || t === undefined || isNaN(n)) return "—"
