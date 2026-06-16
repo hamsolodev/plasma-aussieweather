@@ -9,7 +9,7 @@
         "Id": "net.tropism.plasma.aussieweather",
         "License": "GPL-2.0-or-later",
         "Name": "Aussie Weather",
-        "Version": "1.6.4",
+        "Version": "1.7.0",
         "Website": "https://github.com/hamsolodev/plasma-aussieweather"
     },
     "X-Plasma-API-Minimum-Version": "6.0"

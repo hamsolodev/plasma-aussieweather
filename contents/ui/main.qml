@@ -29,7 +29,7 @@ PlasmoidItem {
             : 0)
 
     // Keep in sync with metadata.json — Plasma 6 QML exposes no version API.
-    readonly property string _widgetVersion: "1.6.4"
+    readonly property string _widgetVersion: "1.7.0"
 
     // ── State ─────────────────────────────────────────────────────────────
     property bool   pollOk:       false
@@ -1301,7 +1301,16 @@ except Exception as e:
                             wrapMode: Text.WordWrap
                             font.pointSize: Kirigami.Theme.defaultFont.pointSize
                             visible: (modelData.text || modelData.description || modelData.message || "").length > 0
-                            text: modelData.text || modelData.description || modelData.message || ""
+                            // External text → escaped RichText with bare URLs
+                            // linkified; only http/https links are opened.
+                            textFormat: Text.RichText
+                            linkColor: Kirigami.Theme.linkColor
+                            text: Helpers.linkify(modelData.text || modelData.description || modelData.message || "")
+                            onLinkActivated: (link) => { if (Helpers.isSafeUrl(link)) Qt.openUrlExternally(link) }
+                            HoverHandler {
+                                enabled: parent.hoveredLink !== ""
+                                cursorShape: Qt.PointingHandCursor
+                            }
                         }
                         PlasmaComponents.Label {
                             Layout.fillWidth: true

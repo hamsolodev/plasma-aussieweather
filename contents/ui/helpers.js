@@ -44,6 +44,48 @@ function bomIcon(descriptor, isNight) {
     return base
 }
 
+// HTML-escape so external text can't inject markup when shown as RichText.
+function escapeHtml(s) {
+    return String(s == null ? "" : s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+}
+
+// Only http/https are ever opened externally — gate Qt.openUrlExternally with
+// this so a crafted link (file:, javascript:, …) can't be launched.
+function isSafeUrl(url) {
+    return /^https?:\/\//i.test(String(url == null ? "" : url))
+}
+
+// Turn plain warning text into RichText-safe HTML: everything is escaped, and
+// bare http(s) URLs become <a> links (the only markup we emit). Trailing
+// sentence punctuation is kept outside the link so "see http://x.au." works.
+function linkify(s) {
+    var text = String(s == null ? "" : s)
+    var re = /https?:\/\/[^\s<>"]+/gi
+    var out = ""
+    var last = 0
+    var m
+    while ((m = re.exec(text)) !== null) {
+        var url = m[0]
+        var trail = ""
+        var tm = url.match(/[.,;:!?)\]}'"]+$/)
+        if (tm) {
+            trail = url.slice(url.length - tm[0].length)
+            url = url.slice(0, url.length - tm[0].length)
+        }
+        out += escapeHtml(text.slice(last, m.index))
+        var esc = escapeHtml(url)
+        out += '<a href="' + esc + '">' + esc + '</a>'
+        out += escapeHtml(trail)
+        last = m.index + m[0].length
+    }
+    out += escapeHtml(text.slice(last))
+    return out
+}
+
 function formatTemp(t) {
     var n = Number(t)
     if (t === null || t === undefined || isNaN(n)) return "—"

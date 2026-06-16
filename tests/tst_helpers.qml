@@ -147,4 +147,57 @@ TestCase {
         var mp = Helpers.moonPhase(new Date("1999-12-07T22:32:00Z"))  // new moon Dec 1999
         compare(mp.name, "New Moon")
     }
+
+    // ── escapeHtml ────────────────────────────────────────────────────────
+
+    function test_escapeHtml_metachars() {
+        compare(Helpers.escapeHtml("a < b & c > d \"e\""),
+                "a &lt; b &amp; c &gt; d &quot;e&quot;")
+        compare(Helpers.escapeHtml(null), "")
+        compare(Helpers.escapeHtml(undefined), "")
+    }
+
+    // ── isSafeUrl ─────────────────────────────────────────────────────────
+
+    function test_isSafeUrl_allows_http_https() {
+        verify(Helpers.isSafeUrl("http://www.bom.gov.au/x"))
+        verify(Helpers.isSafeUrl("https://www.bom.gov.au/x"))
+        verify(Helpers.isSafeUrl("HTTPS://WWW.BOM.GOV.AU"))
+    }
+
+    function test_isSafeUrl_rejects_other_schemes() {
+        verify(!Helpers.isSafeUrl("file:///etc/passwd"))
+        verify(!Helpers.isSafeUrl("javascript:alert(1)"))
+        verify(!Helpers.isSafeUrl("ftp://x"))
+        verify(!Helpers.isSafeUrl(""))
+        verify(!Helpers.isSafeUrl(null))
+    }
+
+    // ── linkify ───────────────────────────────────────────────────────────
+
+    function test_linkify_plain_text_escaped_only() {
+        compare(Helpers.linkify("storms & gusts <severe>"),
+                "storms &amp; gusts &lt;severe&gt;")
+    }
+
+    function test_linkify_wraps_bare_url() {
+        compare(Helpers.linkify("See http://bom.gov.au/x now"),
+                'See <a href="http://bom.gov.au/x">http://bom.gov.au/x</a> now')
+    }
+
+    function test_linkify_trailing_punctuation_outside_link() {
+        compare(Helpers.linkify("More at https://bom.gov.au/x."),
+                'More at <a href="https://bom.gov.au/x">https://bom.gov.au/x</a>.')
+    }
+
+    function test_linkify_query_ampersand_escaped_in_href() {
+        // & inside the URL must be escaped in both href and text, not break it.
+        compare(Helpers.linkify("https://bom.gov.au/p?a=1&b=2"),
+                '<a href="https://bom.gov.au/p?a=1&amp;b=2">https://bom.gov.au/p?a=1&amp;b=2</a>')
+    }
+
+    function test_linkify_no_url() {
+        compare(Helpers.linkify("nothing here"), "nothing here")
+        compare(Helpers.linkify(null), "")
+    }
 }
