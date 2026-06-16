@@ -902,6 +902,7 @@ except Exception as e:
                 visible: root.pollOk && root.forecast.length > 0
                              && (root.forecast[0].extended_text || "") !== ""
                 Layout.fillWidth: true
+                Layout.preferredHeight: implicitHeight
                 Layout.leftMargin:  Kirigami.Units.smallSpacing
                 Layout.rightMargin: Kirigami.Units.smallSpacing
                 Layout.topMargin:   Kirigami.Units.smallSpacing / 2
