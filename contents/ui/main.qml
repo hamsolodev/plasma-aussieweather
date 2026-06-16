@@ -29,7 +29,7 @@ PlasmoidItem {
             : 0)
 
     // Keep in sync with metadata.json — Plasma 6 QML exposes no version API.
-    readonly property string _widgetVersion: "1.6"
+    readonly property string _widgetVersion: "1.6.1"
 
     // ── State ─────────────────────────────────────────────────────────────
     property bool   pollOk:       false

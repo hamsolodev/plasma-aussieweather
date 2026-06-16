@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.1 — 2026-06-16
+
+- Fix extended forecast text leaving dead space when content shrinks to fewer lines
+
 ## 1.6 — 2026-06-16
 
 - Warning badge on the panel icon shows the count of active warnings for your location
