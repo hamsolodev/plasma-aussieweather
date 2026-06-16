@@ -29,7 +29,7 @@ PlasmoidItem {
             : 0)
 
     // Keep in sync with metadata.json — Plasma 6 QML exposes no version API.
-    readonly property string _widgetVersion: "1.5"
+    readonly property string _widgetVersion: "1.6"
 
     // ── State ─────────────────────────────────────────────────────────────
     property bool   pollOk:       false
@@ -399,6 +399,23 @@ except Exception as e:
             width:  Kirigami.Units.iconSizes.smallMedium
             height: width
             source: root.currentIcon
+        }
+        Rectangle {
+            visible: root.hasWarnings
+            height: Math.round(compactIco.height * 0.45)
+            width:  Math.max(height, warningBadgeText.implicitWidth + Kirigami.Units.smallSpacing)
+            radius: height / 2
+            color:  Kirigami.Theme.neutralTextColor
+            anchors.top:   compactIco.top
+            anchors.right: compactIco.right
+            Text {
+                id: warningBadgeText
+                anchors.centerIn: parent
+                text: root.warnings.length
+                font.pixelSize: Math.round(parent.height * 0.7)
+                font.bold: true
+                color: "#ffffff"
+            }
         }
         PlasmaComponents.Label {
             anchors.left:         compactIco.right

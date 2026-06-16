@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6 — 2026-06-16
+
+- Warning badge on the panel icon shows the count of active warnings for your location
+- Exponential backoff on transient poll failures after waking from sleep (5 s → 10 s → 20 s → 40 s → 80 s → 160 s); stale data stays visible during retries
+
 ## 1.5 — 2026-06-13 (first public release)
 
 - Public metadata (website, bug tracker, author contact)
