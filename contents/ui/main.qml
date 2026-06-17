@@ -29,7 +29,7 @@ PlasmoidItem {
             : 0)
 
     // Keep in sync with metadata.json — Plasma 6 QML exposes no version API.
-    readonly property string _widgetVersion: "1.7.1"
+    readonly property string _widgetVersion: "1.7.2"
 
     // ── State ─────────────────────────────────────────────────────────────
     property bool   pollOk:       false
@@ -1267,6 +1267,7 @@ except Exception as e:
         // ── Warnings tab ──────────────────────────────────────────────────
         QQC2.ScrollView {
             id: warningsTab
+            implicitHeight: 0
             Layout.fillWidth: true
             Layout.fillHeight: true
             contentWidth: availableWidth
