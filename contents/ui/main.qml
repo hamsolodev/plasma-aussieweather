@@ -1023,7 +1023,7 @@ except Exception as e:
                 PlasmaComponents.Button {
                     icon.name: "internet-web-browser-symbolic"
                     text: "BoM"
-                    onClicked: Qt.openUrlExternally("https://www.bom.gov.au/vic/")
+                    onClicked: Qt.openUrlExternally("https://www.bom.gov.au/location/australia")
                 }
             }
         }
