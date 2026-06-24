@@ -465,14 +465,15 @@ except Exception as e:
             }
         }
 
-        // Both tab bodies live in a StackLayout so the popup height is always
-        // the taller of the two — no resize jump when switching tabs.
-        StackLayout {
-            currentIndex: tabBar.currentIndex
+        // Tab bodies in a ColumnLayout with visible bindings so only the
+        // visible tab contributes to the popup implicit height.
+        ColumnLayout {
             Layout.fillWidth: true
+            spacing: 0
 
         // ── Weather tab ───────────────────────────────────────────────────
         ColumnLayout {
+            visible: tabBar.currentIndex === 0
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
 
@@ -1030,6 +1031,7 @@ except Exception as e:
 
         // ── Radar tab ─────────────────────────────────────────────────────
         ColumnLayout {
+            visible: tabBar.currentIndex === 1
             id: radarTab
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
@@ -1266,10 +1268,9 @@ except Exception as e:
 
         // ── Warnings tab ──────────────────────────────────────────────────
         QQC2.ScrollView {
+            visible: tabBar.currentIndex === 2
             id: warningsTab
-            implicitHeight: 0
             Layout.fillWidth: true
-            Layout.fillHeight: true
             contentWidth: availableWidth
             clip: true
 
@@ -1335,6 +1336,5 @@ except Exception as e:
                 }
             }
         }
-        } // StackLayout
     }
 }
