@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.7.3 — 2026-06-25
+
+- Popup now collapses to the visible tab's content height instead of always
+  sizing to the tallest tab (replaced StackLayout with ColumnLayout + visible
+  bindings)
+- BoM button now links to the national forecasts page (`/location/australia`)
+  instead of the broken `/vic/` URL
+
 ## 1.7.2 — 2026-06-17
 
 - Fix popup expanding to full screen height on first open: the Warnings
