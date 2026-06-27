@@ -29,7 +29,7 @@ PlasmoidItem {
             : 0)
 
     // Keep in sync with metadata.json — Plasma 6 QML exposes no version API.
-    readonly property string _widgetVersion: "1.7.3"
+    readonly property string _widgetVersion: "1.7.4"
 
     // ── State ─────────────────────────────────────────────────────────────
     property bool   pollOk:       false
@@ -1271,10 +1271,18 @@ except Exception as e:
             visible: tabBar.currentIndex === 2
             id: warningsTab
             Layout.fillWidth: true
+            // Cap the height this tab contributes to the popup. A long list of
+            // warnings otherwise reports its full content height as implicitHeight,
+            // inflating the popup past the screen — Plasma then clamps and persists
+            // that height, leaving stuck whitespace on the Weather/Radar tabs. Size
+            // to content up to the cap, then scroll the remainder internally.
+            implicitHeight: Math.min(warnContent.implicitHeight,
+                                     Kirigami.Units.gridUnit * 24)
             contentWidth: availableWidth
             clip: true
 
             ColumnLayout {
+                id: warnContent
                 width: warningsTab.availableWidth
                 spacing: Kirigami.Units.smallSpacing
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.7.4 — 2026-06-27
+
+- Fix never-collapsing whitespace on the Weather and Radar tabs when several
+  warnings are active: the Warnings tab's ScrollView reported its full content
+  height as implicitHeight, inflating the popup past the screen, which Plasma
+  then clamped and persisted — leaving the other tabs stuck tall. The Warnings
+  tab now contributes a capped height (24 grid units) and scrolls a long list
+  internally, so the popup stays sized to the visible tab
+
 ## 1.7.3 — 2026-06-25
 
 - Popup now collapses to the visible tab's content height instead of always
