@@ -4,35 +4,50 @@
 
 .pragma library
 
-// BoM icon_descriptor → Breeze icon name
+// BoM icon_descriptor → Breeze icon name.
+//
+// The first block is the descriptor set the BoM v1 API actually emits; anything
+// outside it falls back to weather-none-available (Breeze's purple "?"), so the
+// spelling has to match BoM exactly — it sends "windy", not "wind". Every icon
+// named here must also exist in the Breeze applets set; weather-severe-alert
+// does not, which is why cyclones point at weather-many-clouds-wind.
 var _iconMap = {
     "sunny":               "weather-clear",
+    "clear":               "weather-clear",
     "mostly_sunny":        "weather-clear",
     "partly_cloudy":       "weather-few-clouds",
-    "mostly_cloudy":       "weather-clouds",
     "cloudy":              "weather-overcast",
-    "overcast":            "weather-overcast",
     "hazy":                "weather-mist",
+    "dusty":               "weather-fog",
     "fog":                 "weather-fog",
     "frost":               "weather-freezing-rain",
     "light_shower":        "weather-showers-scattered",
-    "light_rain":          "weather-showers-scattered",
     "shower":              "weather-showers",
-    "rain":                "weather-showers",
     "heavy_shower":        "weather-showers",
+    "light_rain":          "weather-showers-scattered",
+    "rain":                "weather-showers",
+    "storm":               "weather-storm",
+    "snow":                "weather-snow",
+    "windy":               "weather-clear-wind",
+    "cyclone":             "weather-many-clouds-wind",
+    "tropical_cyclone":    "weather-many-clouds-wind",
+
+    // Aliases BoM isn't known to send, kept so a variant spelling still lands
+    // on a real icon rather than the fallback.
+    "mostly_cloudy":       "weather-clouds",
+    "overcast":            "weather-overcast",
+    "dust":                "weather-fog",
+    "wind":                "weather-clear-wind",
     "heavy_rain":          "weather-showers",
     "thunderstorm":        "weather-storm",
     "light_snow":          "weather-snow-scattered",
-    "snow":                "weather-snow",
     "sleet":               "weather-freezing-rain",
-    "hail":                "weather-hail",
-    "dust":                "weather-fog",
-    "wind":                "weather-few-clouds",
-    "cyclone":             "weather-severe-alert"
+    "hail":                "weather-hail"
 }
 
 var _nightOverrides = {
     "weather-clear":             "weather-clear-night",
+    "weather-clear-wind":        "weather-clear-wind-night",
     "weather-few-clouds":        "weather-few-clouds-night",
     "weather-showers-scattered": "weather-showers-scattered-night",
     "weather-storm":             "weather-storm-night"

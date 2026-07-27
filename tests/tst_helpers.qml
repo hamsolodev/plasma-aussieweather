@@ -30,7 +30,25 @@ TestCase {
         compare(Helpers.bomIcon("mostly_sunny", false), "weather-clear")
         compare(Helpers.bomIcon("shower", false), "weather-showers")
         compare(Helpers.bomIcon("thunderstorm", false), "weather-storm")
-        compare(Helpers.bomIcon("cyclone", false), "weather-severe-alert")
+        compare(Helpers.bomIcon("cyclone", false), "weather-many-clouds-wind")
+    }
+
+    // Every descriptor the BoM v1 API is known to emit must map to something
+    // other than the fallback — "windy" reaching weather-none-available is the
+    // bug this guards against.
+    function test_bomIcon_covers_every_bom_descriptor() {
+        var descriptors = [
+            "sunny", "clear", "mostly_sunny", "partly_cloudy", "cloudy",
+            "hazy", "dusty", "fog", "frost", "light_shower", "shower",
+            "heavy_shower", "light_rain", "rain", "storm", "snow", "windy",
+            "cyclone", "tropical_cyclone"
+        ]
+        for (var i = 0; i < descriptors.length; ++i) {
+            verify(Helpers.bomIcon(descriptors[i], false) !== "weather-none-available",
+                   "day icon missing for descriptor: " + descriptors[i])
+            verify(Helpers.bomIcon(descriptors[i], true) !== "weather-none-available",
+                   "night icon missing for descriptor: " + descriptors[i])
+        }
     }
 
     function test_bomIcon_night_overrides() {
@@ -38,6 +56,7 @@ TestCase {
         compare(Helpers.bomIcon("partly_cloudy", true), "weather-few-clouds-night")
         compare(Helpers.bomIcon("light_shower", true), "weather-showers-scattered-night")
         compare(Helpers.bomIcon("thunderstorm", true), "weather-storm-night")
+        compare(Helpers.bomIcon("windy", true), "weather-clear-wind-night")
     }
 
     function test_bomIcon_night_without_override_keeps_day_icon() {

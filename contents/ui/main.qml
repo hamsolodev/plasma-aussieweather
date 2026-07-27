@@ -664,7 +664,7 @@ except Exception as e:
 
                 PlasmaComponents.Label {
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
-                    visible: root.observations && root.observations.rain_since_9am !== undefined
+                    visible: !!root.observations && root.observations.rain_since_9am !== undefined
                     text: root.observations
                         ? "🌧  " + i18n("%1 mm since 9 am", root.observations.rain_since_9am || 0)
                         : ""
@@ -673,8 +673,8 @@ except Exception as e:
                 PlasmaComponents.Label {
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     opacity: 0.65
-                    visible: root.observations
-                             && (root.observations.dew_point !== undefined || root.observations.cloud)
+                    visible: !!root.observations
+                             && (root.observations.dew_point !== undefined || !!root.observations.cloud)
                     text: {
                         if (!root.observations) return ""
                         var parts = []
@@ -937,13 +937,13 @@ except Exception as e:
                     text: "🌛"
                 }
                 Kirigami.Icon {
-                    visible: !root.isNight && !!root.forecast[0].uv
+                    visible: !root.isNight && root.forecast.length > 0 && !!root.forecast[0].uv
                     Layout.preferredWidth:  Kirigami.Units.iconSizes.small
                     Layout.preferredHeight: Kirigami.Units.iconSizes.small
                     source: "weather-clear-symbolic"
                 }
                 PlasmaComponents.Label {
-                    visible: !root.isNight && !!root.forecast[0].uv
+                    visible: !root.isNight && root.forecast.length > 0 && !!root.forecast[0].uv
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     font.weight: Font.DemiBold
                     text: {
@@ -968,7 +968,7 @@ except Exception as e:
                 Item { Layout.fillWidth: true }
 
                 PlasmaComponents.Label {
-                    visible: !!root.forecast[0].astronomical
+                    visible: root.forecast.length > 0 && !!root.forecast[0].astronomical
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     opacity: 0.65
                     text: {
