@@ -6,6 +6,7 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
 import org.kde.plasma.plasmoid
+import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.components 3.0 as PlasmaComponents
 import org.kde.plasma.plasma5support as P5Support
 import org.kde.kirigami as Kirigami
@@ -439,9 +440,26 @@ except Exception as e:
 
     // ── Full representation (popup) ───────────────────────────────────────
     fullRepresentation: ColumnLayout {
+        id: fullRoot
         spacing: 0
         Layout.minimumWidth:   Kirigami.Units.gridUnit * 20
         Layout.preferredWidth: Kirigami.Units.gridUnit * 22
+
+        // Each tab body pins its footer to the bottom with an
+        // `Item { Layout.fillHeight: true }` spacer, and a ColumnLayout holding
+        // a fillHeight child reports Layout.maximumHeight as Infinity. Plasma
+        // clamps the popup into [minimumHeight, maximumHeight] against its
+        // *current* size, so with an unbounded maximum a popup that grew for a
+        // tall tab clamps to itself and never shrinks back — switching to a
+        // shorter tab left dead space. (The Warnings tab is a ScrollView with no
+        // spacer, so its maximum equals its content height, which is why that
+        // one tab always did collapse.) Cap the maximum to the content height
+        // while we're a panel popup; on the desktop the widget must stay freely
+        // resizable, so leave it unbounded there.
+        readonly property bool inPanelPopup:
+            Plasmoid.formFactor === PlasmaCore.Types.Horizontal
+            || Plasmoid.formFactor === PlasmaCore.Types.Vertical
+        Layout.maximumHeight: inPanelPopup ? implicitHeight : Number.POSITIVE_INFINITY
 
         // Tab bar — the Warnings tab only exists while warnings are in effect.
         // TabBar doesn't collapse invisible buttons, so width must be zeroed too.
