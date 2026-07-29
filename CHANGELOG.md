@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.7.5 — 2026-07-29
+
+- Fix weather icons showing as a purple question mark in windy conditions. The
+  BoM icon map was built from guessed descriptor names, so several values the
+  API actually sends had no entry and fell through to the "unknown weather"
+  placeholder — `windy` (spelt `wind` in the map), plus `clear`, `storm`,
+  `dusty` and `tropical_cyclone`. `cyclone` also pointed at an icon that does
+  not exist in the Breeze icon set, giving the same placeholder
+- Fix the popup keeping its height after switching from a taller tab to a
+  shorter one, leaving dead space below the content. Each tab pins its footer
+  to the bottom with a stretching spacer, which left the popup's maximum height
+  unbounded; Plasma then had no constraint pulling the popup back down. The
+  maximum is now capped to the visible tab's content height while in a panel
+  popup, and left unbounded on the desktop so the widget stays resizable
+- Fix errors logged before the first forecast arrives, from `visible` bindings
+  that read the first forecast entry without checking the list was populated
+
 ## 1.7.4 — 2026-06-27
 
 - Fix never-collapsing whitespace on the Weather and Radar tabs when several
