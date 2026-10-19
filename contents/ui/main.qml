@@ -1065,17 +1065,29 @@ except Exception as e:
             }
             Component.onCompleted: syncQuickPickers()
 
+            // Whether radar frame i has loaded. Frames load asynchronously, and
+            // one still loading shows as a blank.
+            function frameLoaded(i) {
+                var frame = radarFrames.itemAt(i)
+                return frame !== null && frame.status === Image.Ready
+            }
+
             Binding {
                 target: root
                 property: "radarActive"
                 value: root.expanded && tabBar.currentIndex === 1
             }
 
+            // The loop steps only to frames that have loaded, so on a slow
+            // connection the first pass skips frames still loading rather than
+            // flashing them blank; they join the loop as they arrive.
             Timer {
                 interval: 400
                 running: root.radarActive && root.radarFrameUrls.length > 0
                 repeat: true
-                onTriggered: root.radarFrameIdx = (root.radarFrameIdx + 1) % root.radarFrameUrls.length
+                onTriggered: root.radarFrameIdx = Helpers.nextLoadedFrame(
+                    root.radarFrameIdx, root.radarFrameUrls.length,
+                    i => radarTab.frameLoaded(i))
             }
 
             // Equal stretch above and below centres the radar vertically;
@@ -1183,6 +1195,7 @@ except Exception as e:
                 // Animated radar loop — all frames pre-loaded, only current frame visible.
                 // cache: false so replaced frames are released when the model updates.
                 Repeater {
+                    id: radarFrames
                     model: root.radarFrameUrls
                     Image {
                         required property string modelData
@@ -1193,6 +1206,14 @@ except Exception as e:
                         asynchronous: true
                         cache: false
                         visible: index === root.radarFrameIdx
+                        // While the frame on show has not loaded (a new set has
+                        // just started), the first to arrive is shown at once
+                        // rather than at the loop's next step.
+                        onStatusChanged: {
+                            if (status === Image.Ready
+                                    && !radarTab.frameLoaded(root.radarFrameIdx))
+                                root.radarFrameIdx = index
+                        }
                     }
                 }
 

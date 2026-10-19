@@ -241,4 +241,39 @@ TestCase {
                 'See <a href="http://bom.gov.au/x">http://bom.gov.au/x</a> now')
         compare(Helpers.warningHtml("plain & simple"), "plain &amp; simple")
     }
+
+    // ── nextLoadedFrame (radar loop) ──────────────────────────────────────
+
+    // Frames as the radar tab sees them: true where the Image has loaded.
+    function readyAt(frames) {
+        return function(i) { return frames[i] === true }
+    }
+
+    function test_nextLoadedFrame_steps_through_loaded_frames() {
+        var all = readyAt([true, true, true])
+        compare(Helpers.nextLoadedFrame(0, 3, all), 1)
+        compare(Helpers.nextLoadedFrame(1, 3, all), 2)
+        compare(Helpers.nextLoadedFrame(2, 3, all), 0)
+    }
+
+    // The first loop on a slow connection: frames still loading are skipped,
+    // never shown blank.
+    function test_nextLoadedFrame_skips_frames_not_loaded() {
+        var some = readyAt([false, true, false, false, true, false])
+        compare(Helpers.nextLoadedFrame(1, 6, some), 4)
+        compare(Helpers.nextLoadedFrame(4, 6, some), 1)
+        // From a frame not yet loaded (where a new set starts), to the next
+        // loaded one.
+        compare(Helpers.nextLoadedFrame(0, 6, some), 1)
+        compare(Helpers.nextLoadedFrame(5, 6, some), 1)
+    }
+
+    function test_nextLoadedFrame_holds_when_nothing_else_has_loaded() {
+        compare(Helpers.nextLoadedFrame(2, 4, readyAt([false, false, true, false])), 2)
+        compare(Helpers.nextLoadedFrame(0, 4, readyAt([false, false, false, false])), 0)
+    }
+
+    function test_nextLoadedFrame_no_frames() {
+        compare(Helpers.nextLoadedFrame(0, 0, readyAt([])), 0)
+    }
 }

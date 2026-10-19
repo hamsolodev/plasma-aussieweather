@@ -184,3 +184,15 @@ function moonPhase(date) {
     if (phase < band * 7.5) return {emoji: "🌘", name: "Waning Crescent"}
     return {emoji: "🌑", name: "New Moon"}
 }
+
+// The radar loop's next frame after `current`, of `count`: the next one for
+// which isReady(i) is true, wrapping round. Frames load asynchronously, so on
+// a slow connection the first loop would otherwise show the frames still
+// loading as blanks. With nothing else loaded it stays on `current`.
+function nextLoadedFrame(current, count, isReady) {
+    for (var step = 1; step <= count; step++) {
+        var i = (current + step) % count
+        if (isReady(i)) return i
+    }
+    return current
+}
