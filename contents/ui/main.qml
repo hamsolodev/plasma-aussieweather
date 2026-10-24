@@ -8,6 +8,7 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
 
+import "places.js" as Places
 
 // Aussie Weather: wires the configuration to the weather and radar sources,
 // and those to the panel view, its tooltip and the popup.
@@ -17,6 +18,22 @@ PlasmoidItem {
     // A floor of 10 minutes whatever the config says: BoM's observations
     // update about that often, so polling faster gains nothing.
     readonly property int pollInterval: Math.max(600000, Plasmoid.configuration.pollInterval)
+
+    // The saved places, and the one shown (places.js). The place shown is
+    // locationSearch and radarStation, which the weather and radar read.
+    readonly property var places: Places.fromConfig(Plasmoid.configuration.places,
+                                                    Plasmoid.configuration.locationSearch,
+                                                    Plasmoid.configuration.radarStation)
+    readonly property int currentPlace: Places.indexOf(places, Plasmoid.configuration.locationSearch)
+
+    // Show the saved place at `index`. The list is saved first: one from
+    // before saved places exists only as the place shown until then.
+    function showPlace(index) {
+        var place = places[index]
+        Plasmoid.configuration.places = Places.toConfig(places)
+        Plasmoid.configuration.radarStation = place.radar
+        Plasmoid.configuration.locationSearch = place.search
+    }
 
     MinuteClock {
         id: minuteClock
@@ -81,6 +98,10 @@ PlasmoidItem {
         expanded: root.expanded
         inPanelPopup: Plasmoid.formFactor === PlasmaCore.Types.Horizontal
                       || Plasmoid.formFactor === PlasmaCore.Types.Vertical
+        places: root.places
+        currentPlace: root.currentPlace
         onRefreshRequested: weatherSource.refresh()
+        onPlaceChosen: (index) => root.showPlace(index)
+        onConfigureRequested: Plasmoid.internalAction("configure").trigger()
     }
 }

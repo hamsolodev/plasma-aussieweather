@@ -9,7 +9,7 @@ msgstr ""
 "Project-Id-Version: plasma_applet_net.tropism.plasma.aussieweather\n"
 "Report-Msgid-Bugs-To: https://github.com/hamsolodev/plasma-aussieweather/"
 "issues\n"
-"POT-Creation-Date: 2026-10-24 03:54+0000\n"
+"POT-Creation-Date: 2026-10-24 06:10+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -23,36 +23,45 @@ msgstr ""
 msgid "General"
 msgstr ""
 
-#: contents/ui/ConfigPage.qml:43
-msgid "Location:"
+#: contents/ui/ConfigPage.qml:72
+msgid "Places:"
 msgstr ""
 
-#: contents/ui/ConfigPage.qml:50
-msgid "Radar station:"
+#: contents/ui/ConfigPage.qml:110
+msgid "Show this place"
 msgstr ""
 
-#: contents/ui/ConfigPage.qml:59
-msgid "Radar range:"
-msgstr ""
-
-#: contents/ui/ConfigPage.qml:63 contents/ui/RadarTab.qml:77
+#: contents/ui/ConfigPage.qml:138 contents/ui/RadarTab.qml:77
 msgid "%1 km"
 msgstr ""
 
-#: contents/ui/ConfigPage.qml:70
+#: contents/ui/ConfigPage.qml:145
+msgid "Remove This Place"
+msgstr ""
+
+#: contents/ui/ConfigPage.qml:149
+msgid "Remove this place"
+msgstr ""
+
+#: contents/ui/ConfigPage.qml:158
+msgid "Add Place"
+msgstr ""
+
+#: contents/ui/ConfigPage.qml:165
 msgid "Update interval:"
 msgstr ""
 
-#: contents/ui/ConfigPage.qml:76
+#: contents/ui/ConfigPage.qml:171
 msgctxt "minutes"
 msgid "%1 min"
 msgstr ""
 
-#: contents/ui/ConfigPage.qml:87
+#: contents/ui/ConfigPage.qml:182
 msgid ""
-"Location: use 'Suburb STATE', e.g. 'Seaford VIC' or 'Sydney NSW'.\n"
-"Pick the radar station nearest your location; smaller ranges show more "
-"detail."
+"Each place is 'Suburb STATE', e.g. 'Seaford VIC' or 'Sydney NSW', with the "
+"radar station nearest it; smaller ranges show more detail.\n"
+"The marked place is shown. Click the place's name at the bottom of the popup "
+"to switch between them."
 msgstr ""
 
 #: contents/ui/CurrentConditions.qml:52 contents/ui/HourlyStrip.qml:65
@@ -83,15 +92,15 @@ msgstr[1] ""
 msgid "Today"
 msgstr ""
 
-#: contents/ui/FullView.qml:56
+#: contents/ui/FullView.qml:61
 msgid "Weather"
 msgstr ""
 
-#: contents/ui/FullView.qml:57
+#: contents/ui/FullView.qml:62
 msgid "Radar"
 msgstr ""
 
-#: contents/ui/FullView.qml:61
+#: contents/ui/FullView.qml:66
 msgid "⚠ Warnings (%1)"
 msgstr ""
 
@@ -131,24 +140,24 @@ msgstr ""
 msgid "Rain %1–%2 mm"
 msgstr ""
 
-#: contents/ui/RadarSource.qml:98
+#: contents/ui/RadarSource.qml:107
 msgid "Not a radar station: %1"
 msgstr ""
 
-#: contents/ui/RadarSource.qml:99
+#: contents/ui/RadarSource.qml:108
 msgid ""
 "No recent radar images. The station may be offline; try a neighbouring one."
 msgstr ""
 
-#: contents/ui/RadarSource.qml:100
+#: contents/ui/RadarSource.qml:109
 msgid "Cannot reach BoM's radar listing: %1"
 msgstr ""
 
-#: contents/ui/RadarSource.qml:101
+#: contents/ui/RadarSource.qml:110
 msgid "The radar script failed: %1"
 msgstr ""
 
-#: contents/ui/RadarSource.qml:102
+#: contents/ui/RadarSource.qml:111
 msgid "Radar update failed: %1"
 msgstr ""
 
@@ -247,81 +256,93 @@ msgstr ""
 msgid "Warning"
 msgstr ""
 
-#: contents/ui/WarningsTab.qml:96
+#: contents/ui/WarningsTab.qml:98
 msgid "Final warning"
 msgstr ""
 
-#: contents/ui/WarningsTab.qml:98
+#: contents/ui/WarningsTab.qml:100
 msgid "Issued %1"
 msgstr ""
 
-#: contents/ui/WarningsTab.qml:100
+#: contents/ui/WarningsTab.qml:102
 msgid "Expires %1"
 msgstr ""
 
-#: contents/ui/WeatherSource.qml:71
+#: contents/ui/WeatherSource.qml:84
 msgid "No location set. Choose one in the widget's settings."
 msgstr ""
 
-#: contents/ui/WeatherSource.qml:72
+#: contents/ui/WeatherSource.qml:85
 msgid "Location not found: %1"
 msgstr ""
 
-#: contents/ui/WeatherSource.qml:73
+#: contents/ui/WeatherSource.qml:86
 msgid "BoM returned an error: %1"
 msgstr ""
 
-#: contents/ui/WeatherSource.qml:74
+#: contents/ui/WeatherSource.qml:87
 msgid "Cannot reach BoM: %1"
 msgstr ""
 
-#: contents/ui/WeatherSource.qml:75
+#: contents/ui/WeatherSource.qml:88
 msgid "Unexpected response from BoM: %1"
 msgstr ""
 
-#: contents/ui/WeatherSource.qml:76
+#: contents/ui/WeatherSource.qml:89
 msgid "The weather script failed: %1"
 msgstr ""
 
-#: contents/ui/WeatherSource.qml:77
+#: contents/ui/WeatherSource.qml:90
 msgid "Update failed: %1"
 msgstr ""
 
-#: contents/ui/WeatherSource.qml:114
+#: contents/ui/WeatherSource.qml:127
 msgid "Warnings could not be updated: %1"
 msgstr ""
 
-#: contents/ui/WeatherSource.qml:116
+#: contents/ui/WeatherSource.qml:129
 msgid "The hourly forecast could not be updated: %1"
 msgstr ""
 
-#: contents/ui/WeatherSource.qml:118
+#: contents/ui/WeatherSource.qml:131
 msgid "Warning maps cannot be shown: %1"
 msgstr ""
 
-#: contents/ui/WeatherTab.qml:69
+#: contents/ui/WeatherTab.qml:78
 msgid "Waiting for data…"
 msgstr ""
 
-#: contents/ui/WeatherTab.qml:134
+#: contents/ui/WeatherTab.qml:139
+msgid "Switch Place"
+msgstr ""
+
+#: contents/ui/WeatherTab.qml:147
+msgid "Choose a place"
+msgstr ""
+
+#: contents/ui/WeatherTab.qml:185
+msgid "Add or Edit Places…"
+msgstr ""
+
+#: contents/ui/WeatherTab.qml:200
 msgctxt "observation station and its distance"
 msgid "%1 (%2 km)"
 msgstr ""
 
-#: contents/ui/WeatherTab.qml:149
+#: contents/ui/WeatherTab.qml:215
 msgctxt "abbreviation of Bureau of Meteorology"
 msgid "BoM"
 msgstr ""
 
-#: contents/ui/main.qml:61
+#: contents/ui/main.qml:78
 msgctxt "BoM is the Bureau of Meteorology; %1 is the location"
 msgid "BoM — %1"
 msgstr ""
 
-#: contents/ui/main.qml:63
+#: contents/ui/main.qml:80
 msgid "Connecting…"
 msgstr ""
 
-#: contents/ui/main.qml:67
+#: contents/ui/main.qml:84
 msgid "Last updated %1"
 msgstr ""

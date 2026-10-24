@@ -28,6 +28,17 @@ class ConfigDefaultsTest(unittest.TestCase):
         self.assertIsNotNone(default_id, "defaultId not found in radarstations.js")
         self.assertEqual(defaults()["radarStation"], default_id.group(1))
 
+    def test_the_settings_page_declares_only_config_entries(self):
+        # Plasma fills a cfg_ property from the entry of that name: one with
+        # no entry is never loaded or saved.
+        page = (CONTENTS / "ui" / "ConfigPage.qml").read_text()
+        declared = set(re.findall(r"^\s*property\s+\w+\s+cfg_(\w+)", page, re.MULTILINE))
+        self.assertTrue(declared, "no cfg_ properties found in ConfigPage.qml")
+        self.assertLessEqual(declared, set(defaults()))
+
+    def test_no_place_is_saved_by_default(self):
+        self.assertEqual(defaults()["places"], "")
+
 
 if __name__ == "__main__":
     unittest.main()

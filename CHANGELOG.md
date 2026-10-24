@@ -3,6 +3,8 @@
 ## 1.8.0 — 2026-10-24
 
 New
+- Several places, each with its own radar station: switch between them
+  by clicking the place's name at the bottom of the popup (#2)
 - An icon of its own, Australia under the sun, in Plasma's widget
   explorer and on the website
 

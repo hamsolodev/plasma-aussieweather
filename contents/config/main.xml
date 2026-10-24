@@ -12,14 +12,22 @@ SPDX-License-Identifier: GPL-2.0-or-later
                           http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
     <kcfgfile name=""/>
     <group name="General">
-        <!-- BoM location search string, e.g. "Seaford VIC". -->
+        <!-- The place on show: BoM location search string, e.g. "Seaford
+             VIC". -->
         <entry name="locationSearch" type="String">
             <default>Seaford VIC</default>
         </entry>
-        <!-- BoM radar station ID, e.g. IDR022 = Melbourne 256 km. Must
-             match RadarStations.defaultId. -->
+        <!-- The place on show's BoM radar station ID, e.g. IDR022 =
+             Melbourne 256 km. Must match RadarStations.defaultId. -->
         <entry name="radarStation" type="String">
             <default>IDR022</default>
+        </entry>
+        <!-- Every saved place, the one on show among them: one JSON object
+             each, {"search": "Seaford VIC", "radar": "IDR023"} (places.js).
+             Empty in a config from before saved places, which then has
+             just the place on show. -->
+        <entry name="places" type="StringList">
+            <default></default>
         </entry>
         <!-- Poll interval in milliseconds. -->
         <entry name="pollInterval" type="Int">

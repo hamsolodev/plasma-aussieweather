@@ -9,17 +9,26 @@ import org.kde.kirigami as Kirigami
 
 // The Weather tab: a warning banner, the conditions now, the hourly and
 // daily forecasts, today's extended forecast, UV, sun and moon, and a
-// footer naming the location and station with refresh and BoM buttons.
+// footer naming the place, which switches between the saved places, and the
+// station, with refresh and BoM buttons.
 ColumnLayout {
     id: tab
 
     required property WeatherModel weather
     required property MinuteClock clock
+    // The saved places, {search, radar} each (places.js), and the index of
+    // the one shown.
+    required property var places
+    required property int currentPlace
 
     // The banner was clicked: show the Warnings tab.
     signal warningsRequested()
     // The refresh button was clicked.
     signal refreshRequested()
+    // A place was picked from the place menu.
+    signal placeChosen(int index)
+    // "Add or Edit Places…" was picked.
+    signal configureRequested()
 
     spacing: Kirigami.Units.smallSpacing
 
@@ -115,19 +124,76 @@ ColumnLayout {
 
     Kirigami.Separator { Layout.fillWidth: true }
 
-    // Footer: location · station (distance) · last update | refresh | BoM
+    // Footer: place ▾ | station (distance) · last update | refresh | BoM
     RowLayout {
         Layout.fillWidth: true
         Layout.leftMargin:   Kirigami.Units.smallSpacing
         Layout.rightMargin:  Kirigami.Units.smallSpacing
         Layout.bottomMargin: Kirigami.Units.smallSpacing
 
+        // The place, which opens a menu of the saved places. Names are drawn
+        // by PlainLabels: a control's own label renders AutoText.
+        PlasmaComponents.ToolButton {
+            id: placeButton
+            Layout.maximumWidth: Kirigami.Units.gridUnit * 9
+            text: i18n("Switch Place")
+            onClicked: placeMenu.popup(placeButton, 0, placeButton.height)
+            contentItem: RowLayout {
+                spacing: Kirigami.Units.smallSpacing
+                PlainLabel {
+                    Layout.fillWidth: true
+                    opacity: 0.7
+                    elide: Text.ElideRight
+                    text: tab.weather.locationName || i18n("Choose a place")
+                }
+                Kirigami.Icon {
+                    source: "arrow-down"
+                    Layout.preferredWidth: Kirigami.Units.iconSizes.small
+                    Layout.preferredHeight: Kirigami.Units.iconSizes.small
+                }
+            }
+
+            PlasmaComponents.Menu {
+                id: placeMenu
+
+                Instantiator {
+                    model: tab.places
+                    delegate: PlasmaComponents.MenuItem {
+                        id: placeItem
+                        required property int index
+                        required property var modelData
+                        checkable: true
+                        checked: index === tab.currentPlace
+                        onTriggered: tab.placeChosen(index)
+                        // As Plasma's MenuItem lays its label out.
+                        contentItem: RowLayout {
+                            Item { Layout.preferredWidth: placeItem.indicator.width }
+                            PlainLabel {
+                                Layout.fillWidth: true
+                                text: placeItem.modelData.search
+                            }
+                        }
+                    }
+                    onObjectAdded: (index, object) => placeMenu.insertItem(index, object)
+                    onObjectRemoved: (index, object) => placeMenu.removeItem(object)
+                }
+
+                PlasmaComponents.MenuSeparator {}
+
+                PlasmaComponents.MenuItem {
+                    icon.name: "configure"
+                    text: i18n("Add or Edit Places…")
+                    onTriggered: tab.configureRequested()
+                }
+            }
+        }
+
         PlainLabel {
             Layout.fillWidth: true
             opacity: 0.5
             elide: Text.ElideRight
             text: {
-                var parts = [tab.weather.locationName]
+                var parts = []
                 var obs = tab.weather.observations
                 if (obs && obs.station) {
                     parts.push(obs.station.distance

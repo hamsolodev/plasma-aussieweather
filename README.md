@@ -32,6 +32,9 @@ UV index, severe weather warnings, and an animated rain radar loop.
 - **Radar tab:** animated rain radar composited from BoM's transparency
   layers, with a frame counter and quick station/range switching — the
   station configured in settings stays the sticky default
+- **Places:** save several places (home, school, work…) and switch between
+  them by clicking the place's name at the bottom of the popup; each keeps
+  its own radar station and range
 - **Warnings tab:** appears only while warnings are current for your
   location; full warning text in a scrollable list, plus a banner on the
   Weather tab
@@ -80,12 +83,13 @@ made so, the maps are not shown and the widget says why.
 
 ## Configuration
 
-- **Location** — free text, `Suburb STATE` form: `Seaford VIC`, `Sydney NSW`.
-  The widget resolves it once via the BoM location search and caches the
-  result.
-- **Radar station** — pick by name; the range list offers only what that
-  station publishes. Pick the station nearest your location; smaller ranges
-  show more detail.
+- **Places** — one or more, each a location in `Suburb STATE` form
+  (`Seaford VIC`, `Sydney NSW`) with its own radar station, picked by name,
+  and range, which offers only what that station publishes. Pick the
+  station nearest the place; smaller ranges show more detail. The marked
+  place is shown; the popup switches between them too. The widget looks a
+  place up once via the BoM location search, and again only when it
+  changes.
 - **Update interval** — 10–60 minutes (10-minute minimum is also enforced in
   code; BoM observations only update every ~10 minutes, so faster polling
   gains nothing).

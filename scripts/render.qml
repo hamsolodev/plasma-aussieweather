@@ -102,5 +102,7 @@ Window {
         clock: clock
         expanded: liveRadar
         inPanelPopup: true
+        places: [{ search: "Seaford VIC", radar: "IDR023" }, { search: "Frankston VIC", radar: "IDR023" }]
+        currentPlace: 0
     }
 }

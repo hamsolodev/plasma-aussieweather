@@ -7,14 +7,16 @@ import QtQuick.Layouts
 import QtQuick.Controls as QQC2
 import org.kde.kirigami as Kirigami
 
+import "places.js" as Places
 import "radarstations.js" as RadarStations
 
 Kirigami.FormLayout {
     id: page
     Layout.margins: Kirigami.Units.largeSpacing
 
-    property alias cfg_locationSearch: locationField.text
+    property string cfg_locationSearch
     property string cfg_radarStation
+    property var    cfg_places
     property int    cfg_pollInterval
 
     // Plasma passes the page a title and a cfg_ property for every config
@@ -26,43 +28,136 @@ Kirigami.FormLayout {
     // difference from it as an unsaved change.
     property string title
 
-    // Show and store one product ID: the pickers follow it, so a station
-    // change can keep the range (the range model rebinds and resets).
-    function select(id) {
-        var at = RadarStations.locate(id)
-        stationCombo.currentIndex = at.station
-        rangeCombo.currentIndex = at.range
-        cfg_radarStation = id
+    // The places being edited, {search, radar} each, and which one is shown.
+    ListModel { id: placesModel }
+    property int shown: 0
+
+    // Put the edited places in the cfg_ properties Plasma saves: the list,
+    // and the place shown as locationSearch and radarStation.
+    function save() {
+        var places = []
+        for (var i = 0; i < placesModel.count; i++)
+            places.push({ search: placesModel.get(i).search, radar: placesModel.get(i).radar })
+        cfg_places = Places.toConfig(places)
+        var place = places[shown]
+        cfg_locationSearch = place ? place.search.trim() : ""
+        cfg_radarStation = place ? place.radar : RadarStations.defaultId
     }
 
-    Component.onCompleted: select(RadarStations.isKnownId(cfg_radarStation)
-                                  ? cfg_radarStation : RadarStations.defaultId)
-
-    QQC2.TextField {
-        id: locationField
-        Kirigami.FormData.label: i18n("Location:")
-        placeholderText: "Seaford VIC"
-        Layout.minimumWidth: Kirigami.Units.gridUnit * 18
+    function addPlace() {
+        placesModel.append({ search: "", radar: RadarStations.defaultId })
     }
 
-    QQC2.ComboBox {
-        id: stationCombo
-        Kirigami.FormData.label: i18n("Radar station:")
-        Layout.minimumWidth: Kirigami.Units.gridUnit * 18
-        model: RadarStations.stations.map(function(s) { return s.name })
-        onActivated: page.select(RadarStations.idFor(
-            currentIndex, RadarStations.parseId(page.cfg_radarStation).km))
+    // Removing the place shown shows the next one (or, if it was last, the
+    // one before).
+    function removePlace(index) {
+        placesModel.remove(index)
+        if (index < shown || shown >= placesModel.count)
+            shown--
+        save()
     }
 
-    QQC2.ComboBox {
-        id: rangeCombo
-        Kirigami.FormData.label: i18n("Radar range:")
-        Layout.minimumWidth: Kirigami.Units.gridUnit * 18
-        model: stationCombo.currentIndex >= 0
-            ? RadarStations.stations[stationCombo.currentIndex].ranges.map(
-                  function(r) { return i18n("%1 km", r) })
-            : []
-        onActivated: page.select(RadarStations.idAt(stationCombo.currentIndex, currentIndex))
+    // Loading saves nothing: a config from before saved places would
+    // otherwise count as changed the moment the page opened.
+    Component.onCompleted: {
+        var places = Places.fromConfig(cfg_places, cfg_locationSearch, cfg_radarStation)
+        for (var i = 0; i < places.length; i++)
+            placesModel.append(places[i])
+        if (placesModel.count === 0)
+            addPlace()
+        shown = Math.max(0, Places.indexOf(places, cfg_locationSearch))
+    }
+
+    ColumnLayout {
+        Kirigami.FormData.label: i18n("Places:")
+        // Beside the first place, not the middle of the list.
+        Kirigami.FormData.labelAlignment: Qt.AlignTop
+        spacing: Kirigami.Units.smallSpacing
+
+        QQC2.ButtonGroup { id: shownGroup }
+
+        Repeater {
+            model: placesModel
+
+            RowLayout {
+                id: row
+                required property int index
+                required property string search
+                required property string radar
+
+                // Show and store one product ID: the pickers follow it, so
+                // a station change can keep the range (the range model
+                // rebinds and resets).
+                function show(id) {
+                    var at = RadarStations.locate(id)
+                    stationCombo.currentIndex = at.station
+                    rangeCombo.currentIndex = at.range
+                }
+                function select(id) {
+                    show(id)
+                    placesModel.setProperty(index, "radar", id)
+                    page.save()
+                }
+                Component.onCompleted: show(radar)
+
+                QQC2.RadioButton {
+                    QQC2.ButtonGroup.group: shownGroup
+                    checked: row.index === page.shown
+                    onToggled: {
+                        page.shown = row.index
+                        page.save()
+                    }
+                    QQC2.ToolTip.text: i18n("Show this place")
+                    QQC2.ToolTip.visible: hovered
+                    QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
+                }
+
+                QQC2.TextField {
+                    Layout.preferredWidth: Kirigami.Units.gridUnit * 10
+                    text: row.search
+                    placeholderText: "Seaford VIC"
+                    onTextEdited: {
+                        placesModel.setProperty(row.index, "search", text)
+                        page.save()
+                    }
+                }
+
+                QQC2.ComboBox {
+                    id: stationCombo
+                    Layout.preferredWidth: Kirigami.Units.gridUnit * 11
+                    model: RadarStations.stations.map(function(s) { return s.name })
+                    onActivated: row.select(RadarStations.idFor(
+                        currentIndex, RadarStations.parseId(row.radar).km))
+                }
+
+                QQC2.ComboBox {
+                    id: rangeCombo
+                    Layout.preferredWidth: Kirigami.Units.gridUnit * 5
+                    model: stationCombo.currentIndex >= 0
+                        ? RadarStations.stations[stationCombo.currentIndex].ranges.map(
+                              function(r) { return i18n("%1 km", r) })
+                        : []
+                    onActivated: row.select(RadarStations.idAt(stationCombo.currentIndex, currentIndex))
+                }
+
+                QQC2.ToolButton {
+                    icon.name: "list-remove-symbolic"
+                    text: i18n("Remove This Place")
+                    display: QQC2.AbstractButton.IconOnly
+                    enabled: placesModel.count > 1
+                    onClicked: page.removePlace(row.index)
+                    QQC2.ToolTip.text: i18n("Remove this place")
+                    QQC2.ToolTip.visible: hovered
+                    QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
+                }
+            }
+        }
+
+        QQC2.Button {
+            icon.name: "list-add-symbolic"
+            text: i18n("Add Place")
+            onClicked: page.addPlace()
+        }
     }
 
     QQC2.SpinBox {
@@ -84,7 +179,7 @@ Kirigami.FormLayout {
         Layout.minimumWidth: Kirigami.Units.gridUnit * 20
         type: Kirigami.MessageType.Information
         visible: true
-        text: i18n("Location: use 'Suburb STATE', e.g. 'Seaford VIC' or 'Sydney NSW'.\n" +
-                   "Pick the radar station nearest your location; smaller ranges show more detail.")
+        text: i18n("Each place is 'Suburb STATE', e.g. 'Seaford VIC' or 'Sydney NSW', with the radar station nearest it; smaller ranges show more detail.\n" +
+                   "The marked place is shown. Click the place's name at the bottom of the popup to switch between them.")
     }
 }

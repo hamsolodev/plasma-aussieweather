@@ -19,8 +19,13 @@ ColumnLayout {
     required property bool expanded
     // Whether this is a panel's popup rather than a desktop widget.
     required property bool inPanelPopup
+    // The saved places (places.js) and the index of the one shown.
+    required property var places
+    required property int currentPlace
 
     signal refreshRequested()
+    signal placeChosen(int index)
+    signal configureRequested()
 
     // The tabs, in the order the bar shows them.
     readonly property int weatherTab: 0
@@ -89,8 +94,12 @@ ColumnLayout {
             Layout.fillWidth: true
             weather: full.weather
             clock: full.clock
+            places: full.places
+            currentPlace: full.currentPlace
             onWarningsRequested: full.currentTab = full.warningsTab
             onRefreshRequested: full.refreshRequested()
+            onPlaceChosen: (index) => full.placeChosen(index)
+            onConfigureRequested: full.configureRequested()
         }
 
         RadarTab {
