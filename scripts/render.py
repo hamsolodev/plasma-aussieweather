@@ -7,9 +7,14 @@
 """Render the widget's popup offscreen, one PNG per tab, from fixture data.
 
     scripts/render.py OUTDIR [--scheme light|dark] [--radar-wait SECONDS] [--offline]
+                             [--live PLACE [--station ID]] [--scale FACTOR]
 
 The views are the real ones from contents/ui, fed a synthetic forecast,
-inside a plain window (scripts/render.qml) instead of plasmashell. Prints
+inside a plain window (scripts/render.qml) instead of plasmashell. With
+--live they show BoM's weather for PLACE now instead, fetched by poll.py,
+and the radar of --station; scripts/docs-screenshots.sh takes the
+README's screenshots this way. --scale renders at that many device pixels
+to each pixel. Prints
 each tab's popup height, and exits non-zero if QML logged any warning, so
 it doubles as a smoke test of the QML that plasmashell would swallow. It
 also renders the panel, and runs the real poll.py through WeatherSource
@@ -36,6 +41,7 @@ import pathlib
 import re
 import shutil
 import struct
+import subprocess
 import sys
 import tempfile
 import zlib
@@ -185,6 +191,20 @@ def fixture(now, map_path):
     return {"now": iso(now), "station": "IDR023", "poll": poll}
 
 
+def live(place, station, now, cache):
+    """BoM's weather for PLACE now, as fixture() shapes it: poll.py's
+    answer, its warning maps saved under CACHE, shown with the radar
+    product STATION."""
+    result = subprocess.run([sys.executable, "-I", str(ROOT / "contents" / "code" / "poll.py"),
+                             "render", "", place],
+                            env=dict(os.environ, XDG_CACHE_HOME=cache),
+                            capture_output=True, text=True, timeout=180, check=True)
+    poll = json.loads(result.stdout)
+    if not poll.get("ok"):
+        sys.exit("render: BoM's weather for %s: %s %s" % (place, poll.get("error"), poll.get("detail")))
+    return {"now": iso(now), "station": station, "poll": poll}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("outdir", type=pathlib.Path)
@@ -192,6 +212,12 @@ def main():
     parser.add_argument("--radar-wait", type=float, default=20.0)
     parser.add_argument("--offline", action="store_true",
                         help="keep the radar inactive: no network")
+    parser.add_argument("--live", metavar="PLACE",
+                        help="show BoM's weather for PLACE now, not the fixture")
+    parser.add_argument("--station", default="IDR023",
+                        help="the radar product shown with --live (default: Melbourne, 128 km)")
+    parser.add_argument("--scale", type=float, default=1.0,
+                        help="device pixels to each pixel (default: 1)")
     options = parser.parse_args()
 
     # The KDE platform theme reads its colours from kdeglobals; a private
@@ -207,7 +233,7 @@ def render(options, config_home):
     # container has none, and Qt would warn as it fell back to it).
     os.environ.update({"XDG_CONFIG_HOME": config_home, "QT_QPA_PLATFORM": "offscreen",
                        "QT_QPA_PLATFORMTHEME": "kde", "QT_QUICK_BACKEND": "software",
-                       "TZ": "Australia/Melbourne"})
+                       "TZ": "Australia/Melbourne", "QT_SCALE_FACTOR": str(options.scale)})
 
     from PySide6.QtCore import QObject, QTimer, QUrl, qInstallMessageHandler, QtMsgType
     from PySide6.QtGui import QGuiApplication, QWindow
@@ -241,8 +267,10 @@ def render(options, config_home):
     QQmlEngine.setObjectOwnership(i18n, QQmlEngine.ObjectOwnership.CppOwnership)
     engine.rootContext().setContextObject(i18n)
     now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
-    map_path = warning_map(pathlib.Path(config_home) / "warning-map.png")
-    shown = fixture(now, map_path)
+    if options.live:
+        shown = live(options.live, options.station, now, config_home)
+    else:
+        shown = fixture(now, warning_map(pathlib.Path(config_home) / "warning-map.png"))
     engine.rootContext().setContextProperty("fixtureJson", json.dumps(shown))
     engine.rootContext().setContextProperty(
         "markedFixtureJson", json.dumps(dict(shown, poll=marked(shown["poll"]))))
