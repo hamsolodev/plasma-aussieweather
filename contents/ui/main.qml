@@ -230,9 +230,25 @@ PlasmoidItem {
     property var radarFrameUrls:    []
     property int radarFrameIdx:     0
     property var _radarLastRefreshMs: 0
-    // True only while the popup is open on the Radar tab — gates all radar
-    // network activity. Written by a Binding inside the radar tab.
+    // True only while the Radar tab is on screen — gates all radar network
+    // activity: the frame list, the frames and the overlays. Written by a
+    // Binding inside the radar tab.
     property bool radarActive: false
+
+    // One of BoM's static transparencies for the active station, stacked
+    // over the base map. They never change, so Image's cache keeps them.
+    component RadarLayer: Image {
+        // Not "layer": that is a FINAL property of every Item, and redeclaring
+        // it stops the whole file from compiling.
+        required property string overlay
+        anchors.fill: parent
+        source: root.radarActive
+            ? "https://www.bom.gov.au/products/radar_transparencies/"
+              + root.activeRadarStation + "." + overlay + ".png"
+            : ""
+        fillMode: Image.Stretch
+        asynchronous: true
+    }
 
     // Ephemeral station override from the radar tab's quick picker. Cleared
     // when the tab is left, reverting to the station configured in settings.
@@ -998,7 +1014,9 @@ PlasmoidItem {
             Binding {
                 target: root
                 property: "radarActive"
-                value: root.expanded && tabBar.currentIndex === 1
+                // On the desktop the full representation is always shown, so
+                // only the tab matters there; in a panel the popup must be open.
+                value: (root.expanded || !fullRoot.inPanelPopup) && tabBar.currentIndex === 1
             }
 
             // The loop steps only to frames that have loaded, so on a slow
@@ -1096,24 +1114,10 @@ PlasmoidItem {
                     anchors.fill: parent
                     color: "#e7dcbd"
                 }
-                Image {
-                    anchors.fill: parent
-                    source: "http://www.bom.gov.au/products/radar_transparencies/"
-                          + root.activeRadarStation + ".background.png"
-                    fillMode: Image.Stretch
-                    asynchronous: true
-                    cache: false
-                }
+                RadarLayer { overlay: "background" }
 
                 // Terrain shading (partially transparent)
-                Image {
-                    anchors.fill: parent
-                    source: "http://www.bom.gov.au/products/radar_transparencies/"
-                          + root.activeRadarStation + ".topography.png"
-                    fillMode: Image.Stretch
-                    asynchronous: true
-                    cache: false
-                }
+                RadarLayer { overlay: "topography" }
 
                 // Animated radar loop — all frames pre-loaded, only current frame visible.
                 // cache: false so replaced frames are released when the model updates.
@@ -1141,24 +1145,10 @@ PlasmoidItem {
                 }
 
                 // Locations label overlay
-                Image {
-                    anchors.fill: parent
-                    source: "http://www.bom.gov.au/products/radar_transparencies/"
-                          + root.activeRadarStation + ".locations.png"
-                    fillMode: Image.Stretch
-                    asynchronous: true
-                    cache: false
-                }
+                RadarLayer { overlay: "locations" }
 
                 // Range rings overlay
-                Image {
-                    anchors.fill: parent
-                    source: "http://www.bom.gov.au/products/radar_transparencies/"
-                          + root.activeRadarStation + ".range.png"
-                    fillMode: Image.Stretch
-                    asynchronous: true
-                    cache: false
-                }
+                RadarLayer { overlay: "range" }
 
                 // Frame counter — shows where the loop starts. Black to match
                 // BoM's own overlay text; the base map is always light.
