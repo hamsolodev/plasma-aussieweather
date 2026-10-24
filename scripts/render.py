@@ -52,7 +52,7 @@ SCHEMES = {"light": "BreezeLight", "dark": "BreezeDark"}
 # Text.TextFormat's values.
 PLAIN_TEXT, RICH_TEXT, AUTO_TEXT = 0, 1, 2
 # Fewer text items than these means the walk missed some: the fixture
-# builds 108, 79 of them declared by the widget.
+# builds 114, 82 of them declared by the widget.
 MIN_TEXT_ITEMS = 100
 MIN_WIDGET_TEXT_ITEMS = 70
 # A poll's fields that are not shown as text: times, icon names, ids, and
@@ -235,7 +235,7 @@ def render(options, config_home):
                        "QT_QPA_PLATFORMTHEME": "kde", "QT_QUICK_BACKEND": "software",
                        "TZ": "Australia/Melbourne", "QT_SCALE_FACTOR": str(options.scale)})
 
-    from PySide6.QtCore import QObject, QTimer, QUrl, qInstallMessageHandler, QtMsgType
+    from PySide6.QtCore import QMetaObject, QObject, QTimer, QUrl, qInstallMessageHandler, QtMsgType
     from PySide6.QtGui import QGuiApplication, QWindow
     from PySide6.QtQml import QQmlApplicationEngine, QQmlComponent, QQmlEngine
     from PySide6.QtQuick import QQuickItem, QQuickWindow
@@ -381,6 +381,21 @@ def render(options, config_home):
                         " is the walk broken?" % (len(text_items), widget_items))
     if not marked_items:
         problems.append("no text item shows the marked-up poll: is it applied?")
+
+    # The place menu is a single choice: picking the place shown keeps it
+    # checked. (A checkable item that is not exclusive unchecks itself.)
+    place_items = [item for item in everything(window, panel) if item.objectName() == "placeItem"]
+    shown_items = [item for item in place_items if item.property("checked")]
+    if len(place_items) != 2 or len(shown_items) != 1:
+        problems.append("place menu: %d items, %d checked, not 2 and 1"
+                        % (len(place_items), len(shown_items)))
+    else:
+        QMetaObject.invokeMethod(shown_items[0], "click")
+        settle(0.1)
+        if shown_items[0].property("checked"):
+            print("place menu: picking the place shown keeps it checked")
+        else:
+            problems.append("place menu: picking the place shown unchecked it")
 
     # Each WeatherSource's first poll, at start, must run: poll.py answers
     # both of these at once, without the network.

@@ -136,7 +136,8 @@ ColumnLayout {
         PlasmaComponents.ToolButton {
             id: placeButton
             Layout.maximumWidth: Kirigami.Units.gridUnit * 9
-            text: i18n("Switch Place")
+            Accessible.name: tab.weather.locationName || i18n("Choose a place")
+            Accessible.description: i18n("Switch to another saved place")
             onClicked: placeMenu.popup(placeButton, 0, placeButton.height)
             contentItem: RowLayout {
                 spacing: Kirigami.Units.smallSpacing
@@ -162,8 +163,13 @@ ColumnLayout {
                         id: placeItem
                         required property int index
                         required property var modelData
+                        objectName: "placeItem"
+                        // One place is shown: picking the one shown keeps it
+                        // checked, and the indicator is a radio button.
                         checkable: true
+                        autoExclusive: true
                         checked: index === tab.currentPlace
+                        Accessible.name: modelData.search
                         onTriggered: tab.placeChosen(index)
                         // As Plasma's MenuItem lays its label out.
                         contentItem: RowLayout {
