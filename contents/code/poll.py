@@ -170,8 +170,14 @@ def same_place(a, b):
     return len(a) == len(b) and all(map(same_word, a, b))
 
 
+# BoM answers a shorter search with 403 Forbidden.
+MIN_SEARCH = 3
+
+
 def search(get, place):
-    """BoM's locations matching PLACE."""
+    """BoM's locations matching PLACE; none if it is too short to search."""
+    if len(place) < MIN_SEARCH:
+        return []
     return get("/locations?search=" + urllib.parse.quote(place)).get("data", [])
 
 
@@ -204,11 +210,13 @@ def resolve(get, query):
 
 
 def parse_time(value):
-    """An API timestamp as an aware datetime, or None if it isn't one."""
+    """An API timestamp as an aware datetime, or None if it isn't one: one
+    without a time zone could be any of several moments."""
     try:
-        return datetime.fromisoformat(value)
+        moment = datetime.fromisoformat(value)
     except (TypeError, ValueError):
         return None
+    return moment if moment.tzinfo is not None else None
 
 
 def is_current(warning, now):
@@ -523,8 +531,10 @@ class ImageStore:
         for path in self._own:
             private_directory(path, create=True)
 
-    def is_private(self):
-        """Whether the directories all exist and are private."""
+    def secure_existing(self):
+        """Tighten the widget's existing directories to 0700, as
+        _make_private() does but making none; whether they all exist and
+        are private now."""
         try:
             return private_cache(self.cache, create=False) and all(
                 private_directory(path, create=False) for path in self._own)
@@ -577,7 +587,7 @@ class ImageStore:
         meanwhile is skipped. A directory that is missing or not private is
         skipped quietly: housekeeping, not worth an error. Whether it was
         pruned."""
-        if not self.is_private():
+        if not self.secure_existing():
             return False
         cutoff = time.time() - older_than
         for path in self.directory.iterdir():
@@ -603,7 +613,7 @@ def prune_former_places(cache, geohash):
     """Tidy the image directories of places other than GEOHASH's, removing
     each once empty. Nothing is touched unless the directories above them
     are private."""
-    if not ImageStore(cache, CACHE_NAME, "warnings").is_private():
+    if not ImageStore(cache, CACHE_NAME, "warnings").secure_existing():
         return
     try:
         places = [p for p in (cache / CACHE_NAME / "warnings").iterdir()
@@ -697,7 +707,8 @@ def warning_view(records, images):
 
 
 def warnings_for(get, geohash, now, images):
-    """The location's current warnings, each merged with its detail."""
+    """The location's current warnings, each read from its detail and then
+    its summary."""
     warnings = []
     for warning in get("/locations/" + geohash + "/warnings").get("data", []):
         if not isinstance(warning, dict) or not is_current(warning, now):

@@ -190,6 +190,15 @@ class ResolveTest(unittest.TestCase):
         self.assertFalse(poll.same_place("Mt Eliza", "Mount Martha"))
         self.assertFalse(poll.same_place("Pt Cook", "Pt"))
 
+    def test_too_short_to_search_is_not_found(self):
+        # BoM answers a search of fewer than three characters with 403,
+        # which would be reported as a failure rather than "not found".
+        api = FakeApi({"/locations?search=Pt%20Fairy": {"data": []},
+                       "/locations?search=Pt": http_error(403)})
+        with self.assertRaises(poll.Failure) as caught:
+            poll.resolve(api, "Pt Fairy")
+        self.assertEqual((caught.exception.kind, caught.exception.permanent), ("not_found", True))
+
     def test_api_geohash_is_checked(self):
         bogus = {"geohash": "../../x", "name": "Seaford", "state": "VIC"}
         api = FakeApi({"/locations?search=Seaford": {"data": [bogus]}})
@@ -380,6 +389,13 @@ class CurrentWarningsTest(unittest.TestCase):
         # A detail's field of the wrong type does not hide the summary's.
         self.assertEqual([w["title"] for w in out["warnings"]], ["Flood", "Wind"])
         self.assertEqual([w["html"] for w in out["warnings"]], ["", ""])
+
+    def test_a_time_without_a_zone_does_not_fail_the_rest(self):
+        api = location_api("r1ppnx", warnings=[{"id": "A", "title": "Flood", "expiry_time": "2026-10-25"},
+                                               {"id": "B", "title": "Wind",
+                                                "expiry_time": "2026-10-25T10:00:00"}])
+        out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW, IMAGE_DIR)
+        self.assertEqual([w["title"] for w in out["warnings"]], ["Flood", "Wind"])
 
     def test_warnings_are_capped(self):
         many = [{"id": "W%d" % i, "phase": "new"} for i in range(poll.MAX_WARNINGS + 10)]
