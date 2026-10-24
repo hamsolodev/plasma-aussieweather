@@ -6,7 +6,7 @@
 
 """Render the widget's popup offscreen, one PNG per tab, from fixture data.
 
-    scripts/render.py OUTDIR [--scheme light|dark] [--radar-wait SECONDS]
+    scripts/render.py OUTDIR [--scheme light|dark] [--radar-wait SECONDS] [--offline]
 
 The views are the real ones from contents/ui, fed a synthetic forecast,
 inside a plain window (scripts/render.qml) instead of plasmashell. Prints
@@ -14,7 +14,9 @@ each tab's popup height, and exits non-zero if QML logged any warning, so
 it doubles as a smoke test of the QML that plasmashell would swallow.
 
 The Radar tab is live: it lists frames through radar.py and loads BoM's
-images, so it needs the network and differs from run to run.
+images, so it needs the network and differs from run to run. With
+--offline the radar stays inactive, as in a closed popup, and fetches
+nothing (CI renders this way).
 
 Needs KDE Plasma 6's QML modules and PySide6 built against the same Qt
 (Fedora: python3-pyside6). CI has neither, so this runs locally only.
@@ -34,8 +36,12 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 SCHEMES = {"light": "BreezeLight", "dark": "BreezeDark"}
 TABS = ["weather", "radar", "warnings"]
 # Logged by the offscreen setup itself, not by the widget: KWindowSystem has
-# no plugin for the offscreen platform.
-EXPECTED_MESSAGES = {"Could not find any platform plugin"}
+# no plugin for the offscreen platform, and the KDE platform theme (6.6, as
+# in CI's container) notes the software renderer when there is no OpenGL.
+EXPECTED_MESSAGES = {
+    "Could not find any platform plugin",
+    "Warning: fallback to QtQuick software backend.",
+}
 # The Radar tab is live, and BoM's FTP listing sometimes names a frame its
 # web server does not have yet. The widget skips such frames; the harness
 # reports them without failing.
@@ -125,6 +131,8 @@ def main():
     parser.add_argument("outdir", type=pathlib.Path)
     parser.add_argument("--scheme", choices=sorted(SCHEMES), default="light")
     parser.add_argument("--radar-wait", type=float, default=20.0)
+    parser.add_argument("--offline", action="store_true",
+                        help="keep the radar inactive: no network")
     options = parser.parse_args()
 
     # The KDE platform theme reads its colours from kdeglobals; a private
@@ -132,8 +140,11 @@ def main():
     config_home = pathlib.Path(tempfile.mkdtemp(prefix="aussieweather-render-"))
     shutil.copy(f"/usr/share/color-schemes/{SCHEMES[options.scheme]}.colors",
                 config_home / "kdeglobals")
+    # The software renderer: the same pixels with or without a GPU (CI's
+    # container has none, and Qt would warn as it fell back to it).
     os.environ.update({"XDG_CONFIG_HOME": str(config_home), "QT_QPA_PLATFORM": "offscreen",
-                       "QT_QPA_PLATFORMTHEME": "kde", "TZ": "Australia/Melbourne"})
+                       "QT_QPA_PLATFORMTHEME": "kde", "QT_QUICK_BACKEND": "software",
+                       "TZ": "Australia/Melbourne"})
 
     from PySide6.QtCore import QObject, QTimer, QUrl, qInstallMessageHandler, QtMsgType
     from PySide6.QtGui import QGuiApplication
@@ -168,6 +179,7 @@ def main():
     engine.rootContext().setContextObject(i18n)
     now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
     engine.rootContext().setContextProperty("fixtureJson", json.dumps(fixture(now)))
+    engine.rootContext().setContextProperty("liveRadar", not options.offline)
     engine.load(str(ROOT / "scripts" / "render.qml"))
     if not engine.rootObjects():
         print("FAIL: render.qml did not load", file=sys.stderr)
@@ -202,7 +214,7 @@ def main():
     heights = {}
     for index, name in enumerate(TABS):
         tab_bar.setProperty("currentIndex", index)
-        settle(options.radar_wait if name == "radar" else 1.0)
+        settle(options.radar_wait if name == "radar" and not options.offline else 1.0)
         heights[name] = settled_height()
         window.setProperty("height", heights[name])
         settle(0.5)

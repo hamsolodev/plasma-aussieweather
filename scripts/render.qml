@@ -3,9 +3,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 // The widget's popup in a plain window, fed fixture data, for
-// scripts/render.py. `fixtureJson` is a context property set by the script;
-// it is parsed here so the data are plain JS objects and arrays, as
-// JSON.parse makes them from poll.py's output in the widget.
+// scripts/render.py. `fixtureJson` and `liveRadar` are context properties
+// set by the script. The fixture is parsed here so the data are plain JS
+// objects and arrays, as JSON.parse makes them from poll.py's output in the
+// widget. Without liveRadar the popup counts as closed, so the radar stays
+// inactive and fetches nothing.
 
 import QtQuick
 import QtQuick.Layouts
@@ -57,7 +59,7 @@ Window {
         weather: weather
         radar: radar
         clock: clock
-        expanded: true
+        expanded: liveRadar
         inPanelPopup: true
     }
 }
