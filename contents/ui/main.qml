@@ -29,9 +29,6 @@ PlasmoidItem {
               + Kirigami.Units.smallSpacing
             : 0)
 
-    // Keep in sync with metadata.json — Plasma 6 QML exposes no version API.
-    readonly property string _widgetVersion: "1.7.5"
-
     // ── State ─────────────────────────────────────────────────────────────
     property bool   pollOk:       false
     property string errorText:    ""
@@ -167,7 +164,9 @@ PlasmoidItem {
     }
 
     function buildPollCommand() {
-        return scriptCommand("poll.py", [_widgetVersion, _geohash, locationSearch])
+        // The package version (metadata.json) identifies the widget to BoM in
+        // the User-Agent.
+        return scriptCommand("poll.py", [Plasmoid.metaData.version, _geohash, locationSearch])
     }
 
     // A failure, as poll.py or scriptResult reports it, worded for the user.
