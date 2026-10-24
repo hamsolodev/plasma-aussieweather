@@ -14,5 +14,5 @@ ToneLabel {
 
     visible: chance !== null
     text: chance !== null ? chance + "%" : ""
-    tone: Helpers.rainColorKey(chance)
+    tone: Helpers.rainTone(chance)
 }

@@ -164,30 +164,32 @@ TestCase {
 
     // ── colour keys ───────────────────────────────────────────────────────
 
-    function test_tempColorKey() {
-        compare(Helpers.tempColorKey(36), "hot")
-        compare(Helpers.tempColorKey(35), "hot")
-        compare(Helpers.tempColorKey(30), "warm")
-        compare(Helpers.tempColorKey(20), "normal")
-        compare(Helpers.tempColorKey(null), "normal")
+    // Tones are what the colour means; ToneLabel picks the theme colour.
+    function test_tempTone() {
+        compare(Helpers.tempTone(36), "negative")
+        compare(Helpers.tempTone(35), "negative")
+        compare(Helpers.tempTone(30), "neutral")
+        compare(Helpers.tempTone(20), "")
+        compare(Helpers.tempTone(null), "")
     }
 
-    function test_rainChance() {
-        compare(Helpers.rainChance({ rain: { chance: 40 } }), 40)
-        compare(Helpers.rainChance({ rain: { chance: 0 } }), 0)
-        compare(Helpers.rainChance({ rain: { chance: null } }), null)
-        compare(Helpers.rainChance({ rain: null }), null)
-        compare(Helpers.rainChance({}), null)
-        compare(Helpers.rainChance(null), null)
+    function test_rainTone() {
+        compare(Helpers.rainTone(80), "negative")
+        compare(Helpers.rainTone(70), "negative")
+        compare(Helpers.rainTone(50), "neutral")
+        compare(Helpers.rainTone(20), "")
+        compare(Helpers.rainTone(5), "dim")
+        compare(Helpers.rainTone(null), "dim")
     }
 
-    function test_rainColorKey() {
-        compare(Helpers.rainColorKey(80), "heavy")
-        compare(Helpers.rainColorKey(70), "heavy")
-        compare(Helpers.rainColorKey(50), "moderate")
-        compare(Helpers.rainColorKey(20), "low")
-        compare(Helpers.rainColorKey(5), "none")
-        compare(Helpers.rainColorKey(null), "none")
+    // UV "moderate" is ordinary; rain "moderate" (40-69%) is a caution.
+    function test_uvTone() {
+        compare(Helpers.uvTone("extreme"), "negative")
+        compare(Helpers.uvTone("veryhigh"), "negative")
+        compare(Helpers.uvTone("high"), "neutral")
+        compare(Helpers.uvTone("moderate"), "")
+        compare(Helpers.uvTone("low"), "positive")
+        compare(Helpers.uvTone(""), "")
     }
 
     // ── uvKey ─────────────────────────────────────────────────────────────

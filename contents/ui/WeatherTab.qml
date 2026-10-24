@@ -153,9 +153,10 @@ ColumnLayout {
             Layout.preferredHeight: Kirigami.Units.iconSizes.small
             source: "weather-clear-symbolic"
         }
-        PlainLabel {
+        ToneLabel {
             visible: !tab.weather.isNight && tab.weather.todayUvKey !== ""
             font.weight: Font.DemiBold
+            tone: Helpers.uvTone(tab.weather.todayUvKey)
             text: {
                 if (tab.weather.todayUvKey === "") return ""
                 var label = {
@@ -167,15 +168,6 @@ ColumnLayout {
                 }[tab.weather.todayUvKey] || ""
                 var idx = tab.weather.today.uv.max_index
                 return label + (Helpers.hasValue(idx) ? "  " + idx : "")
-            }
-            color: {
-                switch (tab.weather.todayUvKey) {
-                    case "extreme":
-                    case "veryhigh": return Kirigami.Theme.negativeTextColor
-                    case "high":     return Kirigami.Theme.neutralTextColor
-                    case "low":      return Kirigami.Theme.positiveTextColor
-                    default:         return Kirigami.Theme.textColor
-                }
             }
         }
 

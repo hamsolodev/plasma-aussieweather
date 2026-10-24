@@ -159,13 +159,16 @@ function titleCase(s) {
     return String(s || "").replace(/_/g, " ").replace(/\b\w/g, function(c) { return c.toUpperCase() })
 }
 
-// Colour key for temperature (high): "hot" ≥ 35, "warm" ≥ 28, "normal" otherwise
-function tempColorKey(celsius) {
+// Tones say what a colour means; ToneLabel turns them into theme colours:
+// "negative" (a hazard), "neutral" (a caution), "positive", "dim" (next to
+// nothing), or "" (ordinary text).
+
+// A day's high: negative from 35 °C, neutral from 28 °C.
+function tempTone(celsius) {
     var n = Number(celsius)
-    if (isNaN(n)) return "normal"
-    if (n >= 35)  return "hot"
-    if (n >= 28)  return "warm"
-    return "normal"
+    if (n >= 35) return "negative"
+    if (n >= 28) return "neutral"
+    return ""
 }
 
 // An entry's chance of rain in percent; null when BoM gives none.
@@ -173,13 +176,19 @@ function rainChance(entry) {
     return entry && entry.rain && hasValue(entry.rain.chance) ? entry.rain.chance : null
 }
 
-// Rain chance colour key: "heavy" ≥ 70, "moderate" ≥ 40, "low" otherwise
-function rainColorKey(chance) {
+// A chance of rain: negative from 70%, neutral from 40%, dim below 10%.
+function rainTone(chance) {
     var n = Number(chance)
-    if (isNaN(n) || n < 10) return "none"
-    if (n >= 70) return "heavy"
-    if (n >= 40) return "moderate"
-    return "low"
+    if (isNaN(n) || n < 10) return "dim"
+    if (n >= 70) return "negative"
+    if (n >= 40) return "neutral"
+    return ""
+}
+
+// A UV category (uvKey): very high and extreme are hazards, high a caution,
+// low is good.
+function uvTone(key) {
+    return { extreme: "negative", veryhigh: "negative", high: "neutral", low: "positive" }[key] || ""
 }
 
 // BoM's UV category as one of low, moderate, high, veryhigh or extreme, or

@@ -65,7 +65,7 @@ ColumnLayout {
                 readonly property var high: conditions.weather.today ? conditions.weather.today.temp_max : null
                 Layout.alignment: Qt.AlignRight
                 text: Helpers.formatTemp(high)
-                tone: Helpers.tempColorKey(high)
+                tone: Helpers.tempTone(high)
                 font.pointSize: Kirigami.Theme.defaultFont.pointSize + 1
                 font.weight: Font.Bold
             }

@@ -70,7 +70,7 @@ ColumnLayout {
                 ToneLabel {
                     Layout.alignment: Qt.AlignHCenter
                     text: Helpers.formatTemp(modelData.temp_max)
-                    tone: Helpers.tempColorKey(modelData.temp_max)
+                    tone: Helpers.tempTone(modelData.temp_max)
                     font.weight: Font.DemiBold
                 }
                 PlainLabel {
