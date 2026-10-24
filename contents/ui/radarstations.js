@@ -115,3 +115,28 @@ function isKnownId(id) {
     var i = indexOfSite(p.site)
     return i >= 0 && stations[i].ranges.indexOf(p.km) >= 0
 }
+
+// Picker indices for a product ID, {station, range} into stations and that
+// station's ranges; null if the table does not offer it.
+function locate(id) {
+    var p = parseId(id)
+    if (!p) return null
+    var station = indexOfSite(p.site)
+    if (station < 0) return null
+    var range = stations[station].ranges.indexOf(p.km)
+    return range < 0 ? null : { station: station, range: range }
+}
+
+// The product ID at picker indices: the inverse of locate.
+function idAt(stationIndex, rangeIndex) {
+    var st = stations[stationIndex]
+    return stationId(st.site, st.ranges[rangeIndex])
+}
+
+// The product ID for a newly picked station: at preferredKm if it offers
+// that range, else at its smallest (the most detailed).
+function idFor(stationIndex, preferredKm) {
+    var ranges = stations[stationIndex].ranges
+    var range = ranges.indexOf(preferredKm)
+    return idAt(stationIndex, range >= 0 ? range : ranges.length - 1)
+}

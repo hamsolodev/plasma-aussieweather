@@ -27,27 +27,17 @@ Kirigami.FormLayout {
     property string cfg_lastLocationName
     property string cfg_lastLocationSearch
 
-    // Last applied range in km — survives the range model rebinding (which
-    // resets rangeCombo.currentIndex) when the station changes.
-    property int _selectedKm: 128
-
-    function applySelection() {
-        var st = RadarStations.stations[stationCombo.currentIndex]
-        var km = st.ranges[rangeCombo.currentIndex]
-        _selectedKm = km
-        cfg_radarStation = RadarStations.stationId(st.site, km)
+    // Show and store one product ID: the pickers follow it, so a station
+    // change can keep the range (the range model rebinds and resets).
+    function select(id) {
+        var at = RadarStations.locate(id)
+        stationCombo.currentIndex = at.station
+        rangeCombo.currentIndex = at.range
+        cfg_radarStation = id
     }
 
-    Component.onCompleted: {
-        var id = plasmoid.configuration.radarStation
-        var parsed = RadarStations.parseId(
-            RadarStations.isKnownId(id) ? id : RadarStations.defaultId)
-        var stIdx = RadarStations.indexOfSite(parsed.site)
-        stationCombo.currentIndex = stIdx
-        var rIdx = RadarStations.stations[stIdx].ranges.indexOf(parsed.km)
-        rangeCombo.currentIndex = rIdx >= 0 ? rIdx : 0
-        applySelection()
-    }
+    Component.onCompleted: select(RadarStations.isKnownId(cfg_radarStation)
+                                  ? cfg_radarStation : RadarStations.defaultId)
 
     QQC2.TextField {
         id: locationField
@@ -61,13 +51,8 @@ Kirigami.FormLayout {
         Kirigami.FormData.label: i18n("Radar station:")
         Layout.minimumWidth: Kirigami.Units.gridUnit * 18
         model: RadarStations.stations.map(function(s) { return s.name })
-        onActivated: {
-            // Keep the previously chosen range if the new station offers it
-            var ranges = RadarStations.stations[currentIndex].ranges
-            var rIdx = ranges.indexOf(page._selectedKm)
-            rangeCombo.currentIndex = rIdx >= 0 ? rIdx : ranges.length - 1
-            page.applySelection()
-        }
+        onActivated: page.select(RadarStations.idFor(
+            currentIndex, RadarStations.parseId(page.cfg_radarStation).km))
     }
 
     QQC2.ComboBox {
@@ -78,7 +63,7 @@ Kirigami.FormLayout {
             ? RadarStations.stations[stationCombo.currentIndex].ranges.map(
                   function(r) { return i18n("%1 km", r) })
             : []
-        onActivated: page.applySelection()
+        onActivated: page.select(RadarStations.idAt(stationCombo.currentIndex, currentIndex))
     }
 
     QQC2.SpinBox {

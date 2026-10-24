@@ -34,6 +34,29 @@ TestCase {
         verify(!RadarStations.isKnownId(""))
     }
 
+    function test_locate_gives_picker_indices() {
+        var at = RadarStations.locate("IDR023")
+        compare(RadarStations.stations[at.station].site, "02")
+        compare(RadarStations.stations[at.station].ranges[at.range], 128)
+        compare(RadarStations.locate("IDR074"), null)
+        compare(RadarStations.locate("garbage"), null)
+    }
+
+    function test_idAt_is_the_inverse_of_locate() {
+        var at = RadarStations.locate("IDR713")
+        compare(RadarStations.idAt(at.station, at.range), "IDR713")
+    }
+
+    // Switching station keeps the range if the new station offers it,
+    // else takes its smallest (most detailed).
+    function test_idFor_keeps_the_range_where_offered() {
+        var melbourne = RadarStations.locate("IDR022").station
+        var wyndham = RadarStations.locate("IDR073").station
+        compare(RadarStations.idFor(melbourne, 256), "IDR022")
+        compare(RadarStations.idFor(wyndham, 256), "IDR073")
+        compare(RadarStations.idFor(melbourne, 999), "IDR024")
+    }
+
     function test_defaultId_is_known() {
         verify(RadarStations.isKnownId(RadarStations.defaultId))
     }

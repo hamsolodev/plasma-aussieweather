@@ -1065,14 +1065,11 @@ PlasmoidItem {
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
 
+            // activeRadarStation is always one the table offers.
             function syncQuickPickers() {
-                var p = RadarStations.parseId(root.activeRadarStation)
-                if (!p) return
-                var stIdx = RadarStations.indexOfSite(p.site)
-                if (stIdx < 0) return
-                quickStation.currentIndex = stIdx
-                var rIdx = RadarStations.stations[stIdx].ranges.indexOf(p.km)
-                quickRange.currentIndex = rIdx >= 0 ? rIdx : 0
+                var at = RadarStations.locate(root.activeRadarStation)
+                quickStation.currentIndex = at.station
+                quickRange.currentIndex = at.range
             }
             Component.onCompleted: syncQuickPickers()
 
@@ -1136,13 +1133,8 @@ PlasmoidItem {
                     id: quickStation
                     Layout.preferredWidth: Kirigami.Units.gridUnit * 8
                     model: RadarStations.stations.map(function(s) { return s.name })
-                    onActivated: {
-                        var st = RadarStations.stations[currentIndex]
-                        var p  = RadarStations.parseId(root.activeRadarStation)
-                        var km = p && st.ranges.indexOf(p.km) >= 0
-                            ? p.km : st.ranges[st.ranges.length - 1]
-                        root.radarOverride = RadarStations.stationId(st.site, km)
-                    }
+                    onActivated: root.radarOverride = RadarStations.idFor(
+                        currentIndex, RadarStations.parseId(root.activeRadarStation).km)
                 }
                 QQC2.ComboBox {
                     id: quickRange
@@ -1151,11 +1143,8 @@ PlasmoidItem {
                         ? RadarStations.stations[quickStation.currentIndex].ranges.map(
                               function(r) { return i18n("%1 km", r) })
                         : []
-                    onActivated: {
-                        var st = RadarStations.stations[quickStation.currentIndex]
-                        root.radarOverride = RadarStations.stationId(
-                            st.site, st.ranges[currentIndex])
-                    }
+                    onActivated: root.radarOverride = RadarStations.idAt(
+                        quickStation.currentIndex, currentIndex)
                 }
             }
 
