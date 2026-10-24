@@ -64,16 +64,30 @@ def failure_from(error):
     return Failure("bad_response", "%s: %s" % (type(error).__name__, error))
 
 
+class HttpsOnlyRedirects(urllib.request.HTTPRedirectHandler):
+    """Follow a redirect only to another https URL.
+
+    The API is https; a redirect to http (or any other scheme) would drop
+    TLS for the rest of the exchange.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not newurl.lower().startswith("https://"):
+            raise urllib.error.HTTPError(newurl, code, "redirect off https refused", headers, fp)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 def make_get(version):
     """A GET-and-parse-JSON function for API paths."""
     headers = {
         "User-Agent": "net.tropism.plasma.aussieweather/" + version,
         "Accept": "application/json",
     }
+    opener = urllib.request.build_opener(HttpsOnlyRedirects)
 
     def get(path):
         request = urllib.request.Request(API + path, headers=headers)
-        with urllib.request.urlopen(request, timeout=15) as response:
+        with opener.open(request, timeout=15) as response:
             return json.load(response)
 
     return get

@@ -8,6 +8,7 @@ import io
 import json
 import unittest
 import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 
 from codeloader import FakeApi, load
@@ -50,6 +51,23 @@ def run_main(api, geohash, query):
         return json.loads(out.getvalue())
     finally:
         poll.make_get = original
+
+
+class RedirectTest(unittest.TestCase):
+
+    def setUp(self):
+        self.handler = poll.HttpsOnlyRedirects()
+        self.request = urllib.request.Request("https://api.weather.bom.gov.au/v1/x")
+
+    def test_https_redirect_is_followed(self):
+        followed = self.handler.redirect_request(
+            self.request, None, 302, "Found", {}, "https://api.weather.bom.gov.au/v1/y")
+        self.assertEqual(followed.full_url, "https://api.weather.bom.gov.au/v1/y")
+
+    def test_redirect_off_https_is_refused(self):
+        for target in ("http://api.weather.bom.gov.au/v1/y", "ftp://x/y", "file:///etc/passwd"):
+            with self.assertRaises(urllib.error.HTTPError, msg=target):
+                self.handler.redirect_request(self.request, None, 302, "Found", {}, target)
 
 
 class SplitStateTest(unittest.TestCase):
