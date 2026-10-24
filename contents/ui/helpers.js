@@ -147,6 +147,21 @@ function moonPhase(date) {
     return {emoji: "🌑", name: "New Moon"}
 }
 
+// Whether data last fetched at lastMs is out of date at nowMs: two polls in
+// a row have been missed. False before the first fetch (lastMs 0).
+function isStale(lastMs, nowMs, intervalMs) {
+    return lastMs > 0 && nowMs - lastMs > 2 * intervalMs
+}
+
+// Whether two times fall on the same local calendar day.
+function isSameDay(aMs, bMs) {
+    var a = new Date(aMs)
+    var b = new Date(bMs)
+    return a.getFullYear() === b.getFullYear()
+        && a.getMonth() === b.getMonth()
+        && a.getDate() === b.getDate()
+}
+
 // The JSON object a fetch script printed, from the executable engine's data
 // for its run. Output that isn't one (python3 missing, the script crashed)
 // becomes a failure of kind "script" carrying the last stderr line or the

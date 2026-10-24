@@ -40,7 +40,7 @@ PlasmoidItem {
     property var    warnings:     []
     property var    hourlyForecast: []
     property string locationName: plasmoid.configuration.locationSearch
-    property string lastUpdated:  ""
+    property real   lastSuccessMs: 0
     property string _geohash:     ""
 
     // Seed from the last successful lookup so the widget works across
@@ -64,7 +64,7 @@ PlasmoidItem {
         forecast       = []
         warnings       = []
         hourlyForecast = []
-        lastUpdated    = ""
+        lastSuccessMs  = 0
         pollOk         = false
         errorText      = ""
         _retryCount    = 0
@@ -73,6 +73,16 @@ PlasmoidItem {
     }
 
     readonly property string panelText: pollOk ? Helpers.formatTemp(observations ? observations.temp : null) : ""
+
+    // Data that has missed two polls in a row is out of date: the panel
+    // dims and the tooltip says when it is from.
+    readonly property bool isStale:
+        Helpers.isStale(lastSuccessMs, currentTime.getTime(), effectivePollInterval)
+    readonly property string updatedText: {
+        if (!lastSuccessMs) return ""
+        var today = Helpers.isSameDay(lastSuccessMs, currentTime.getTime())
+        return Qt.formatDateTime(new Date(lastSuccessMs), today ? "h:mm ap" : "d MMM h:mm ap")
+    }
 
     // Night by astronomical sunrise/sunset (minute precision, reactive to
     // currentTime). The hourly is_night flag describes the slot's timestamp
@@ -113,10 +123,14 @@ PlasmoidItem {
     toolTipTextFormat: Text.PlainText
     toolTipMainText: i18nc("BoM is the Bureau of Meteorology; %1 is the location",
                            "BoM — %1", locationName)
-    toolTipSubText: pollOk
-        ? (Helpers.formatTemp(observations ? observations.temp : null)
-           + (forecast.length > 0 ? "  " + Helpers.titleCase(forecast[0].short_text || forecast[0].icon_descriptor || "") : ""))
-        : (errorText || i18n("Connecting…"))
+    toolTipSubText: {
+        if (!pollOk) return errorText || i18n("Connecting…")
+        var lines = [Helpers.formatTemp(observations ? observations.temp : null)
+                     + (forecast.length > 0 ? "  " + Helpers.titleCase(forecast[0].short_text || forecast[0].icon_descriptor || "") : "")]
+        if (isStale) lines.push(i18n("Last updated %1", updatedText))
+        if (errorText) lines.push(errorText)
+        return lines.join("\n")
+    }
 
     // ── Fetch scripts ─────────────────────────────────────────────────────
     // contents/code/*.py, run through the executable engine. -I isolates them
@@ -184,7 +198,7 @@ PlasmoidItem {
         // there are no warnings; the error says why.
         if (d.warnings !== null) warnings       = d.warnings
         if (d.hourly   !== null) hourlyForecast = d.hourly
-        lastUpdated  = Qt.formatTime(new Date(), "h:mm ap")
+        lastSuccessMs = Date.now()
         errorText    = d.warningsError ? i18n("Warnings could not be updated: %1", d.warningsError)
                      : d.hourlyError   ? i18n("The hourly forecast could not be updated: %1", d.hourlyError)
                      : ""
@@ -395,6 +409,7 @@ PlasmoidItem {
             anchors.verticalCenter: parent.verticalCenter
             visible: root.panelText !== ""
             text:    root.panelText
+            opacity: root.isStale ? 0.5 : 1
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             elide:   Text.ElideRight
         }
@@ -972,6 +987,18 @@ PlasmoidItem {
 
             Item { Layout.fillHeight: true }
 
+            // A failed update while older data is still shown: say so, rather
+            // than let the old data pass for current.
+            PlainLabel {
+                visible: root.pollOk && root.errorText !== ""
+                Layout.fillWidth: true
+                Layout.leftMargin:  Kirigami.Units.smallSpacing
+                Layout.rightMargin: Kirigami.Units.smallSpacing
+                wrapMode: Text.WordWrap
+                color: Kirigami.Theme.neutralTextColor
+                text: "⚠  " + root.errorText
+            }
+
             Kirigami.Separator { Layout.fillWidth: true }
 
             // Footer
@@ -993,7 +1020,7 @@ PlasmoidItem {
                             var km = st.distance ? (st.distance / 1000).toFixed(1) : null
                             parts.push(st.name + (km ? " (" + km + " km)" : ""))
                         }
-                        if (root.lastUpdated) parts.push(root.lastUpdated)
+                        if (root.updatedText) parts.push(root.updatedText)
                         return parts.join("  ·  ")
                     }
                 }

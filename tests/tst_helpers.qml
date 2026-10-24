@@ -201,6 +201,27 @@ TestCase {
                 "/home/u/my widgets/poll.py")
     }
 
+    // ── isStale / isSameDay ───────────────────────────────────────────────
+
+    function test_isStale_after_two_missed_polls() {
+        var interval = 600000
+        var last = Date.UTC(2026, 9, 24, 0, 0)
+        verify(!Helpers.isStale(last, last + 2 * interval, interval))
+        verify(Helpers.isStale(last, last + 2 * interval + 1, interval))
+    }
+
+    function test_isStale_not_before_the_first_poll() {
+        verify(!Helpers.isStale(0, Date.UTC(2026, 9, 24), 600000))
+    }
+
+    function test_isSameDay_uses_the_local_calendar() {
+        var morning = new Date(2026, 9, 24, 0, 5).getTime()
+        var night = new Date(2026, 9, 24, 23, 55).getTime()
+        var next = new Date(2026, 9, 25, 0, 5).getTime()
+        verify(Helpers.isSameDay(morning, night))
+        verify(!Helpers.isSameDay(night, next))
+    }
+
     // ── scriptResult ──────────────────────────────────────────────────────
 
     function test_scriptResult_parses_the_printed_object() {
