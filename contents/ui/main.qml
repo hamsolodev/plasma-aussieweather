@@ -580,7 +580,6 @@ PlasmoidItem {
                         Layout.fillWidth: true
                         wrapMode: Text.WordWrap
                         color: Kirigami.Theme.neutralTextColor
-                        font.pointSize: Kirigami.Theme.defaultFont.pointSize
                         text: {
                             if (!root.hasWarnings) return ""
                             return "⚠  " + root.warnings.map(function(w) {
@@ -627,7 +626,6 @@ PlasmoidItem {
                     Layout.fillWidth: true
                     Layout.alignment: Qt.AlignVCenter
                     visible: root.pollOk && root.observations !== null
-                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     opacity: 0.7
                     wrapMode: Text.WordWrap
                     text: {
@@ -663,7 +661,6 @@ PlasmoidItem {
                     PlainLabel {
                         Layout.alignment: Qt.AlignRight
                         text: Helpers.formatTemp(root.today ? root.today.temp_min : null)
-                        font.pointSize: Kirigami.Theme.defaultFont.pointSize
                         opacity: 0.55
                     }
                     PlainLabel {
@@ -673,7 +670,6 @@ PlasmoidItem {
                         text: root.today !== null && !!root.today.rain
                               && Helpers.hasValue(root.today.rain.chance)
                             ? root.today.rain.chance + "%" : ""
-                        font.pointSize: Kirigami.Theme.defaultFont.pointSize
                         color: {
                             var key = root.today && root.today.rain
                                 ? Helpers.rainColorKey(root.today.rain.chance || 0) : "none"
@@ -695,7 +691,6 @@ PlasmoidItem {
                 spacing: Kirigami.Units.smallSpacing
 
                 PlainLabel {
-                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     text: {
                         if (!root.observations) return ""
                         var w = root.observations.wind || {}
@@ -708,7 +703,6 @@ PlasmoidItem {
                 }
                 Item { Layout.fillWidth: true }
                 PlainLabel {
-                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     visible: !!root.observations && Helpers.hasValue(root.observations.humidity)
                     text: root.observations && Helpers.hasValue(root.observations.humidity)
                         ? "💧  " + i18nc("relative humidity", "%1% RH",
@@ -722,7 +716,6 @@ PlasmoidItem {
                 visible: root.pollOk && root.observations !== null
                          && Helpers.hasValue(root.observations.rain_since_9am)
                 Layout.leftMargin: Kirigami.Units.smallSpacing
-                font.pointSize: Kirigami.Theme.defaultFont.pointSize
                 text: root.observations && Helpers.hasValue(root.observations.rain_since_9am)
                     ? "🌧  " + i18n("%1 mm since 9 am", root.observations.rain_since_9am)
                     : ""
@@ -739,7 +732,6 @@ PlasmoidItem {
                 visible: root.pollOk && root.upcomingHourly.length > 0
                 Layout.leftMargin: Kirigami.Units.smallSpacing
                 text: i18np("Next Hour", "Next %1 Hours", root.upcomingHourly.length)
-                font.pointSize: Kirigami.Theme.defaultFont.pointSize
                 font.weight: Font.Bold
                 opacity: 0.55
             }
@@ -761,7 +753,6 @@ PlasmoidItem {
 
                         PlainLabel {
                             Layout.alignment: Qt.AlignHCenter
-                            font.pointSize: Kirigami.Theme.defaultFont.pointSize
                             font.weight: index === 0 ? Font.Bold : Font.Normal
                             opacity: 0.65
                             text: {
@@ -813,13 +804,11 @@ PlasmoidItem {
                         PlainLabel {
                             Layout.alignment: Qt.AlignHCenter
                             text: Helpers.formatTemp(modelData.temp)
-                            font.pointSize: Kirigami.Theme.defaultFont.pointSize
                             font.weight: Font.DemiBold
                         }
                         PlainLabel {
                             Layout.alignment: Qt.AlignHCenter
                             visible: modelData.rain && (modelData.rain.chance || 0) > 0
-                            font.pointSize: Kirigami.Theme.defaultFont.pointSize
                             text: modelData.rain ? ((modelData.rain.chance || 0) + "%") : ""
                             color: {
                                 var c = modelData.rain ? (modelData.rain.chance || 0) : 0
@@ -844,7 +833,6 @@ PlasmoidItem {
                 visible: root.pollOk && root.today !== null
                 Layout.leftMargin: Kirigami.Units.smallSpacing
                 text: i18np("1-Day Forecast", "%1-Day Forecast", root.days.length)
-                font.pointSize: Kirigami.Theme.defaultFont.pointSize
                 font.weight: Font.Bold
                 opacity: 0.55
             }
@@ -874,7 +862,6 @@ PlasmoidItem {
                                 var day = Helpers.forecastWeekday(modelData.date)
                                 return day < 0 ? "—" : Qt.locale().dayName(day, Locale.ShortFormat)
                             }
-                            font.pointSize: Kirigami.Theme.defaultFont.pointSize
                             font.weight: index === 0 ? Font.Bold : Font.Normal
                             opacity: 0.65
                         }
@@ -895,7 +882,6 @@ PlasmoidItem {
                         PlainLabel {
                             Layout.alignment: Qt.AlignHCenter
                             text: Helpers.formatTemp(modelData.temp_max)
-                            font.pointSize: Kirigami.Theme.defaultFont.pointSize
                             font.weight: Font.DemiBold
                             color: {
                                 var key = Helpers.tempColorKey(modelData.temp_max)
@@ -907,7 +893,6 @@ PlasmoidItem {
                         PlainLabel {
                             Layout.alignment: Qt.AlignHCenter
                             text: Helpers.formatTemp(modelData.temp_min)
-                            font.pointSize: Kirigami.Theme.defaultFont.pointSize
                             opacity: 0.5
                         }
                         PlainLabel {
@@ -918,7 +903,6 @@ PlasmoidItem {
                                     ? modelData.rain.chance : null
                                 return c !== null ? c + "%" : ""
                             }
-                            font.pointSize: Kirigami.Theme.defaultFont.pointSize
                             color: {
                                 var c = (modelData.rain && modelData.rain.chance !== undefined)
                                     ? modelData.rain.chance : 0
@@ -960,7 +944,6 @@ PlasmoidItem {
                 Layout.rightMargin: Kirigami.Units.smallSpacing
                 Layout.topMargin:   Kirigami.Units.smallSpacing / 2
                 wrapMode: Text.WordWrap
-                font.pointSize: Kirigami.Theme.defaultFont.pointSize
                 opacity: 0.75
                 text: root.today !== null ? (root.today.extended_text || "") : ""
             }
@@ -978,7 +961,6 @@ PlasmoidItem {
                 // minute-reactive via currentTime).
                 PlainLabel {
                     visible: root.isNight
-                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     text: "🌛"
                 }
                 // Shown only for a category BoM actually gave: later days carry
@@ -991,7 +973,6 @@ PlasmoidItem {
                 }
                 PlainLabel {
                     visible: !root.isNight && root.todayUvKey !== ""
-                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     font.weight: Font.DemiBold
                     text: {
                         if (root.todayUvKey === "") return ""
@@ -1020,7 +1001,6 @@ PlasmoidItem {
 
                 PlainLabel {
                     visible: root.today !== null && !!root.today.astronomical
-                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     opacity: 0.65
                     text: {
                         if (!root.today || !root.today.astronomical) return ""
@@ -1033,7 +1013,6 @@ PlasmoidItem {
                 Item { Layout.fillWidth: true }
 
                 PlainLabel {
-                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     text: {
                         var mp = Helpers.moonPhase(root.currentTime)
                         var name = {
@@ -1076,7 +1055,6 @@ PlasmoidItem {
 
                 PlainLabel {
                     Layout.fillWidth: true
-                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     opacity: 0.5
                     elide: Text.ElideRight
                     text: {
@@ -1301,7 +1279,6 @@ PlasmoidItem {
 
                 PlainLabel {
                     Layout.fillWidth: true
-                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     opacity: 0.55
                     text: root.radarFrameUrls.length > 0
                         ? i18np("Radar: %2  ·  %1 frame", "Radar: %2  ·  %1 frames",
@@ -1383,14 +1360,12 @@ PlasmoidItem {
                             Layout.topMargin: Kirigami.Units.smallSpacing
                             wrapMode: Text.WordWrap
                             color: Kirigami.Theme.neutralTextColor
-                            font.pointSize: Kirigami.Theme.defaultFont.pointSize
                             font.weight: Font.Bold
                             text: modelData.title || i18n("Warning")
                         }
                         PlasmaComponents.Label {
                             Layout.fillWidth: true
                             wrapMode: Text.WordWrap
-                            font.pointSize: Kirigami.Theme.defaultFont.pointSize
                             visible: modelData.html !== ""
                             // poll.py rebuilds the body from a tag allowlist
                             // (sanitise_html): only https links and PNG data:
@@ -1407,7 +1382,6 @@ PlasmoidItem {
                         PlainLabel {
                             Layout.fillWidth: true
                             wrapMode: Text.WordWrap
-                            font.pointSize: Kirigami.Theme.defaultFont.pointSize
                             opacity: 0.6
                             visible: text !== ""
                             // BoM gives each warning an issue and an expiry time;
