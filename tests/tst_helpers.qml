@@ -172,6 +172,15 @@ TestCase {
         compare(Helpers.tempColorKey(null), "normal")
     }
 
+    function test_rainChance() {
+        compare(Helpers.rainChance({ rain: { chance: 40 } }), 40)
+        compare(Helpers.rainChance({ rain: { chance: 0 } }), 0)
+        compare(Helpers.rainChance({ rain: { chance: null } }), null)
+        compare(Helpers.rainChance({ rain: null }), null)
+        compare(Helpers.rainChance({}), null)
+        compare(Helpers.rainChance(null), null)
+    }
+
     function test_rainColorKey() {
         compare(Helpers.rainColorKey(80), "heavy")
         compare(Helpers.rainColorKey(70), "heavy")

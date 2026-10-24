@@ -301,6 +301,28 @@ PlasmoidItem {
     // Binding inside the radar tab.
     property bool radarActive: false
 
+    // Text colour for a Helpers colour key (tempColorKey, rainColorKey).
+    function toneColor(key) {
+        switch (key) {
+        case "hot":
+        case "heavy":    return Kirigami.Theme.negativeTextColor
+        case "warm":
+        case "moderate": return Kirigami.Theme.neutralTextColor
+        case "none":     return Kirigami.Theme.disabledTextColor
+        default:         return Kirigami.Theme.textColor
+        }
+    }
+
+    // A forecast entry's chance of rain, coloured by how likely it is, and
+    // shown whenever BoM gives one (0% included, dimmed).
+    component RainChanceLabel: PlainLabel {
+        required property var entry
+        readonly property var chance: Helpers.rainChance(entry)
+        visible: chance !== null
+        text: chance !== null ? chance + "%" : ""
+        color: root.toneColor(Helpers.rainColorKey(chance))
+    }
+
     // One of BoM's static transparencies for the active station, stacked
     // over the base map. They never change, so Image's cache keeps them.
     component RadarLayer: Image {
@@ -651,32 +673,16 @@ PlasmoidItem {
                         text: Helpers.formatTemp(root.today ? root.today.temp_max : null)
                         font.pointSize: Kirigami.Theme.defaultFont.pointSize + 1
                         font.weight: Font.Bold
-                        color: {
-                            var key = Helpers.tempColorKey(root.today ? root.today.temp_max : null)
-                            if (key === "hot")  return Kirigami.Theme.negativeTextColor
-                            if (key === "warm") return Kirigami.Theme.neutralTextColor
-                            return Kirigami.Theme.textColor
-                        }
+                        color: root.toneColor(Helpers.tempColorKey(root.today ? root.today.temp_max : null))
                     }
                     PlainLabel {
                         Layout.alignment: Qt.AlignRight
                         text: Helpers.formatTemp(root.today ? root.today.temp_min : null)
                         opacity: 0.55
                     }
-                    PlainLabel {
+                    RainChanceLabel {
                         Layout.alignment: Qt.AlignRight
-                        visible: root.today !== null && !!root.today.rain
-                                 && Helpers.hasValue(root.today.rain.chance)
-                        text: root.today !== null && !!root.today.rain
-                              && Helpers.hasValue(root.today.rain.chance)
-                            ? root.today.rain.chance + "%" : ""
-                        color: {
-                            var key = root.today && root.today.rain
-                                ? Helpers.rainColorKey(root.today.rain.chance || 0) : "none"
-                            if (key === "heavy")    return Kirigami.Theme.negativeTextColor
-                            if (key === "moderate") return Kirigami.Theme.neutralTextColor
-                            return Kirigami.Theme.disabledTextColor
-                        }
+                        entry: root.today
                     }
                 }
             }
@@ -806,18 +812,9 @@ PlasmoidItem {
                             text: Helpers.formatTemp(modelData.temp)
                             font.weight: Font.DemiBold
                         }
-                        PlainLabel {
+                        RainChanceLabel {
                             Layout.alignment: Qt.AlignHCenter
-                            visible: modelData.rain && (modelData.rain.chance || 0) > 0
-                            text: modelData.rain ? ((modelData.rain.chance || 0) + "%") : ""
-                            color: {
-                                var c = modelData.rain ? (modelData.rain.chance || 0) : 0
-                                var key = Helpers.rainColorKey(c)
-                                if (key === "heavy")    return Kirigami.Theme.negativeTextColor
-                                if (key === "moderate") return Kirigami.Theme.neutralTextColor
-                                if (key === "low")      return Kirigami.Theme.textColor
-                                return Kirigami.Theme.disabledTextColor
-                            }
+                            entry: modelData
                         }
                     }
                 }
@@ -883,35 +880,16 @@ PlasmoidItem {
                             Layout.alignment: Qt.AlignHCenter
                             text: Helpers.formatTemp(modelData.temp_max)
                             font.weight: Font.DemiBold
-                            color: {
-                                var key = Helpers.tempColorKey(modelData.temp_max)
-                                if (key === "hot")  return Kirigami.Theme.negativeTextColor
-                                if (key === "warm") return Kirigami.Theme.neutralTextColor
-                                return Kirigami.Theme.textColor
-                            }
+                            color: root.toneColor(Helpers.tempColorKey(modelData.temp_max))
                         }
                         PlainLabel {
                             Layout.alignment: Qt.AlignHCenter
                             text: Helpers.formatTemp(modelData.temp_min)
                             opacity: 0.5
                         }
-                        PlainLabel {
+                        RainChanceLabel {
                             Layout.alignment: Qt.AlignHCenter
-                            visible: modelData.rain !== undefined && modelData.rain !== null
-                            text: {
-                                var c = (modelData.rain && modelData.rain.chance !== undefined)
-                                    ? modelData.rain.chance : null
-                                return c !== null ? c + "%" : ""
-                            }
-                            color: {
-                                var c = (modelData.rain && modelData.rain.chance !== undefined)
-                                    ? modelData.rain.chance : 0
-                                var key = Helpers.rainColorKey(c)
-                                if (key === "heavy")    return Kirigami.Theme.negativeTextColor
-                                if (key === "moderate") return Kirigami.Theme.neutralTextColor
-                                if (key === "low")      return Kirigami.Theme.textColor
-                                return Kirigami.Theme.disabledTextColor
-                            }
+                            entry: modelData
                         }
                     }
                 }

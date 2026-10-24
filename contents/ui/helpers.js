@@ -162,6 +162,11 @@ function tempColorKey(celsius) {
     return "normal"
 }
 
+// An entry's chance of rain in percent; null when BoM gives none.
+function rainChance(entry) {
+    return entry && entry.rain && hasValue(entry.rain.chance) ? entry.rain.chance : null
+}
+
 // Rain chance colour key: "heavy" ≥ 70, "moderate" ≥ 40, "low" otherwise
 function rainColorKey(chance) {
     var n = Number(chance)
