@@ -46,7 +46,7 @@ SEAFORD_SA = {"geohash": "r1f93cz", "name": "Seaford", "state": "SA"}
 NOW = datetime(2026, 10, 24, 1, 0, tzinfo=timezone.utc)
 # Where warning images go in tests that do not look at them.
 _IMAGE_DIR = tempfile.TemporaryDirectory()
-IMAGES = poll.ImageStore(pathlib.Path(_IMAGE_DIR.name))
+IMAGE_DIR = pathlib.Path(_IMAGE_DIR.name)
 
 
 def tearDownModule():
@@ -142,6 +142,16 @@ class ResolveTest(unittest.TestCase):
                        "/locations?search=Sydney": {"data": [sydney]}})
         self.assertEqual(poll.resolve(api, "Sydney CBD"), ("r3gx2f", "Sydney, NSW"))
 
+    def test_dropped_suffix_must_leave_the_place_itself(self):
+        # A misspelt place must not become whatever BoM lists first for its
+        # first word: "Glen Waverly" is not Glen Alice, NSW.
+        glen_alice = {"geohash": "r65t0ez", "name": "Glen Alice", "state": "NSW"}
+        api = FakeApi({"/locations?search=Glen%20Waverly": {"data": []},
+                       "/locations?search=Glen": {"data": [glen_alice]}})
+        with self.assertRaises(poll.Failure) as caught:
+            poll.resolve(api, "Glen Waverly")
+        self.assertEqual(caught.exception.kind, "not_found")
+
     def test_api_geohash_is_checked(self):
         bogus = {"geohash": "../../x", "name": "Seaford", "state": "VIC"}
         api = FakeApi({"/locations?search=Seaford": {"data": [bogus]}})
@@ -203,7 +213,7 @@ class CollectTest(unittest.TestCase):
 
     def test_cached_geohash_skips_the_lookup(self):
         api = location_api("r1ppnx")
-        out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW, IMAGES)
+        out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW, IMAGE_DIR)
         self.assertTrue(out["ok"])
         self.assertNotIn("locationName", out)
         self.assertFalse(any(p.startswith("/locations?") for p in api.requested))
@@ -216,25 +226,39 @@ class CollectTest(unittest.TestCase):
 
     def test_lookup_reports_the_resolved_location(self):
         api = location_api("r1ppnx", **{"/locations?search=Seaford": {"data": [SEAFORD_VIC]}})
-        out = poll.collect(api, "", "Seaford VIC", NOW, IMAGES)
+        out = poll.collect(api, "", "Seaford VIC", NOW, IMAGE_DIR)
         self.assertEqual(out["geohash"], "r1ppnx")
         self.assertEqual(out["locationName"], "Seaford, VIC")
 
     def test_failed_extras_are_unknown_not_empty(self):
         api = location_api("r1ppnx", **{"/locations/r1ppnx/forecasts/hourly": http_error(503),
                                         "/locations/r1ppnx/warnings": http_error(503)})
-        out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW, IMAGES)
+        out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW, IMAGE_DIR)
         self.assertIsNone(out["hourly"])
         self.assertIsNone(out["warnings"])
         self.assertIn("503", out["warningsError"])
 
+    def test_each_location_keeps_its_own_images(self):
+        # Two widgets for two places share the cache directory: one place's
+        # poll must not prune the other's maps.
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = pathlib.Path(tmp)
+            warning = {"id": "SA_1", "message": '<img src="%s">' % data_uri("image/png", PNG)}
+            adelaide = location_api("r1f93c", warnings=[warning], details={"SA_1": {}})
+            out = poll.collect(adelaide, "r1f93c", "Adelaide SA", NOW, cache)
+            [saved] = out["warnings"][0]["images"]
+            os.utime(saved, (0, 0))
+            poll.collect(location_api("r1ppnx"), "r1ppnx", "Seaford VIC", NOW, cache)
+            self.assertTrue(pathlib.Path(saved).exists())
+            self.assertEqual(pathlib.Path(saved).parent, cache / "r1f93c")
+
     def test_hourly_not_offered_is_empty(self):
         api = location_api("rd3het", **{"/locations/rd3het/forecasts/hourly": http_error(404)})
-        out = poll.collect(api, "rd3het", "Lord Howe Island NSW", NOW, IMAGES)
+        out = poll.collect(api, "rd3het", "Lord Howe Island NSW", NOW, IMAGE_DIR)
         self.assertEqual(out["hourly"], [])
 
     def test_forecasts_are_trimmed(self):
-        out = poll.collect(location_api("r1ppnx"), "r1ppnx", "Seaford VIC", NOW, IMAGES)
+        out = poll.collect(location_api("r1ppnx"), "r1ppnx", "Seaford VIC", NOW, IMAGE_DIR)
         self.assertEqual(len(out["forecast"]), 8)
         # More hours than are shown: the widget drops slots that have passed.
         self.assertEqual(len(out["hourly"]), 12)
@@ -243,7 +267,7 @@ class CollectTest(unittest.TestCase):
         summary = {"id": "VIC_X_1", "title": "Flood Warning"}
         api = location_api("r1ppnx", warnings=[summary],
                            details={"VIC_X_1": {"message": "<p>Detail</p>"}})
-        out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW, IMAGES)
+        out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW, IMAGE_DIR)
         self.assertEqual(out["warnings"][0]["html"], "<p>Detail</p>")
         self.assertEqual(out["warnings"][0]["title"], "Flood Warning")
 
@@ -255,7 +279,7 @@ class CurrentWarningsTest(unittest.TestCase):
         cancelled = {"id": "B", "phase": "cancelled", "expiry_time": "2026-10-24T04:16:30Z"}
         expired = {"id": "C", "phase": "update", "expiry_time": "2026-10-24T00:59:59Z"}
         api = location_api("r1ppnx", warnings=[live, cancelled, expired], details={"A": {}})
-        out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW, IMAGES)
+        out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW, IMAGE_DIR)
         self.assertEqual([w["id"] for w in out["warnings"]], ["A"])
         self.assertNotIn("/warnings/B", api.requested)
         self.assertNotIn("/warnings/C", api.requested)
@@ -264,7 +288,7 @@ class CurrentWarningsTest(unittest.TestCase):
         missing = {"id": "A", "phase": "new"}
         garbled = {"id": "B", "phase": "new", "expiry_time": "soon"}
         api = location_api("r1ppnx", warnings=[missing, garbled], details={"A": {}, "B": {}})
-        out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW, IMAGES)
+        out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW, IMAGE_DIR)
         self.assertEqual([w["id"] for w in out["warnings"]], ["A", "B"])
 
 
@@ -361,6 +385,22 @@ class ImageStoreTest(unittest.TestCase):
     def test_same_image_same_file(self):
         self.assertEqual(self.store.save(PNG), self.store.save(PNG))
         self.assertEqual(len(list(self.store.directory.iterdir())), 1)
+
+    def test_prune_skips_a_file_already_gone(self):
+        # Another poll may delete or replace a file mid-prune.
+        old = self.store.directory / ("0" * 64 + ".png")
+        self.store.directory.mkdir(parents=True)
+        old.write_bytes(PNG)
+        os.utime(old, (0, 0))
+        stat = pathlib.Path.stat
+
+        def vanishing_stat(path, *args, **kwargs):
+            if path == old:
+                raise FileNotFoundError(path)
+            return stat(path, *args, **kwargs)
+
+        with mock.patch.object(pathlib.Path, "stat", vanishing_stat):
+            self.store.prune()
 
     def test_prune_keeps_what_this_poll_saved_and_recent_files(self):
         kept = pathlib.Path(self.store.save(PNG))

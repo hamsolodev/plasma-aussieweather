@@ -123,7 +123,8 @@ def resolve(get, query):
     When QUERY names a state, only places in that state match: "Seaford
     NSW" is not found rather than quietly becoming Seaford, VIC. A last
     word that is not a state and leaves nothing found ("Sydney CBD") is
-    dropped and the place searched again.
+    dropped, but only a place named exactly what is left will do: a
+    misspelt "Glen Waverly" is not found, rather than Glen Alice, NSW.
     """
     place, state = split_state(query)
     if not place:
@@ -132,7 +133,9 @@ def resolve(get, query):
     if state:
         locations = [l for l in locations if (l.get("state") or "").upper() == state]
     elif not locations and len(place.split()) > 1:
-        locations = search(get, place.rsplit(None, 1)[0])
+        shorter = place.rsplit(None, 1)[0]
+        locations = [l for l in search(get, shorter)
+                     if (l.get("name") or "").lower() == shorter.lower()]
     if not locations:
         raise Failure("not_found", query.strip(), permanent=True)
     location = locations[0]
@@ -311,20 +314,26 @@ class ImageStore:
         return str(path)
 
     def prune(self):
-        """Delete files no current warning shows."""
+        """Delete files no current warning shows. A file another poll
+        removes or replaces meanwhile is skipped."""
         if not self.directory.is_dir():
             return
         cutoff = time.time() - self.PRUNE_AFTER
         for path in self.directory.iterdir():
-            if path.name not in self.kept and path.stat().st_mtime < cutoff:
-                path.unlink(missing_ok=True)
+            try:
+                if path.name not in self.kept and path.stat().st_mtime < cutoff:
+                    path.unlink(missing_ok=True)
+            except FileNotFoundError:
+                pass
 
 
-def image_store():
-    """The ImageStore under the user's cache directory."""
+def image_directory():
+    """Where warning images are kept, under the user's cache directory. Each
+    location has its own subdirectory, so two widgets for two places do
+    not prune each other's images."""
     cache = os.environ.get("XDG_CACHE_HOME") or ""
     base = pathlib.Path(cache) if os.path.isabs(cache) else pathlib.Path.home() / ".cache"
-    return ImageStore(base / "net.tropism.plasma.aussieweather" / "warnings")
+    return base / "net.tropism.plasma.aussieweather" / "warnings"
 
 
 HTTPS_URL = re.compile(r'https://[^\s<>"]+')
@@ -406,7 +415,7 @@ def hourly_for(get, geohash):
         raise
 
 
-def collect(get, geohash, query, now, images):
+def collect(get, geohash, query, now, image_directory):
     """Everything the widget shows, as one JSON-ready dict."""
     if not query.strip():
         raise Failure("no_location", permanent=True)
@@ -431,12 +440,19 @@ def collect(get, geohash, query, now, images):
     except Exception as e:
         out["hourly"] = None
         out["hourlyError"] = failure_from(e).detail
+    images = ImageStore(image_directory / geohash)
     try:
         out["warnings"] = warnings_for(get, geohash, now, images)
-        images.prune()
     except Exception as e:
         out["warnings"] = None
         out["warningsError"] = failure_from(e).detail
+    else:
+        # Tidying old images is housekeeping: failing at it must not fail
+        # the poll.
+        try:
+            images.prune()
+        except OSError:
+            pass
     return out
 
 
@@ -444,7 +460,7 @@ def main(argv):
     version, geohash, query = argv[1:4]
     try:
         result = collect(make_get(version), geohash, query, datetime.now(timezone.utc),
-                         image_store())
+                         image_directory())
     except Exception as e:
         failure = failure_from(e)
         result = {"ok": False, "error": failure.kind, "detail": failure.detail,
