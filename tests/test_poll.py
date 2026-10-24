@@ -6,6 +6,7 @@ import base64
 import struct
 import zlib
 import contextlib
+import http.client
 import hashlib
 import os
 import pathlib
@@ -169,6 +170,13 @@ class ResolveTest(unittest.TestCase):
             poll.resolve(api, "Glen Waverly")
         self.assertEqual(caught.exception.kind, "not_found")
 
+    def test_dropped_suffix_allows_bom_spelling_out_mount(self):
+        # BoM lists "Mt Buller" as Mount Buller.
+        buller = {"geohash": "r1u7m0z", "name": "Mount Buller", "state": "VIC"}
+        api = FakeApi({"/locations?search=Mt%20Buller%20Village": {"data": []},
+                       "/locations?search=Mt%20Buller": {"data": [buller]}})
+        self.assertEqual(poll.resolve(api, "Mt Buller Village"), ("r1u7m0", "Mount Buller, VIC"))
+
     def test_api_geohash_is_checked(self):
         bogus = {"geohash": "../../x", "name": "Seaford", "state": "VIC"}
         api = FakeApi({"/locations?search=Seaford": {"data": [bogus]}})
@@ -208,6 +216,17 @@ class ErrorKindTest(unittest.TestCase):
             api = location_api("r1ppnx", **{"/locations/r1ppnx/observations": http_error(code)})
             result = run_main(api, "r1ppnx", "Seaford VIC")
             self.assertEqual((result["error"], result["permanent"]), ("http", False), code)
+
+    def test_a_poll_has_a_deadline(self):
+        # A server dripping a byte at a time keeps each read inside its
+        # timeout; the whole poll must still end.
+        def slow(path):
+            time.sleep(10)
+        started = time.monotonic()
+        with mock.patch.object(poll, "POLL_DEADLINE", 1):
+            result = run_main(slow, "r1ppnx", "Seaford VIC")
+        self.assertLess(time.monotonic() - started, 5)
+        self.assertEqual((result["error"], result["permanent"]), ("network", False))
 
     def test_network_failure_is_retried(self):
         api = location_api("r1ppnx", **{"/locations/r1ppnx/observations":
@@ -264,11 +283,28 @@ class CollectTest(unittest.TestCase):
             adelaide = location_api("r1f93c", warnings=[warning], details={"SA_1": {}})
             out = poll.collect(adelaide, "r1f93c", "Adelaide SA", NOW, cache)
             [saved] = out["warnings"][0]["images"]
-            os.utime(saved, (0, 0))
+            # Older than a poll's own prune would spare, but still in use.
+            eleven_minutes_ago = time.time() - 660
+            os.utime(saved, (eleven_minutes_ago, eleven_minutes_ago))
             poll.collect(location_api("r1ppnx"), "r1ppnx", "Seaford VIC", NOW, cache)
             self.assertTrue(pathlib.Path(saved).exists())
             self.assertEqual(pathlib.Path(saved).parent,
                              cache / "net.tropism.plasma.aussieweather" / "warnings" / "r1f93c")
+
+    def test_a_former_places_images_go_after_a_day(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = pathlib.Path(tmp)
+            warnings = cache / "net.tropism.plasma.aussieweather" / "warnings"
+            old = warnings / "r1f93c"
+            recent = warnings / "r4152n"
+            for place in (old, recent):
+                place.mkdir(parents=True, mode=0o700)
+                (place / (hashlib.sha256(place.name.encode()).hexdigest() + ".png")).write_bytes(PNG)
+            for f in old.iterdir():
+                os.utime(f, (0, 0))
+            poll.collect(location_api("r1ppnx"), "r1ppnx", "Seaford VIC", NOW, cache)
+            self.assertFalse(old.exists())
+            self.assertEqual(len(list(recent.iterdir())), 1)
 
     def test_hourly_not_offered_is_empty(self):
         api = location_api("rd3het", **{"/locations/rd3het/forecasts/hourly": http_error(404)})
@@ -301,6 +337,17 @@ class CurrentWarningsTest(unittest.TestCase):
         self.assertEqual([w["id"] for w in out["warnings"]], ["A"])
         self.assertNotIn("/warnings/B", api.requested)
         self.assertNotIn("/warnings/C", api.requested)
+
+    def test_a_bad_detail_does_not_fail_the_rest(self):
+        # The warning still shows, by its summary, whatever went wrong.
+        for error in (poll.Failure("bad_response", "too large"),
+                      http.client.IncompleteRead(b""), RecursionError()):
+            with self.subTest(type(error).__name__):
+                api = location_api("r1ppnx", warnings=[{"id": "A", "title": "Flood"},
+                                                       {"id": "B", "title": "Wind"}],
+                                   details={"A": {}, "B": {}}, **{"/warnings/A": error})
+                out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW, IMAGE_DIR)
+                self.assertEqual([w["title"] for w in out["warnings"]], ["Flood", "Wind"])
 
     def test_warnings_are_capped(self):
         many = [{"id": "W%d" % i, "phase": "new"} for i in range(poll.MAX_WARNINGS + 10)]
@@ -418,6 +465,25 @@ class SanitiseHtmlTest(unittest.TestCase):
         poll.sanitise("<b>" * 200000 + "</i>" * 200000)
         self.assertLess(time.monotonic() - started, 5)
 
+    def test_plain_text_is_capped_too(self):
+        # A warning body with no markup goes through linkify, which must
+        # keep to the same budgets.
+        out = poll.linkify("a" * (poll.MAX_TEXT * 10))
+        self.assertLessEqual(len(out), poll.MAX_OUTPUT)
+        links = poll.linkify(" ".join(["https://x.example/%d" % i for i in range(5000)]))
+        self.assertLessEqual(links.count("<a "), poll.MAX_ELEMENTS)
+        self.assertLessEqual(len(links), poll.MAX_OUTPUT + 100)
+
+    def test_escaping_cannot_overrun_the_budget(self):
+        # "&" escapes to five characters: the budget counts what is emitted.
+        out = poll.sanitise("<p>" + "&amp;" * 30000 + "</p>").html
+        self.assertLessEqual(len(out), poll.MAX_OUTPUT + 100)
+        self.assertNotRegex(out, r"&[a-z]*…")
+
+    def test_long_links_are_dropped(self):
+        href = "https://x.example/" + "a" * 5000
+        self.assertEqual(poll.sanitise('<a href="%s">map</a>' % href).html, "map")
+
     def test_text_is_capped(self):
         out = poll.sanitise("<p>" + "a" * (poll.MAX_TEXT + 500) + "</p><p>tail</p>").html
         self.assertLessEqual(out.count("a"), poll.MAX_TEXT)
@@ -471,11 +537,45 @@ class ImageStoreTest(unittest.TestCase):
         self.assertTrue((victim / "precious").exists())
         self.assertIn("not a private directory", self.store.problem)
 
-    def test_a_directory_others_can_write_is_refused(self):
+    def test_its_own_directories_are_made_private(self):
+        # Made under a umask of 002 (Ubuntu's), or by an older build.
         directory = pathlib.Path(self.directory.name) / "warnings"
         directory.mkdir()
-        directory.chmod(0o777)
+        directory.chmod(0o775)
+        self.assertIsNotNone(self.store.save(PNG))
+        self.assertEqual(directory.stat().st_mode & 0o777, 0o700)
+
+    def test_a_cache_writable_only_by_the_users_own_group_is_accepted(self):
+        # User-private groups: ~/.cache is 775 on Ubuntu, but the group is
+        # the user's alone.
+        cache = pathlib.Path(self.directory.name)
+        cache.chmod(0o775)
+        with mock.patch.object(poll, "group_is_private", lambda gid: True):
+            self.assertIsNotNone(self.store.save(PNG))
+        with mock.patch.object(poll, "group_is_private", lambda gid: False):
+            fresh = poll.ImageStore(cache, "other")
+            self.assertIsNone(fresh.save(PNG))
+
+    def test_a_symlinked_cache_is_followed(self):
+        real = pathlib.Path(self.directory.name) / "real"
+        real.mkdir(mode=0o700)
+        link = pathlib.Path(self.directory.name) / "link"
+        link.symlink_to(real)
+        self.assertIsNotNone(poll.ImageStore(link, "warnings").save(PNG))
+
+    def test_prune_reports_nothing(self):
+        # Pruning an unusable directory is skipped quietly: only a map that
+        # could not be stored is worth telling the user about.
+        (pathlib.Path(self.directory.name) / "warnings").symlink_to("/nonexistent")
+        self.store.prune()
+        self.assertEqual(self.store.problem, "")
+
+    def test_a_directory_others_can_write_is_refused(self):
+        # One the widget did not make: the cache itself.
+        cache = pathlib.Path(self.directory.name)
+        cache.chmod(0o777)
         self.assertIsNone(self.store.save(PNG))
+        cache.chmod(0o700)
 
     def test_a_planted_file_is_replaced_not_reused(self):
         # A file with the expected name but other content (say, TIFF bytes

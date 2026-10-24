@@ -19,13 +19,16 @@ stdout carrying "ok"; the exit status is always 0.
 import base64
 import binascii
 import collections
+import grp
 import hashlib
 import html
 import json
 import os
 import pathlib
+import pwd
 import re
 import resource
+import signal
 import stat
 import struct
 import sys
@@ -43,7 +46,8 @@ MAX_RESPONSE = 4 * 1024 * 1024
 MAX_WARNINGS = 20
 
 # A backstop for anything else a hostile reply could make grow: the script
-# runs out of memory, not the machine. It needs under 30 MB.
+# runs out of memory, not the machine. It needs under 30 MB resident, and
+# about 250 MB of address space, most of it the locale archive.
 MEMORY_LIMIT = 512 * 1024 * 1024
 
 
@@ -56,6 +60,21 @@ def limit_memory():
 # territories (Norfolk, Christmas and the Cocos Islands).
 STATES = {"ACT", "NSW", "NT", "OT", "QLD", "SA", "TAS", "VIC", "WA"}
 GEOHASH = re.compile(r"[0-9b-hjkmnp-z]{6}")
+
+
+# A whole poll's limit. Each read has a 15 s timeout, but a server dripping
+# a byte at a time never trips it, and while a poll runs the widget cannot
+# start another.
+POLL_DEADLINE = 120
+
+
+class PollTimedOut(BaseException):
+    """The poll passed POLL_DEADLINE. A BaseException, so the handlers that
+    let one extra fail without the others do not swallow it."""
+
+
+def _deadline_passed(signum, frame):
+    raise PollTimedOut()
 
 
 class Failure(Exception):
@@ -79,6 +98,8 @@ def failure_from(error):
     """ERROR as a Failure."""
     if isinstance(error, Failure):
         return error
+    if isinstance(error, PollTimedOut):
+        return Failure("network", "BoM took too long to answer")
     if isinstance(error, urllib.error.HTTPError):
         error.close()  # it holds the response
         # A client error will not change on retry; rate limiting will.
@@ -132,6 +153,17 @@ def split_state(query):
     return " ".join(words), None
 
 
+# BoM spells abbreviations out: "Mt Buller" is listed as Mount Buller.
+SPELLED_OUT = {"mt": "mount", "st": "saint", "pt": "port"}
+
+
+def same_place(a, b):
+    """Whether two place names are the same, abbreviations aside."""
+    def words(name):
+        return [SPELLED_OUT.get(word, word) for word in name.lower().split()]
+    return words(a) == words(b)
+
+
 def search(get, place):
     """BoM's locations matching PLACE."""
     return get("/locations?search=" + urllib.parse.quote(place)).get("data", [])
@@ -143,8 +175,9 @@ def resolve(get, query):
     When QUERY names a state, only places in that state match: "Seaford
     NSW" is not found rather than quietly becoming Seaford, VIC. A last
     word that is not a state and leaves nothing found ("Sydney CBD") is
-    dropped, but only a place named exactly what is left will do: a
-    misspelt "Glen Waverly" is not found, rather than Glen Alice, NSW.
+    dropped, but only a place named what is left will do (abbreviations
+    aside): a misspelt "Glen Waverly" is not found, rather than Glen Alice,
+    NSW.
     """
     place, state = split_state(query)
     if not place:
@@ -154,8 +187,7 @@ def resolve(get, query):
         locations = [l for l in locations if (l.get("state") or "").upper() == state]
     elif not locations and len(place.split()) > 1:
         shorter = place.rsplit(None, 1)[0]
-        locations = [l for l in search(get, shorter)
-                     if (l.get("name") or "").lower() == shorter.lower()]
+        locations = [l for l in search(get, shorter) if same_place(l.get("name") or "", shorter)]
     if not locations:
         raise Failure("not_found", query.strip(), permanent=True)
     location = locations[0]
@@ -206,6 +238,7 @@ MAX_ELEMENTS = 1000
 MAX_OUTPUT = 40000
 MAX_BREAKS = 2
 MAX_STACK = 256
+MAX_HREF = 2048
 
 PNG_URI_PREFIX = "data:image/png;base64,"
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -220,6 +253,14 @@ MAX_IMAGE_SIDE = 2048
 MAX_IMAGE_ASPECT = 8
 
 Sanitised = collections.namedtuple("Sanitised", ["html", "images"])
+
+
+def clip_escaped(escaped, room):
+    """Escaped text cut to at most ROOM characters, without splitting an
+    entity."""
+    if len(escaped) <= room:
+        return escaped
+    return re.sub(r"&[a-z]*$", "", escaped[:room])
 
 
 def png_dimensions(data):
@@ -301,7 +342,7 @@ class _Sanitiser(HTMLParser):
             self.breaks = 0
         if tag == "a":
             href = dict(attrs).get("href") or ""
-            if not href.lower().startswith("https://"):
+            if not href.lower().startswith("https://") or len(href) > MAX_HREF:
                 return
             start = '<a href="%s">' % html.escape(href, quote=True)
         else:
@@ -352,7 +393,13 @@ class _Sanitiser(HTMLParser):
         self.text_left -= len(data)
         if self.text_left <= 0:
             self.full = True
-        self.emit(html.escape(data, quote=False))
+        # Escaping lengthens text ("&" is five characters): the budget is
+        # for what is emitted.
+        escaped = html.escape(data, quote=False)
+        if len(escaped) > self.output_left:
+            escaped = clip_escaped(escaped, self.output_left) + "…"
+            self.full = True
+        self.emit(escaped)
 
     def result(self):
         self.close()
@@ -368,6 +415,7 @@ def sanitise(markup):
     return sanitiser.result()
 
 
+CACHE_NAME = "net.tropism.plasma.aussieweather"
 IMAGE_NAME = re.compile(r"[0-9a-f]{64}\.png")
 TEMP_NAME = re.compile(r"tmp\w+\.tmp")
 
@@ -378,10 +426,41 @@ def user_cache():
     return pathlib.Path(cache) if os.path.isabs(cache) else pathlib.Path.home() / ".cache"
 
 
+def group_is_private(gid):
+    """Whether group GID is the user's alone: the user-private group
+    Debian, Ubuntu and Fedora give each user, with no other members. Their
+    sessions' umask (002) leaves directories group-writable."""
+    try:
+        group = grp.getgrgid(gid)
+        user = pwd.getpwuid(os.getuid())
+    except KeyError:
+        return False
+    return (gid == user.pw_gid and group.gr_name == user.pw_name
+            and not set(group.gr_mem) - {user.pw_name})
+
+
+def private_cache(path, create):
+    """Check the user's cache directory, symlinks followed, is the user's
+    and nobody else can write to it. Made (0700) if it is missing and
+    CREATE. False if missing and not made; PermissionError if not
+    private."""
+    if create:
+        path.mkdir(mode=0o700, parents=True, exist_ok=True)
+    try:
+        info = path.stat()
+    except FileNotFoundError:
+        return False
+    others = info.st_mode & 0o002 or (info.st_mode & 0o020 and not group_is_private(info.st_gid))
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or others:
+        raise PermissionError("%s is not a private directory" % path)
+    return True
+
+
 def private_directory(path, create):
-    """Check PATH is a real directory of this user's that nobody else can
-    write to, making it (0700) if it is missing and CREATE. False if it is
-    missing and not made; PermissionError if it is not private."""
+    """Check PATH, one of the widget's own directories, is a real directory
+    of the user's (not a symlink), and make it 0700: made so if missing and
+    CREATE, tightened if a umask of 002 or an older build left it open.
+    False if missing and not made; PermissionError if not the user's."""
     if create:
         try:
             path.mkdir(mode=0o700)
@@ -391,9 +470,10 @@ def private_directory(path, create):
         info = path.lstat()
     except FileNotFoundError:
         return False
-    if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid()
-            or info.st_mode & 0o022):
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
         raise PermissionError("%s is not a private directory" % path)
+    if info.st_mode & 0o077:
+        path.chmod(0o700)
     return True
 
 
@@ -405,10 +485,10 @@ class ImageStore:
     by its size alone); a QML Image of a .png file goes to the PNG decoder.
     Files are named by their content's hash.
 
-    Every directory from the user's cache down must be a real directory of
-    the user's that nobody else can write to (missing ones are made so):
-    anyone who could place one could point it elsewhere or plant files. If
-    one is not, nothing is stored, and problem says why.
+    The user's cache must be the user's and nobody else's to write, and the
+    widget's directories under it real directories of the user's, kept
+    0700: anyone who could place one could point it elsewhere or plant
+    files. If not, nothing is stored, and problem says why.
     """
 
     # An unreferenced file younger than this may belong to a poll still
@@ -416,31 +496,30 @@ class ImageStore:
     PRUNE_AFTER = 600
 
     def __init__(self, cache, *names):
+        self.cache = cache
         self.directory = cache.joinpath(*names)
-        self._chain = [cache] + [cache.joinpath(*names[:n]) for n in range(1, len(names) + 1)]
+        self._own = [cache.joinpath(*names[:n]) for n in range(1, len(names) + 1)]
         self.kept = set()
         self.saved_bytes = 0
         self.problem = ""
 
     def _private(self, create):
-        """Whether every directory is private (made if CREATE)."""
-        try:
-            return all(private_directory(path, create) for path in self._chain)
-        except OSError as e:
-            self.problem = str(e)
-            return False
+        """Whether the cache and the widget's directories are private (made
+        so if CREATE); raises OSError if not."""
+        return private_cache(self.cache, create) and all(
+            private_directory(path, create) for path in self._own)
 
     def save(self, data):
         """Store DATA; its file's path, or None once this poll has saved
         MAX_POLL_IMAGES images or MAX_POLL_IMAGE_BYTES, or if the directory
-        is not private."""
+        is not private (problem says why)."""
         if (len(self.kept) >= MAX_POLL_IMAGES
-                or self.saved_bytes + len(data) > MAX_POLL_IMAGE_BYTES
-                or not self._private(create=True)):
+                or self.saved_bytes + len(data) > MAX_POLL_IMAGE_BYTES):
             return None
         name = hashlib.sha256(data).hexdigest() + ".png"
         path = self.directory / name
         try:
+            self._private(create=True)
             if self._holds(path, data):
                 os.utime(path)  # still shown: not one for prune
             else:
@@ -464,13 +543,18 @@ class ImageStore:
         except FileNotFoundError:
             return False
 
-    def prune(self):
+    def prune(self, older_than=PRUNE_AFTER):
         """Delete the images and leftover temporary files no current
-        warning shows. Anything else in the directory is not ours and is
-        left; a file another poll removes meanwhile is skipped."""
-        if not self._private(create=False):
+        warning shows, once OLDER_THAN seconds old. Anything else in the
+        directory is not ours and is left; a file another poll removes
+        meanwhile is skipped. A directory that is missing or not private is
+        skipped quietly: housekeeping, not worth an error."""
+        try:
+            if not self._private(create=False):
+                return
+        except OSError:
             return
-        cutoff = time.time() - self.PRUNE_AFTER
+        cutoff = time.time() - older_than
         for path in self.directory.iterdir():
             if path.name in self.kept:
                 continue
@@ -484,6 +568,27 @@ class ImageStore:
                 pass
 
 
+# Another widget may still show a place this one has left, and refreshes
+# its images' age each poll, so they go only when a day old.
+FORMER_PLACE_AFTER = 24 * 3600
+
+
+def prune_former_places(cache, geohash):
+    """Tidy the image directories of places other than GEOHASH's, removing
+    each once empty."""
+    try:
+        places = [p for p in (cache / CACHE_NAME / "warnings").iterdir()
+                  if p.name != geohash and GEOHASH.fullmatch(p.name)]
+    except OSError:
+        return
+    for place in places:
+        ImageStore(cache, CACHE_NAME, "warnings", place.name).prune(FORMER_PLACE_AFTER)
+        try:
+            place.rmdir()
+        except OSError:
+            pass
+
+
 HTTPS_URL = re.compile(r'https://[^\s<>"]+')
 TRAILING_PUNCTUATION = re.compile(r"[.,;:!?)\]}'\"]+$")
 LOOKS_LIKE_HTML = re.compile(r"<[a-z!/]", re.IGNORECASE)
@@ -493,19 +598,35 @@ def linkify(text):
     """Plain TEXT as RichText: escaped, with bare https URLs made links.
 
     Trailing sentence punctuation stays outside the link, so a sentence
-    ending in a URL works.
+    ending in a URL works. It keeps to the budgets of sanitised HTML: at
+    most MAX_TEXT of text, MAX_ELEMENTS links and MAX_OUTPUT of markup.
     """
-    out = []
+    if len(text) > MAX_TEXT:
+        text = text[:MAX_TEXT] + "…"
+    pieces = []
     last = 0
-    for match in HTTPS_URL.finditer(text):
+    for links, match in enumerate(HTTPS_URL.finditer(text)):
+        if links >= MAX_ELEMENTS:
+            break
         url = match.group(0)
         trail = TRAILING_PUNCTUATION.search(url)
         if trail:
             url = url[:trail.start()]
-        out.append(html.escape(text[last:match.start()], quote=False))
-        out.append('<a href="%s">%s</a>' % (html.escape(url), html.escape(url, quote=False)))
+        pieces.append(html.escape(text[last:match.start()], quote=False))
+        if len(url) <= MAX_HREF:
+            pieces.append('<a href="%s">%s</a>' % (html.escape(url), html.escape(url, quote=False)))
+        else:
+            pieces.append(html.escape(url, quote=False))
         last = match.start() + len(url)
-    out.append(html.escape(text[last:], quote=False))
+    pieces.append(html.escape(text[last:], quote=False))
+    out = []
+    room = MAX_OUTPUT
+    for piece in pieces:
+        if len(piece) > room:
+            out.append("…" if piece.startswith("<a ") else clip_escaped(piece, room) + "…")
+            break
+        out.append(piece)
+        room -= len(piece)
     return "".join(out)
 
 
@@ -544,7 +665,7 @@ def warnings_for(get, geohash, now, images):
             try:
                 detail = get("/warnings/" + urllib.parse.quote(wid, safe=""))
                 warning = dict(warning, **detail.get("data", {}))
-            except (OSError, ValueError, TypeError, AttributeError) as e:
+            except Exception as e:
                 failure_from(e)  # closes an HTTP error's response
         warnings.append(warning_view(warning, images))
     return warnings
@@ -592,7 +713,7 @@ def collect(get, geohash, query, now, cache):
         out["hourlyError"] = failure_from(e).detail
     # Each place's images apart, so two widgets for two places do not prune
     # each other's.
-    images = ImageStore(cache, "net.tropism.plasma.aussieweather", "warnings", geohash)
+    images = ImageStore(cache, CACHE_NAME, "warnings", geohash)
     try:
         out["warnings"] = warnings_for(get, geohash, now, images)
     except Exception as e:
@@ -603,6 +724,7 @@ def collect(get, geohash, query, now, cache):
         # the poll.
         try:
             images.prune()
+            prune_former_places(cache, geohash)
         except OSError:
             pass
     if images.problem:
@@ -612,13 +734,18 @@ def collect(get, geohash, query, now, cache):
 
 def main(argv):
     version, geohash, query = argv[1:4]
+    previous = signal.signal(signal.SIGALRM, _deadline_passed)
+    signal.alarm(POLL_DEADLINE)
     try:
         result = collect(make_get(version), geohash, query, datetime.now(timezone.utc),
                          user_cache())
-    except Exception as e:
+    except (Exception, PollTimedOut) as e:
         failure = failure_from(e)
         result = {"ok": False, "error": failure.kind, "detail": failure.detail,
                   "permanent": failure.permanent}
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous)
     # Every result names the request it answers: polls can overlap, and
     # the widget drops answers to a request it would no longer make.
     result["request"] = {"query": query, "geohash": geohash}

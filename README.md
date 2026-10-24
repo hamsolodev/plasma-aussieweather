@@ -70,9 +70,11 @@ only; no third-party Python packages needed).
 Warning maps are saved as PNG files under
 `~/.cache/net.tropism.plasma.aussieweather/warnings/` (or under
 `$XDG_CACHE_HOME`), one directory per location, while their warnings are
-current, and removed after. Those directories must be private to you
-(the widget makes them so, mode 0700); if one is not, the maps are not
-shown and the widget says why.
+current. They are removed once no current warning uses them, and a
+location no longer shown loses its maps after a day. The cache directory
+must not be writable by other users (a group of your own is fine); the
+widget keeps its own directories private (mode 0700). If they cannot be
+made so, the maps are not shown and the widget says why.
 
 ## Configuration
 
