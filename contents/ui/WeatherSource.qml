@@ -114,6 +114,8 @@ QtObject {
             partial.push(i18n("Warnings could not be updated: %1", d.warningsError))
         if (d.hourlyError)
             partial.push(i18n("The hourly forecast could not be updated: %1", d.hourlyError))
+        if (d.imagesError)
+            partial.push(i18n("Warning maps cannot be shown: %1", d.imagesError))
         weather.errorText = partial.join("\n")
     }
 

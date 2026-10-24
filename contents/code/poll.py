@@ -26,6 +26,7 @@ import os
 import pathlib
 import re
 import resource
+import stat
 import struct
 import sys
 import tempfile
@@ -367,61 +368,120 @@ def sanitise(markup):
     return sanitiser.result()
 
 
+IMAGE_NAME = re.compile(r"[0-9a-f]{64}\.png")
+TEMP_NAME = re.compile(r"tmp\w+\.tmp")
+
+
+def user_cache():
+    """The user's cache directory: $XDG_CACHE_HOME, else ~/.cache."""
+    cache = os.environ.get("XDG_CACHE_HOME") or ""
+    return pathlib.Path(cache) if os.path.isabs(cache) else pathlib.Path.home() / ".cache"
+
+
+def private_directory(path, create):
+    """Check PATH is a real directory of this user's that nobody else can
+    write to, making it (0700) if it is missing and CREATE. False if it is
+    missing and not made; PermissionError if it is not private."""
+    if create:
+        try:
+            path.mkdir(mode=0o700)
+        except FileExistsError:
+            pass
+    try:
+        info = path.lstat()
+    except FileNotFoundError:
+        return False
+    if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid()
+            or info.st_mode & 0o022):
+        raise PermissionError("%s is not a private directory" % path)
+    return True
+
+
 class ImageStore:
     """Warning images, as PNG files the widget shows with a QML Image.
 
     A data: image left in RichText is handed to every image plugin's
     sniffer before the PNG decoder (LibRaw claims some PNG-signature data
     by its size alone); a QML Image of a .png file goes to the PNG decoder.
-    Files are named by their content's hash, so a poll rewrites nothing.
+    Files are named by their content's hash.
+
+    Every directory from the user's cache down must be a real directory of
+    the user's that nobody else can write to (missing ones are made so):
+    anyone who could place one could point it elsewhere or plant files. If
+    one is not, nothing is stored, and problem says why.
     """
 
     # An unreferenced file younger than this may belong to a poll still
     # running (the location changed mid-poll), so prune leaves it.
     PRUNE_AFTER = 600
 
-    def __init__(self, directory):
-        self.directory = directory
+    def __init__(self, cache, *names):
+        self.directory = cache.joinpath(*names)
+        self._chain = [cache] + [cache.joinpath(*names[:n]) for n in range(1, len(names) + 1)]
         self.kept = set()
         self.saved_bytes = 0
+        self.problem = ""
+
+    def _private(self, create):
+        """Whether every directory is private (made if CREATE)."""
+        try:
+            return all(private_directory(path, create) for path in self._chain)
+        except OSError as e:
+            self.problem = str(e)
+            return False
 
     def save(self, data):
         """Store DATA; its file's path, or None once this poll has saved
-        MAX_POLL_IMAGES images or MAX_POLL_IMAGE_BYTES."""
+        MAX_POLL_IMAGES images or MAX_POLL_IMAGE_BYTES, or if the directory
+        is not private."""
         if (len(self.kept) >= MAX_POLL_IMAGES
-                or self.saved_bytes + len(data) > MAX_POLL_IMAGE_BYTES):
+                or self.saved_bytes + len(data) > MAX_POLL_IMAGE_BYTES
+                or not self._private(create=True)):
+            return None
+        name = hashlib.sha256(data).hexdigest() + ".png"
+        path = self.directory / name
+        try:
+            if self._holds(path, data):
+                os.utime(path)  # still shown: not one for prune
+            else:
+                with tempfile.NamedTemporaryFile(dir=self.directory, suffix=".tmp",
+                                                 delete=False) as f:
+                    f.write(data)
+                os.replace(f.name, path)
+        except OSError as e:
+            self.problem = str(e)
             return None
         self.saved_bytes += len(data)
-        path = self.directory / (hashlib.sha256(data).hexdigest() + ".png")
-        if not path.exists():
-            self.directory.mkdir(mode=0o700, parents=True, exist_ok=True)
-            with tempfile.NamedTemporaryFile(dir=self.directory, suffix=".tmp", delete=False) as f:
-                f.write(data)
-            os.replace(f.name, path)
-        self.kept.add(path.name)
+        self.kept.add(name)
         return str(path)
 
+    @staticmethod
+    def _holds(path, data):
+        """Whether PATH is a regular file holding DATA. Its type is checked
+        first: reading a FIFO would block."""
+        try:
+            return stat.S_ISREG(path.lstat().st_mode) and path.read_bytes() == data
+        except FileNotFoundError:
+            return False
+
     def prune(self):
-        """Delete files no current warning shows. A file another poll
-        removes or replaces meanwhile is skipped."""
-        if not self.directory.is_dir():
+        """Delete the images and leftover temporary files no current
+        warning shows. Anything else in the directory is not ours and is
+        left; a file another poll removes meanwhile is skipped."""
+        if not self._private(create=False):
             return
         cutoff = time.time() - self.PRUNE_AFTER
         for path in self.directory.iterdir():
+            if path.name in self.kept:
+                continue
+            if not (IMAGE_NAME.fullmatch(path.name) or TEMP_NAME.fullmatch(path.name)):
+                continue
             try:
-                if path.name not in self.kept and path.stat().st_mtime < cutoff:
-                    path.unlink(missing_ok=True)
+                info = path.lstat()
+                if not stat.S_ISDIR(info.st_mode) and info.st_mtime < cutoff:
+                    path.unlink()
             except FileNotFoundError:
                 pass
-
-
-def image_directory():
-    """Where warning images are kept, under the user's cache directory. Each
-    location has its own subdirectory, so two widgets for two places do
-    not prune each other's images."""
-    cache = os.environ.get("XDG_CACHE_HOME") or ""
-    base = pathlib.Path(cache) if os.path.isabs(cache) else pathlib.Path.home() / ".cache"
-    return base / "net.tropism.plasma.aussieweather" / "warnings"
 
 
 HTTPS_URL = re.compile(r'https://[^\s<>"]+')
@@ -505,7 +565,7 @@ def hourly_for(get, geohash):
         raise
 
 
-def collect(get, geohash, query, now, image_directory):
+def collect(get, geohash, query, now, cache):
     """Everything the widget shows, as one JSON-ready dict."""
     if not query.strip():
         raise Failure("no_location", permanent=True)
@@ -530,7 +590,9 @@ def collect(get, geohash, query, now, image_directory):
     except Exception as e:
         out["hourly"] = None
         out["hourlyError"] = failure_from(e).detail
-    images = ImageStore(image_directory / geohash)
+    # Each place's images apart, so two widgets for two places do not prune
+    # each other's.
+    images = ImageStore(cache, "net.tropism.plasma.aussieweather", "warnings", geohash)
     try:
         out["warnings"] = warnings_for(get, geohash, now, images)
     except Exception as e:
@@ -543,6 +605,8 @@ def collect(get, geohash, query, now, image_directory):
             images.prune()
         except OSError:
             pass
+    if images.problem:
+        out["imagesError"] = images.problem
     return out
 
 
@@ -550,7 +614,7 @@ def main(argv):
     version, geohash, query = argv[1:4]
     try:
         result = collect(make_get(version), geohash, query, datetime.now(timezone.utc),
-                         image_directory())
+                         user_cache())
     except Exception as e:
         failure = failure_from(e)
         result = {"ok": False, "error": failure.kind, "detail": failure.detail,

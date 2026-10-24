@@ -9,7 +9,7 @@ msgstr ""
 "Project-Id-Version: plasma_applet_net.tropism.plasma.aussieweather\n"
 "Report-Msgid-Bugs-To: https://github.com/hamsolodev/plasma-aussieweather/"
 "issues\n"
-"POT-Creation-Date: 2026-10-24 03:32+0000\n"
+"POT-Creation-Date: 2026-10-24 03:54+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -131,24 +131,24 @@ msgstr ""
 msgid "Rain %1–%2 mm"
 msgstr ""
 
-#: contents/ui/RadarSource.qml:86
+#: contents/ui/RadarSource.qml:98
 msgid "Not a radar station: %1"
 msgstr ""
 
-#: contents/ui/RadarSource.qml:87
+#: contents/ui/RadarSource.qml:99
 msgid ""
 "No recent radar images. The station may be offline; try a neighbouring one."
 msgstr ""
 
-#: contents/ui/RadarSource.qml:88
+#: contents/ui/RadarSource.qml:100
 msgid "Cannot reach BoM's radar listing: %1"
 msgstr ""
 
-#: contents/ui/RadarSource.qml:89
+#: contents/ui/RadarSource.qml:101
 msgid "The radar script failed: %1"
 msgstr ""
 
-#: contents/ui/RadarSource.qml:90
+#: contents/ui/RadarSource.qml:102
 msgid "Radar update failed: %1"
 msgstr ""
 
@@ -247,15 +247,15 @@ msgstr ""
 msgid "Warning"
 msgstr ""
 
-#: contents/ui/WarningsTab.qml:94
+#: contents/ui/WarningsTab.qml:96
 msgid "Final warning"
 msgstr ""
 
-#: contents/ui/WarningsTab.qml:96
+#: contents/ui/WarningsTab.qml:98
 msgid "Issued %1"
 msgstr ""
 
-#: contents/ui/WarningsTab.qml:98
+#: contents/ui/WarningsTab.qml:100
 msgid "Expires %1"
 msgstr ""
 
@@ -293,6 +293,10 @@ msgstr ""
 
 #: contents/ui/WeatherSource.qml:116
 msgid "The hourly forecast could not be updated: %1"
+msgstr ""
+
+#: contents/ui/WeatherSource.qml:118
+msgid "Warning maps cannot be shown: %1"
 msgstr ""
 
 #: contents/ui/WeatherTab.qml:69

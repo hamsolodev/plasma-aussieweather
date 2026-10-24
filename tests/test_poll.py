@@ -6,6 +6,7 @@ import base64
 import struct
 import zlib
 import contextlib
+import hashlib
 import os
 import pathlib
 import tempfile
@@ -266,7 +267,8 @@ class CollectTest(unittest.TestCase):
             os.utime(saved, (0, 0))
             poll.collect(location_api("r1ppnx"), "r1ppnx", "Seaford VIC", NOW, cache)
             self.assertTrue(pathlib.Path(saved).exists())
-            self.assertEqual(pathlib.Path(saved).parent, cache / "r1f93c")
+            self.assertEqual(pathlib.Path(saved).parent,
+                             cache / "net.tropism.plasma.aussieweather" / "warnings" / "r1f93c")
 
     def test_hourly_not_offered_is_empty(self):
         api = location_api("rd3het", **{"/locations/rd3het/forecasts/hourly": http_error(404)})
@@ -440,7 +442,7 @@ class ImageStoreTest(unittest.TestCase):
 
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
-        self.store = poll.ImageStore(pathlib.Path(self.directory.name) / "warnings")
+        self.store = poll.ImageStore(pathlib.Path(self.directory.name), "warnings")
 
     def tearDown(self):
         self.directory.cleanup()
@@ -456,6 +458,59 @@ class ImageStoreTest(unittest.TestCase):
         kept = sum(path is not None for path in saved)
         self.assertEqual(kept, poll.MAX_POLL_IMAGE_BYTES // size)
 
+    def test_a_symlinked_directory_is_refused(self):
+        # Someone who could place the directory could point it anywhere;
+        # one poll used to delete every old file in the target.
+        victim = pathlib.Path(self.directory.name) / "victim"
+        victim.mkdir()
+        (victim / "precious").write_text("x")
+        os.utime(victim / "precious", (0, 0))
+        (pathlib.Path(self.directory.name) / "warnings").symlink_to(victim)
+        self.assertIsNone(self.store.save(PNG))
+        self.store.prune()
+        self.assertTrue((victim / "precious").exists())
+        self.assertIn("not a private directory", self.store.problem)
+
+    def test_a_directory_others_can_write_is_refused(self):
+        directory = pathlib.Path(self.directory.name) / "warnings"
+        directory.mkdir()
+        directory.chmod(0o777)
+        self.assertIsNone(self.store.save(PNG))
+
+    def test_a_planted_file_is_replaced_not_reused(self):
+        # A file with the expected name but other content (say, TIFF bytes
+        # Qt would sniff) must not be shown as the warning's map.
+        path = pathlib.Path(self.store.save(PNG))
+        path.write_bytes(b"II*\0 not the map")
+        os.utime(path, (0, 0))
+        self.assertEqual(pathlib.Path(self.store.save(PNG)).read_bytes(), PNG)
+
+    def test_a_fifo_with_the_name_is_replaced(self):
+        # Reading a FIFO blocks: Qt's image loader hung on one.
+        path = self.store.directory / (hashlib.sha256(PNG).hexdigest() + ".png")
+        self.store.directory.mkdir(parents=True)
+        os.mkfifo(path)
+        self.assertEqual(pathlib.Path(self.store.save(PNG)).read_bytes(), PNG)
+
+    def test_reuse_refreshes_the_files_age(self):
+        path = pathlib.Path(self.store.save(PNG))
+        os.utime(path, (0, 0))
+        self.store.save(PNG)
+        self.assertGreater(path.stat().st_mtime, 0)
+
+    def test_prune_leaves_what_it_did_not_make(self):
+        self.store.save(PNG)
+        foreign = self.store.directory / "notes.txt"
+        foreign.write_text("x")
+        sub = self.store.directory / "sub"
+        sub.mkdir()
+        for path in (foreign, sub):
+            os.utime(path, (0, 0))
+        fresh = poll.ImageStore(pathlib.Path(self.directory.name), "warnings")
+        fresh.prune()
+        self.assertTrue(foreign.exists())
+        self.assertTrue(sub.exists())
+
     def test_same_image_same_file(self):
         self.assertEqual(self.store.save(PNG), self.store.save(PNG))
         self.assertEqual(len(list(self.store.directory.iterdir())), 1)
@@ -466,15 +521,16 @@ class ImageStoreTest(unittest.TestCase):
         self.store.directory.mkdir(parents=True)
         old.write_bytes(PNG)
         os.utime(old, (0, 0))
-        stat = pathlib.Path.stat
+        lstat = pathlib.Path.lstat
 
-        def vanishing_stat(path, *args, **kwargs):
+        def vanishing_lstat(path):
             if path == old:
                 raise FileNotFoundError(path)
-            return stat(path, *args, **kwargs)
+            return lstat(path)
 
-        with mock.patch.object(pathlib.Path, "stat", vanishing_stat):
+        with mock.patch.object(pathlib.Path, "lstat", vanishing_lstat):
             self.store.prune()
+        self.assertTrue(old.exists(), "the patch should have hidden it from prune")
 
     def test_prune_keeps_what_this_poll_saved_and_recent_files(self):
         kept = pathlib.Path(self.store.save(PNG))
@@ -508,7 +564,7 @@ class WarningViewTest(unittest.TestCase):
 
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
-        self.store = poll.ImageStore(pathlib.Path(self.directory.name) / "warnings")
+        self.store = poll.ImageStore(pathlib.Path(self.directory.name), "warnings")
 
     def tearDown(self):
         self.directory.cleanup()
