@@ -247,6 +247,38 @@ TestCase {
                 "/home/u/my widgets/poll.py")
     }
 
+    // ── hourly slots ──────────────────────────────────────────────────────
+
+    // Hourly slots start on UTC hours.
+    function slots() {
+        return [{ time: "2026-10-24T00:00:00Z" }, { time: "2026-10-24T01:00:00Z" },
+                { time: "2026-10-24T02:00:00Z" }, { time: "2026-10-24T03:00:00Z" }]
+    }
+
+    function test_upcomingSlots_drops_past_hours() {
+        var now = Date.parse("2026-10-24T01:45:00Z")
+        compare(Helpers.upcomingSlots(slots(), now).map(function(h) { return h.time }),
+                ["2026-10-24T01:00:00Z", "2026-10-24T02:00:00Z", "2026-10-24T03:00:00Z"])
+        compare(Helpers.upcomingSlots(null, now), [])
+    }
+
+    function test_currentSlot_is_the_slot_now_falls_in() {
+        compare(Helpers.currentSlot(slots(), Date.parse("2026-10-24T01:45:00Z")).time,
+                "2026-10-24T01:00:00Z")
+        compare(Helpers.currentSlot(slots(), Date.parse("2026-10-24T09:00:00Z")).time,
+                "2026-10-24T03:00:00Z")
+        compare(Helpers.currentSlot(slots(), Date.parse("2026-10-23T23:59:00Z")), null)
+    }
+
+    // A UTC-hour slot starts at half past locally in SA, the NT, Broken Hill
+    // and the Cocos Islands; its label must say so.
+    function test_slotTimeFormat_shows_minutes_off_the_hour() {
+        compare(Helpers.slotTimeFormat(new Date(2026, 9, 24, 14, 0), false), "hap")
+        compare(Helpers.slotTimeFormat(new Date(2026, 9, 24, 14, 30), false), "h:mmap")
+        compare(Helpers.slotTimeFormat(new Date(2026, 9, 24, 14, 0), true), "HH:mm")
+        compare(Helpers.slotTimeFormat(new Date(2026, 9, 24, 14, 30), true), "HH:mm")
+    }
+
     // ── isStale / isSameDay ───────────────────────────────────────────────
 
     function test_isStale_after_two_missed_polls() {

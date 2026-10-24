@@ -26,7 +26,7 @@ def location_api(geohash, warnings=(), details=None, **overrides):
     responses = {
         base + "/observations": {"data": {"temp": 17.2}},
         base + "/forecasts/daily": {"data": [{"date": "2026-10-23T13:00:00Z"}] * 8},
-        base + "/forecasts/hourly": {"data": [{"time": "2026-10-24T00:00:00Z"}] * 12},
+        base + "/forecasts/hourly": {"data": [{"time": "2026-10-24T00:00:00Z"}] * 24},
         base + "/warnings": {"data": list(warnings)},
     }
     for wid, detail in (details or {}).items():
@@ -164,7 +164,8 @@ class CollectTest(unittest.TestCase):
     def test_forecasts_are_trimmed(self):
         out = poll.collect(location_api("r1ppnx"), "r1ppnx", "Seaford VIC", NOW)
         self.assertEqual(len(out["forecast"]), 7)
-        self.assertEqual(len(out["hourly"]), 8)
+        # More hours than are shown: the widget drops slots that have passed.
+        self.assertEqual(len(out["hourly"]), 12)
 
     def test_warning_detail_is_merged(self):
         summary = {"id": "VIC_X_1", "title": "Flood Warning"}

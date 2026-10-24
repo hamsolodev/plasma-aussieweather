@@ -194,6 +194,41 @@ function moonPhase(date) {
     return {emoji: "🌑", name: "New Moon"}
 }
 
+// The hour a time falls in, counted in UTC hours. BoM's hourly slots start
+// on UTC hours, so this matches a time to its slot in half-hour time zones
+// too.
+function hourBucket(ms) {
+    return Math.floor(ms / 3600000)
+}
+
+// The hourly entries from the one now falls in onwards. Past slots stay in
+// the list until the next poll, an hour away at the longest interval and
+// longer while polls fail.
+function upcomingSlots(hourly, nowMs) {
+    var now = hourBucket(nowMs)
+    return (hourly || []).filter(function(h) {
+        return hourBucket(Date.parse(h.time)) >= now
+    })
+}
+
+// The hourly entry now falls in: the latest that starts at or before it.
+// null if every entry is in the future.
+function currentSlot(hourly, nowMs) {
+    var now = hourBucket(nowMs)
+    var best = null
+    for (var i = 0; i < (hourly || []).length; i++)
+        if (hourBucket(Date.parse(hourly[i].time)) <= now) best = hourly[i]
+    return best
+}
+
+// Qt time format for an hourly slot's label: the hour alone when the slot
+// starts on the hour locally, with minutes when it does not (UTC-hour slots
+// start at half past in SA, the NT, Broken Hill and the Cocos Islands).
+function slotTimeFormat(date, use24Hour) {
+    if (use24Hour) return "HH:mm"
+    return date.getMinutes() === 0 ? "hap" : "h:mmap"
+}
+
 // Whether data last fetched at lastMs is out of date at nowMs: two polls in
 // a row have been missed. False before the first fetch (lastMs 0).
 function isStale(lastMs, nowMs, intervalMs) {

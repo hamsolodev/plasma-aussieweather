@@ -100,24 +100,25 @@ PlasmoidItem {
         if (!pollOk || !forecast || forecast.length === 0)
             return "weather-none-available"
         var now = root.currentTime
-        // Descriptor from the hourly entry whose hour-bucket matches or most
-        // recently precedes now; its is_night is hourly-quantised, so only
-        // used when astronomical times are missing.
-        if (hourlyForecast && hourlyForecast.length > 0) {
-            var nowBucket = Math.floor(now.getTime() / 3600000)
-            var best = null
-            for (var i = 0; i < hourlyForecast.length; i++) {
-                var bucket = Math.floor(new Date(hourlyForecast[i].time).getTime() / 3600000)
-                if (bucket <= nowBucket) best = hourlyForecast[i]
-            }
-            if (best)
-                return Helpers.bomIcon(Helpers.iconDescriptor(best),
-                                       root.hasAstro ? root.isNight : best.is_night)
-        }
+        // The hourly slot now falls in; its is_night is hourly-quantised, so
+        // only used when astronomical times are missing.
+        var slot = Helpers.currentSlot(hourlyForecast, root.currentTime.getTime())
+        if (slot)
+            return Helpers.bomIcon(Helpers.iconDescriptor(slot),
+                                   root.hasAstro ? root.isNight : slot.is_night)
         return Helpers.bomIcon(Helpers.iconDescriptor(forecast[0]), root.isNight)
     }
 
     readonly property bool hasWarnings: Array.isArray(warnings) && warnings.length > 0
+
+    // The hour now falls in (Helpers.hourBucket); it changes once an hour, so
+    // what depends on it is rebuilt hourly rather than every minute.
+    readonly property int currentHour: Helpers.hourBucket(currentTime.getTime())
+    // The hourly strip: from the current slot on, never past ones.
+    readonly property var upcomingHourly:
+        Helpers.upcomingSlots(hourlyForecast, currentHour * 3600000).slice(0, 8)
+    readonly property bool use24Hour:
+        Qt.locale().timeFormat(Locale.ShortFormat).toLowerCase().indexOf("ap") < 0
 
     // Today's UV category (Helpers.uvKey), "" when BoM gave none.
     readonly property string todayUvKey:
@@ -708,15 +709,15 @@ PlasmoidItem {
 
             Kirigami.Separator {
                 Layout.fillWidth: true
-                visible: root.pollOk && (root.hourlyForecast.length > 0 || root.forecast.length > 0)
+                visible: root.pollOk && (root.upcomingHourly.length > 0 || root.forecast.length > 0)
                 Layout.topMargin: Kirigami.Units.smallSpacing / 2
             }
 
             // Hourly forecast
             PlainLabel {
-                visible: root.pollOk && root.hourlyForecast.length > 0
+                visible: root.pollOk && root.upcomingHourly.length > 0
                 Layout.leftMargin: Kirigami.Units.smallSpacing
-                text: i18n("Next 8 Hours")
+                text: i18np("Next Hour", "Next %1 Hours", root.upcomingHourly.length)
                 font.pointSize: Kirigami.Theme.defaultFont.pointSize
                 font.weight: Font.Bold
                 opacity: 0.55
@@ -724,17 +725,17 @@ PlasmoidItem {
 
             Row {
                 id: hourlyRow
-                visible: root.pollOk && root.hourlyForecast.length > 0
+                visible: root.pollOk && root.upcomingHourly.length > 0
                 Layout.fillWidth: true
                 Layout.leftMargin:  Kirigami.Units.smallSpacing
                 Layout.rightMargin: Kirigami.Units.smallSpacing
 
                 Repeater {
-                    model: root.hourlyForecast
+                    model: root.upcomingHourly
                     delegate: ColumnLayout {
                         required property var modelData
                         required property int index
-                        width: hourlyRow.width / Math.max(root.hourlyForecast.length, 1)
+                        width: hourlyRow.width / Math.max(root.upcomingHourly.length, 1)
                         spacing: 1
 
                         PlainLabel {
@@ -743,11 +744,11 @@ PlasmoidItem {
                             font.weight: index === 0 ? Font.Bold : Font.Normal
                             opacity: 0.65
                             text: {
-                                var d = new Date(modelData.time)
-                                var now = new Date()
-                                if (Math.floor(d.getTime() / 3600000) === Math.floor(now.getTime() / 3600000))
+                                var start = Date.parse(modelData.time)
+                                if (Helpers.hourBucket(start) === root.currentHour)
                                     return i18n("Now")
-                                return Qt.formatTime(d, "h ap").replace(" ", "")
+                                var d = new Date(start)
+                                return Qt.formatTime(d, Helpers.slotTimeFormat(d, root.use24Hour))
                             }
                         }
                         Kirigami.Icon {
@@ -814,7 +815,7 @@ PlasmoidItem {
 
             Kirigami.Separator {
                 Layout.fillWidth: true
-                visible: root.pollOk && root.hourlyForecast.length > 0 && root.forecast.length > 0
+                visible: root.pollOk && root.upcomingHourly.length > 0 && root.forecast.length > 0
             }
 
             // 7-day forecast

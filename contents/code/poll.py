@@ -310,7 +310,9 @@ def collect(get, geohash, query, now):
     # still worth showing. None means unknown, so the widget keeps what it
     # had; an empty list would mean there are none.
     try:
-        out["hourly"] = hourly_for(get, geohash)[:8]
+        # More than the widget shows: it drops slots that have passed
+        # before the next poll.
+        out["hourly"] = hourly_for(get, geohash)[:12]
     except Exception as e:
         out["hourly"] = None
         out["hourlyError"] = failure_from(e).detail
