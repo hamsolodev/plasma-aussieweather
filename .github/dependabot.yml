@@ -2,8 +2,10 @@
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
 
-# Workflow actions are pinned to commit SHAs; this proposes updates to them.
-# A release is proposed only once it is a week old.
+# Workflow actions are pinned to commit SHAs, and ruff (requirements-dev.txt)
+# to hashes; this proposes updates to both. A release is proposed once it is
+# a week old, a patch release once it is two days old. Dependabot cannot tell
+# an action's patch releases from its others, so every action waits a week.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -12,3 +14,11 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+      semver-patch-days: 2

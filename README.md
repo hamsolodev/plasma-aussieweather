@@ -161,6 +161,8 @@ web pages open them in your browser.
 ./scripts/package.sh         # build net.tropism.plasma.aussieweather-<version>.plasmoid
 ./scripts/make-icons.py      # remake the icon's copies after editing branding/
 ./translate/merge.sh         # regenerate translate/template.pot after string changes
+./scripts/ruff.sh check .    # lint the Python
+./scripts/ruff.sh format .   # format it
 ```
 
 The tests need `python3` and Qt 6's `qmltestrunner` (Fedora:
@@ -172,6 +174,21 @@ if `template.pot` is out of date, or if the icon's copies were not made
 from today's `branding/` sources (`make-icons.py` needs ImageMagick with
 librsvg, and Pillow; its `--check` only Python). `check-settings.py` needs
 what `render.py` does, with KCMUtils (Fedora: `kf6-kcmutils`).
+
+The Python is linted and formatted by ruff, the release pinned in
+`requirements-dev.txt`; `ruff.sh` installs it, hash-checked, into a venv
+inside `.git` on first use. CI fails if the lint fails or a file is not
+formatted. Once in each clone, turn on the pre-commit hook, which formats
+the Python before each commit, and have `git blame` pass over commits that
+only reformat, as GitHub's does:
+
+```sh
+git config core.hooksPath scripts/hooks
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+```
+
+When the hook has to format a file it stops the commit, so the change can
+be looked at and staged.
 
 This repo is also consumed as a git submodule by a private multi-widget
 repo; the widget package itself is `metadata.json` + `contents/` at the repo

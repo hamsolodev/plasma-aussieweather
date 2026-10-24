@@ -24,7 +24,7 @@
 
 3. The release workflow runs automatically. It first runs all of CI's
    checks (the tests, the QML compiled and rendered against real Plasma,
-   the translation template); then it builds the `.plasmoid` (with
+   the translation template, ruff's lint and formatting); then it builds the `.plasmoid` (with
    compiled translations) with `scripts/package.sh`, checks the tag
    matches `metadata.json` and extracts the CHANGELOG section, all with a
    read-only token; a separate job, which runs no code from the

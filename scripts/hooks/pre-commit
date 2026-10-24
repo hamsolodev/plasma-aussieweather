@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+
+# SPDX-FileCopyrightText: 2026 Mark Hellewell <aussieweather.sandlot200@passinbox.com>
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+# Before each commit, ruff checks the Python being committed as CI does:
+# formatted, then linted. When a file is not formatted, the hook formats it
+# and stops the commit, so the change can be looked at and staged.
+#
+# Turn it on once in each clone:  git config core.hooksPath scripts/hooks
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+RUFF="$ROOT/scripts/ruff.sh"
+
+mapfile -d '' staged < <(git diff --cached --name-only --diff-filter=ACMR -z -- '*.py')
+[ "${#staged[@]}" -gt 0 ] || exit 0
+
+# What is staged, not the working tree: a file may be staged only in part.
+tree="$(mktemp -d)"
+trap 'rm -r "$tree"' EXIT
+git checkout-index --prefix="$tree/" -- ruff.toml "${staged[@]}"
+
+if ! (cd "$tree" && "$RUFF" format --check --no-cache .); then
+    (cd "$ROOT" && "$RUFF" format --quiet -- "${staged[@]}")
+    echo "pre-commit: ruff has formatted those files; look at them, stage them, commit again" >&2
+    exit 1
+fi
+(cd "$tree" && "$RUFF" check --no-cache .)

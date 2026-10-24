@@ -33,6 +33,7 @@ jobs:
       - name: Shell script syntax
         run: |
           find . -name '*.sh' -not -path './.git/*' -print0 | xargs -0 -n1 bash -n
+          bash -n scripts/hooks/pre-commit
 
       - name: Validate metadata.json
         run: |
@@ -65,6 +66,22 @@ jobs:
         with:
           name: plasmoid
           path: net.tropism.plasma.aussieweather-*.plasmoid
+
+  # The Python, linted and its formatting checked by the ruff that
+  # requirements-dev.txt pins. Nothing here changes a file: the formatting
+  # is done before each commit, by scripts/hooks/pre-commit.
+  ruff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Lint
+        run: bash scripts/ruff.sh check --output-format=github .
+
+      - name: Formatting
+        run: bash scripts/ruff.sh format --check --diff .
 
   # The QML itself, against real Plasma 6 QML modules, which Ubuntu's
   # runners lack: every file must compile (qmllint passes code that does

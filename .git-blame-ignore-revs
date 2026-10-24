@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2026 Mark Hellewell <aussieweather.sandlot200@passinbox.com>
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+# Commits that only reformat, which git blame passes over. GitHub reads this
+# file itself; a clone does once told to:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# style: format the Python with ruff format
+27b97adfdcb16e7951002ac1aca1340557c0d261
