@@ -61,8 +61,8 @@ kpackagetool6 --type Plasma/Applet --install aussieweather.plasmoid
 ### Runtime requirement
 
 `python3` must be on `PATH`. The widget fetches BoM API data and the radar
-frame list via small embedded Python scripts (no third-party Python packages
-needed).
+frame list with two small Python scripts in `contents/code/` (standard library
+only; no third-party Python packages needed).
 
 ## Configuration
 

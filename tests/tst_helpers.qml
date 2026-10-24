@@ -242,6 +242,24 @@ TestCase {
         compare(Helpers.warningHtml("plain & simple"), "plain &amp; simple")
     }
 
+    // ── shellQuote / localPath ────────────────────────────────────────────
+
+    function test_shellQuote_escapes_what_double_quotes_leave_special() {
+        compare(Helpers.shellQuote("Seaford VIC"), '"Seaford VIC"')
+        compare(Helpers.shellQuote('a"b'), '"a\\"b"')
+        compare(Helpers.shellQuote("$(id)`id`"), '"\\$(id)\\`id\\`"')
+        compare(Helpers.shellQuote("back\\slash"), '"back\\\\slash"')
+        compare(Helpers.shellQuote("it's"), "\"it's\"")
+        compare(Helpers.shellQuote(""), '""')
+        compare(Helpers.shellQuote(null), '""')
+    }
+
+    function test_localPath_decodes_file_url() {
+        compare(Helpers.localPath("file:///usr/share/x/poll.py"), "/usr/share/x/poll.py")
+        compare(Helpers.localPath("file:///home/u/my%20widgets/poll.py"),
+                "/home/u/my widgets/poll.py")
+    }
+
     // ── nextLoadedFrame (radar loop) ──────────────────────────────────────
 
     // Frames as the radar tab sees them: true where the Image has loaded.

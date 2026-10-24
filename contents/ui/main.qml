@@ -115,78 +115,18 @@ PlasmoidItem {
            + (forecast.length > 0 ? "  " + Helpers.titleCase(forecast[0].short_text || forecast[0].icon_descriptor || "") : ""))
         : (errorText || i18n("Connecting…"))
 
-    // ── Python poll script ────────────────────────────────────────────────
-    function shellQuote(s) {
-        return "\"" + String(s || "").replace(/[\\\"`$]/g, "\\$&") + "\""
-    }
-
-    function pollScript() {
-        return `import sys, json, urllib.request, urllib.parse
-geohash = sys.argv[1]
-q = sys.argv[2]
-base = "https://api.weather.bom.gov.au/v1"
-hdrs = {"User-Agent": "net.tropism.plasma.aussieweather/${root._widgetVersion}", "Accept": "application/json"}
-def get(u):
-    return json.load(urllib.request.urlopen(urllib.request.Request(u, headers=hdrs), timeout=15))
-try:
-    o = {"ok": True}
-    if not geohash:
-        parts = q.strip().rsplit(None, 1)
-        state = parts[-1] if len(parts) > 1 and parts[-1].isalpha() and parts[-1].isupper() and 2 <= len(parts[-1]) <= 3 else None
-        term = parts[0].strip() if state else q.strip()
-        d = get(base + "/locations?search=" + urllib.parse.quote(term))
-        locs = d.get("data", [])
-        if not locs:
-            print(json.dumps({"ok": False, "permanent": True, "error": "Location not found: " + q}))
-            raise SystemExit(0)
-        if state:
-            preferred = [l for l in locs if l.get("state", "").upper() == state.upper()]
-            if preferred:
-                locs = preferred
-        loc = locs[0]
-        geohash = loc.get("geohash", "")[:6]
-        o["geohash"] = geohash
-        o["locationName"] = loc.get("name", "") + ", " + loc.get("state", "")
-    obs = get(base + "/locations/" + geohash + "/observations")
-    o["observations"] = obs.get("data", {})
-    fc = get(base + "/locations/" + geohash + "/forecasts/daily")
-    o["forecast"] = fc.get("data", [])[:7]
-    try:
-        hr = get(base + "/locations/" + geohash + "/forecasts/hourly")
-        o["hourly"] = hr.get("data", [])[:8]
-    except Exception:
-        o["hourly"] = []
-    try:
-        w = get(base + "/locations/" + geohash + "/warnings")
-        raw = w.get("data", [])
-        warnings = []
-        for warn in raw:
-            wid = (warn.get("id") or "").strip()
-            if wid:
-                try:
-                    detail = get(base + "/warnings/" + urllib.parse.quote(wid, safe=""))
-                    merged = dict(warn)
-                    merged.update(detail.get("data", {}))
-                    warnings.append(merged)
-                except Exception:
-                    warnings.append(warn)
-            else:
-                warnings.append(warn)
-        o["warnings"] = warnings
-    except Exception:
-        o["warnings"] = []
-    print(json.dumps(o))
-except SystemExit:
-    pass
-except Exception as e:
-    print(json.dumps({"ok": False, "error": str(e)}))
-`
+    // ── Fetch scripts ─────────────────────────────────────────────────────
+    // contents/code/*.py, run through the executable engine. -I isolates them
+    // from the user's environment: plasmashell's working directory is $HOME,
+    // so without it a stray ~/json.py would be imported in place of the
+    // standard library.
+    function scriptCommand(name, args) {
+        var path = Helpers.localPath(Qt.resolvedUrl("../code/" + name))
+        return "python3 -I " + [path].concat(args).map(Helpers.shellQuote).join(" ")
     }
 
     function buildPollCommand() {
-        return "python3 -c '" + pollScript() + "' "
-             + shellQuote(_geohash) + " "
-             + shellQuote(locationSearch)
+        return scriptCommand("poll.py", [_widgetVersion, _geohash, locationSearch])
     }
 
     function _handlePoll(out) {
@@ -334,25 +274,6 @@ except Exception as e:
         onTriggered: root.currentTime = new Date()
     }
 
-    function radarFrameScript() {
-        return `import sys, json, ftplib
-station = sys.argv[1]
-try:
-    ftp = ftplib.FTP("ftp.bom.gov.au", timeout=15)
-    ftp.login()
-    ftp.cwd("/anon/gen/radar")
-    files = []
-    ftp.retrlines("NLST", files.append)
-    ftp.quit()
-    prefix = station + ".T."
-    matching = sorted([f for f in files if f.startswith(prefix) and f.endswith(".png")])[-6:]
-    urls = ["https://www.bom.gov.au/radar/" + f for f in matching]
-    print(json.dumps({"ok": True, "frames": urls}))
-except Exception as e:
-    print(json.dumps({"ok": False, "error": str(e)}))
-`
-    }
-
     P5Support.DataSource {
         id: radarPoller
         engine: "executable"
@@ -373,9 +294,7 @@ except Exception as e:
     }
 
     function refreshRadarFrames() {
-        radarPoller.connectSource("python3 -c '"
-            + radarFrameScript() + "' "
-            + shellQuote(activeRadarStation))
+        radarPoller.connectSource(scriptCommand("radar.py", [activeRadarStation]))
     }
 
     // Refresh only while the Radar tab is being viewed, no sooner than the

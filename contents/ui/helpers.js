@@ -59,6 +59,17 @@ function bomIcon(descriptor, isNight) {
     return base
 }
 
+// One word for /bin/sh: double-quoted, with the four characters that stay
+// special inside double quotes (\ " ` $) escaped.
+function shellQuote(s) {
+    return "\"" + String(s == null ? "" : s).replace(/[\\"`$]/g, "\\$&") + "\""
+}
+
+// Filesystem path of a file: URL, as Qt.resolvedUrl returns one.
+function localPath(url) {
+    return decodeURIComponent(String(url).replace(/^file:\/\//, ""))
+}
+
 // HTML-escape so external text can't inject markup when shown as RichText.
 function escapeHtml(s) {
     return String(s == null ? "" : s)

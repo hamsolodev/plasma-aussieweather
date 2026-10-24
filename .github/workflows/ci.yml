@@ -37,10 +37,10 @@ jobs:
         run: bash scripts/check-version.sh
 
       # qmllint with KDE imports is not available on stock ubuntu runners;
-      # tests cover the pure-JS helpers only (no Plasma runtime needed).
-      - name: Run QML tests
-        run: |
-          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner -input tests/
+      # tests cover the fetch scripts and the pure-JS helpers (no Plasma
+      # runtime needed).
+      - name: Run tests
+        run: bash scripts/test.sh
 
       - name: Compile translations
         run: bash translate/build.sh
