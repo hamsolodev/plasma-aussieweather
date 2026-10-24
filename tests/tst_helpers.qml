@@ -111,6 +111,16 @@ TestCase {
         compare(Helpers.iconDescriptor(null), "")
     }
 
+    // ── conditionKey ──────────────────────────────────────────────────────
+
+    function test_conditionKey_says_clear_not_sunny_at_night() {
+        compare(Helpers.conditionKey("sunny", true), "clear")
+        compare(Helpers.conditionKey("mostly_sunny", true), "mostly_clear")
+        compare(Helpers.conditionKey("sunny", false), "sunny")
+        compare(Helpers.conditionKey("shower", true), "shower")
+        compare(Helpers.conditionKey("", true), "")
+    }
+
     // ── windStr ───────────────────────────────────────────────────────────
 
     function test_windStr_with_direction() {

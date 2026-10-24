@@ -60,6 +60,15 @@ function bomIcon(descriptor, isNight) {
 }
 
 
+// A condition descriptor as it should read at the time: BoM calls a clear
+// night slot "sunny", which reads wrong beside a moon.
+var _nightConditions = { "sunny": "clear", "mostly_sunny": "mostly_clear" }
+
+function conditionKey(descriptor, isNight) {
+    var key = String(descriptor || "")
+    return (isNight && _nightConditions[key]) || key
+}
+
 // Keywords in a forecast's first sentence → descriptor, first match wins, so
 // "Partly cloudy. Medium chance of a shower or two." is partly cloudy.
 var _textDescriptors = [

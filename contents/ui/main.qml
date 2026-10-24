@@ -96,17 +96,29 @@ PlasmoidItem {
         return currentTime < sunrise || currentTime >= sunset
     }
 
+    // The hourly slot now falls in, null without an hourly forecast. Its
+    // is_night is hourly-quantised, so slotIsNight prefers sunrise/sunset.
+    readonly property var nowSlot: Helpers.currentSlot(hourlyForecast, currentHour * 3600000)
+    readonly property bool slotIsNight: hasAstro ? isNight : (!!nowSlot && !!nowSlot.is_night)
+
     readonly property string currentIcon: {
         if (!pollOk || !forecast || forecast.length === 0)
             return "weather-none-available"
-        var now = root.currentTime
-        // The hourly slot now falls in; its is_night is hourly-quantised, so
-        // only used when astronomical times are missing.
-        var slot = Helpers.currentSlot(hourlyForecast, root.currentTime.getTime())
-        if (slot)
-            return Helpers.bomIcon(Helpers.iconDescriptor(slot),
-                                   root.hasAstro ? root.isNight : slot.is_night)
-        return Helpers.bomIcon(Helpers.iconDescriptor(forecast[0]), root.isNight)
+        if (nowSlot)
+            return Helpers.bomIcon(Helpers.iconDescriptor(nowSlot), slotIsNight)
+        return Helpers.bomIcon(Helpers.iconDescriptor(forecast[0]), isNight)
+    }
+
+    // What it is like now, for the popup and the panel tooltip: the current
+    // slot's condition, worded for night after dark ("Clear", not "Sunny").
+    // Without an hourly forecast (the external territories), today's text.
+    readonly property string summaryText: {
+        var descriptor = nowSlot ? Helpers.iconDescriptor(nowSlot) : ""
+        if (descriptor)
+            return Helpers.titleCase(Helpers.conditionKey(descriptor, slotIsNight))
+        if (forecast.length > 0)
+            return Helpers.titleCase(forecast[0].short_text || "").replace(/\.$/, "")
+        return ""
     }
 
     readonly property bool hasWarnings: Array.isArray(warnings) && warnings.length > 0
@@ -131,7 +143,7 @@ PlasmoidItem {
     toolTipSubText: {
         if (!pollOk) return errorText || i18n("Connecting…")
         var lines = [Helpers.formatTemp(observations ? observations.temp : null)
-                     + (forecast.length > 0 ? "  " + Helpers.titleCase(forecast[0].short_text || forecast[0].icon_descriptor || "") : "")]
+                     + (summaryText ? "  " + summaryText : "")]
         if (isStale) lines.push(i18n("Last updated %1", updatedText))
         if (errorText) lines.push(errorText)
         return lines.join("\n")
@@ -610,12 +622,7 @@ PlasmoidItem {
                         var fl = root.observations.temp_feels_like
                         if (fl !== null && fl !== undefined)
                             parts.push(i18n("Feels like %1", Helpers.formatTemp(fl)))
-                        var desc = root.forecast.length > 0
-                            ? Helpers.titleCase(root.forecast[0].short_text
-                                                || root.forecast[0].icon_descriptor || "")
-                                  .replace(/\.$/, "")
-                            : ""
-                        if (desc) parts.push(desc)
+                        if (root.summaryText) parts.push(root.summaryText)
                         return parts.join("  ·  ")
                     }
                 }
