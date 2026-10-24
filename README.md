@@ -68,8 +68,11 @@ frame list with two small Python scripts in `contents/code/` (standard library
 only; no third-party Python packages needed).
 
 Warning maps are saved as PNG files under
-`~/.cache/net.tropism.plasma.aussieweather/warnings/` (or
-`$XDG_CACHE_HOME`) while their warnings are current, and removed after.
+`~/.cache/net.tropism.plasma.aussieweather/warnings/` (or under
+`$XDG_CACHE_HOME`), one directory per location, while their warnings are
+current, and removed after. Those directories must be private to you
+(the widget makes them so, mode 0700); if one is not, the maps are not
+shown and the widget says why.
 
 ## Configuration
 

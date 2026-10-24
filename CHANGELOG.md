@@ -36,16 +36,19 @@ Fixes
 Security
 - Radar overlays are fetched over https, and nothing radar-related is
   fetched unless the radar is on screen
-- Warning text is rebuilt from a tag allowlist, with nesting and length
-  capped; warning maps are saved as PNG files and shown from there,
-  never inside rich text
+- Warning text is rebuilt from a tag allowlist, with its markup, nesting
+  and length capped; warning maps are checked (real PNGs of sensible
+  size and shape), kept as files in a private cache directory, and shown
+  from there, never inside rich text
+- One update can download and store only so much: responses, warnings
+  and images are all capped
 - Everything else from BoM or the config is shown as plain text
-- The radar listing (plain FTP) is validated and bounded, and its
-  server's messages are not shown
+- The radar listing (plain FTP) is validated and bounded, replies
+  included, and its server's messages are not shown
 - The fetch scripts run isolated from the user's Python environment,
   and API redirects are followed only to https
-- Releases run the tests first, publish SHA256SUMS, and no longer use a
-  third-party release action
+- Releases run every CI check first, build with a read-only token,
+  publish SHA256SUMS, and no longer use a third-party release action
 
 ## 1.7.5 — 2026-07-29
 
