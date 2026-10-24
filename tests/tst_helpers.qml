@@ -142,6 +142,23 @@ TestCase {
         compare(Helpers.rainColorKey(null), "none")
     }
 
+    // ── uvKey ─────────────────────────────────────────────────────────────
+
+    // BoM sends "veryhigh"; tolerate the spellings a person would write.
+    function test_uvKey_normalises_bom_categories() {
+        compare(Helpers.uvKey("veryhigh"), "veryhigh")
+        compare(Helpers.uvKey("very_high"), "veryhigh")
+        compare(Helpers.uvKey("Very High"), "veryhigh")
+        compare(Helpers.uvKey("extreme"), "extreme")
+        compare(Helpers.uvKey("LOW"), "low")
+    }
+
+    function test_uvKey_unknown_is_empty() {
+        compare(Helpers.uvKey(null), "")
+        compare(Helpers.uvKey(""), "")
+        compare(Helpers.uvKey("scorching"), "")
+    }
+
     // ── moonPhase ─────────────────────────────────────────────────────────
 
     function test_moonPhase_known_new_moon() {

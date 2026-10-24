@@ -119,6 +119,10 @@ PlasmoidItem {
 
     readonly property bool hasWarnings: Array.isArray(warnings) && warnings.length > 0
 
+    // Today's UV category (Helpers.uvKey), "" when BoM gave none.
+    readonly property string todayUvKey:
+        forecast.length > 0 && forecast[0].uv ? Helpers.uvKey(forecast[0].uv.category) : ""
+
     Plasmoid.icon: currentIcon
     toolTipTextFormat: Text.PlainText
     toolTipMainText: i18nc("BoM is the Bureau of Meteorology; %1 is the location",
@@ -982,31 +986,36 @@ PlasmoidItem {
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     text: "🌛"
                 }
+                // Shown only for a category BoM actually gave: later days carry
+                // a uv object whose fields are all null.
                 Kirigami.Icon {
-                    visible: !root.isNight && root.forecast.length > 0 && !!root.forecast[0].uv
+                    visible: !root.isNight && root.todayUvKey !== ""
                     Layout.preferredWidth:  Kirigami.Units.iconSizes.small
                     Layout.preferredHeight: Kirigami.Units.iconSizes.small
                     source: "weather-clear-symbolic"
                 }
                 PlainLabel {
-                    visible: !root.isNight && root.forecast.length > 0 && !!root.forecast[0].uv
+                    visible: !root.isNight && root.todayUvKey !== ""
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     font.weight: Font.DemiBold
                     text: {
-                        if (!root.forecast.length || !root.forecast[0].uv) return ""
-                        var uv = root.forecast[0].uv
-                        var label = Helpers.titleCase((uv.category || "").replace(/_/g, " "))
-                        var idx = (uv.max_index !== null && uv.max_index !== undefined) ? uv.max_index : ""
-                        return label + (idx !== "" ? "  " + idx : "")
+                        var label = {
+                            low:      i18nc("UV index category", "Low"),
+                            moderate: i18nc("UV index category", "Moderate"),
+                            high:     i18nc("UV index category", "High"),
+                            veryhigh: i18nc("UV index category", "Very High"),
+                            extreme:  i18nc("UV index category", "Extreme")
+                        }[root.todayUvKey] || ""
+                        var idx = root.forecast[0].uv.max_index
+                        return label + (idx !== null && idx !== undefined ? "  " + idx : "")
                     }
                     color: {
-                        if (!root.forecast.length || !root.forecast[0].uv) return Kirigami.Theme.textColor
-                        switch ((root.forecast[0].uv.category || "").toLowerCase()) {
+                        switch (root.todayUvKey) {
                             case "extreme":
-                            case "very_high": return Kirigami.Theme.negativeTextColor
-                            case "high":      return Kirigami.Theme.neutralTextColor
-                            case "low":       return Kirigami.Theme.positiveTextColor
-                            default:          return Kirigami.Theme.textColor
+                            case "veryhigh": return Kirigami.Theme.negativeTextColor
+                            case "high":     return Kirigami.Theme.neutralTextColor
+                            case "low":      return Kirigami.Theme.positiveTextColor
+                            default:         return Kirigami.Theme.textColor
                         }
                     }
                 }

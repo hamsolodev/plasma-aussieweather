@@ -125,6 +125,16 @@ function rainColorKey(chance) {
     return "low"
 }
 
+// BoM's UV category as one of low, moderate, high, veryhigh or extreme, or
+// "" when missing or unrecognised. BoM sends "veryhigh"; "very_high" and
+// "Very High" are accepted too.
+var _uvKeys = ["low", "moderate", "high", "veryhigh", "extreme"]
+
+function uvKey(category) {
+    var key = String(category || "").toLowerCase().replace(/[\s_]/g, "")
+    return _uvKeys.indexOf(key) >= 0 ? key : ""
+}
+
 // Moon phase from date — returns {emoji, name}
 // Reference: known new moon 2000-01-06T18:14:00Z; synodic month 29.530588853 days.
 // Eight equal bands CENTRED on the principal phase instants (new = 0,
