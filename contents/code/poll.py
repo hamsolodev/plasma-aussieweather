@@ -6,7 +6,8 @@
 
 """Fetch one location's weather from the BoM API and print it as JSON.
 
-main.qml runs this through Plasma's executable engine as
+ScriptRunner.qml runs this, for WeatherSource, through Plasma's executable
+engine as
 
     python3 -I poll.py VERSION GEOHASH QUERY
 
@@ -378,11 +379,14 @@ def warnings_for(get, geohash, now, images):
             continue
         wid = (warning.get("id") or "").strip()
         if wid:
+            # Without its detail a warning still shows, by its summary's
+            # title, so a detail that fails to load or makes no sense is
+            # skipped rather than failing every warning.
             try:
                 detail = get("/warnings/" + urllib.parse.quote(wid, safe=""))
                 warning = dict(warning, **detail.get("data", {}))
-            except Exception:
-                pass
+            except (OSError, ValueError, TypeError, AttributeError) as e:
+                failure_from(e)  # closes an HTTP error's response
         warnings.append(warning_view(warning, images))
     return warnings
 

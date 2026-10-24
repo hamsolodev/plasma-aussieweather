@@ -6,7 +6,7 @@ UV index, severe weather warnings, and an animated rain radar loop.
 
 > **Unofficial client.** This widget is not affiliated with or endorsed by
 > the Australian Bureau of Meteorology. Weather data © Australian Bureau of
-> Meteorology. The widget identifies itself to BoM services with a versioned
+> Meteorology. The widget identifies itself to BoM's API with a versioned
 > User-Agent and polls every 10 minutes at most often; a failed poll is
 > retried after 5 seconds, doubling, at most six times.
 

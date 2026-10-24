@@ -5,12 +5,12 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 # Compile .po translations into contents/locale/<lang>/LC_MESSAGES/*.mo so
-# they ship inside the .plasmoid package. Run before packaging (CI does this).
+# they ship inside the .plasmoid package. scripts/package.sh runs this.
 set -euo pipefail
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 PACKAGE_ROOT="$DIR/.."
-PLASMOID_NAME="net.tropism.plasma.aussieweather"
+PLASMOID_NAME="$(python3 -I "$DIR/../scripts/metadata.py" Id)"
 PROJECT_NAME="plasma_applet_${PLASMOID_NAME}"
 
 found=0

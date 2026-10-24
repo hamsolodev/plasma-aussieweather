@@ -15,8 +15,7 @@ cd "$ROOT"
 
 bash translate/build.sh >&2
 
-version="$(python3 -I -c 'import json; print(json.load(open("metadata.json"))["KPlugin"]["Version"])')"
-package="$ROOT/net.tropism.plasma.aussieweather-${version}.plasmoid"
+package="$ROOT/$(python3 -I scripts/metadata.py Id)-$(python3 -I scripts/metadata.py Version).plasmoid"
 rm -f "$package"
 zip -qr "$package" metadata.json contents/ -x '*/__pycache__/*' '*.pyc'
 echo "$package"

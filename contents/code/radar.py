@@ -6,7 +6,8 @@
 
 """List a radar station's latest loop frames and print them as JSON.
 
-main.qml runs this through Plasma's executable engine as
+ScriptRunner.qml runs this, for RadarSource, through Plasma's executable
+engine as
 
     python3 -I radar.py STATION
 

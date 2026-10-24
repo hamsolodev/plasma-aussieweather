@@ -15,7 +15,7 @@ Kirigami.FormLayout {
 
     property alias cfg_locationSearch: locationField.text
     property string cfg_radarStation
-    property int    cfg_pollInterval:  plasmoid.configuration.pollInterval
+    property int    cfg_pollInterval
 
     // Plasma passes the page a title and a cfg_ property for every config
     // key, and logs "Setting initial properties failed" for each one the
@@ -68,6 +68,7 @@ Kirigami.FormLayout {
     QQC2.SpinBox {
         id: intervalSpin
         Kirigami.FormData.label: i18n("Update interval:")
+        // main.qml holds polling to 10 minutes at least, whatever is set.
         from: 10
         to: 60
         value: cfg_pollInterval / 60000

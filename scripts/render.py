@@ -19,7 +19,7 @@ images, so it needs the network and differs from run to run. With
 nothing (CI renders this way).
 
 Needs KDE Plasma 6's QML modules and PySide6 built against the same Qt
-(Fedora: python3-pyside6). CI has neither, so this runs locally only.
+(Fedora: python3-pyside6). CI runs it, offline, in a Fedora container.
 """
 
 import argparse

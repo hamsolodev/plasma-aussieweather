@@ -4,8 +4,9 @@
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
 
-# Run every test suite: the fetch scripts' Python tests, then the QML tests
-# of the JavaScript helpers. Used by CI and the release workflow.
+# Run every test suite that needs no Plasma: the fetch scripts' Python
+# tests, then the QML tests of the helpers, the station table and
+# WeatherModel. Used by CI and the release workflow.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -25,6 +26,11 @@ fi
 # BoM's times are UTC and its locations span +6:30 to +12, so date logic
 # that leans on the system time zone passes in one zone and fails in
 # another. Run the QML tests in several.
+# A private config directory: KDE code writes config as it loads, and an
+# unwritable one makes KConfig pop up a dialog.
+XDG_CONFIG_HOME="$(mktemp -d)"
+export XDG_CONFIG_HOME
+trap 'rm -r "$XDG_CONFIG_HOME"' EXIT
 for tz in UTC Australia/Adelaide Australia/Brisbane America/New_York; do
     echo "== QML tests, TZ=$tz"
     TZ="$tz" QT_QPA_PLATFORM=offscreen "$runner" -input "$ROOT/tests"

@@ -11,9 +11,9 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 PACKAGE_ROOT="$DIR/.."
-PLASMOID_NAME="net.tropism.plasma.aussieweather"
+PLASMOID_NAME="$(python3 -I "$DIR/../scripts/metadata.py" Id)"
 PROJECT_NAME="plasma_applet_${PLASMOID_NAME}"
-BUG_ADDRESS="https://github.com/hamsolodev/plasma-aussieweather/issues"
+BUG_ADDRESS="$(python3 -I "$DIR/../scripts/metadata.py" BugReportUrl)"
 
 cd "$PACKAGE_ROOT"
 find contents -name '*.qml' -o -name '*.js' | sort > "$DIR/infiles.list"
