@@ -59,6 +59,39 @@ function bomIcon(descriptor, isNight) {
     return base
 }
 
+
+// Keywords in a forecast's first sentence → descriptor, first match wins, so
+// "Partly cloudy. Medium chance of a shower or two." is partly cloudy.
+var _textDescriptors = [
+    [/thunder|storm/,                                     "storm"],
+    [/shower or two|few showers|possible shower|drizzle/, "light_shower"],
+    [/shower/,                                            "shower"],
+    [/rain/,                                              "rain"],
+    [/snow/,                                              "snow"],
+    [/frost/,                                             "frost"],
+    [/fog/,                                               "fog"],
+    [/haz|smoke/,                                         "hazy"],
+    [/dust/,                                              "dusty"],
+    [/wind/,                                              "windy"],
+    [/partly cloudy/,                                     "partly_cloudy"],
+    [/mostly sunny/,                                      "mostly_sunny"],
+    [/cloud|overcast/,                                    "cloudy"],
+    [/sunny|fine|clear/,                                  "sunny"]
+]
+
+// The icon descriptor of a forecast entry. BoM leaves it null for the
+// external territories (Lord Howe, Norfolk, Christmas and Cocos Islands),
+// whose forecasts carry only short_text, so it is read from that instead.
+// "" when there is nothing to go on.
+function iconDescriptor(entry) {
+    if (!entry) return ""
+    if (entry.icon_descriptor) return entry.icon_descriptor
+    var sentence = String(entry.short_text || "").toLowerCase().split(".")[0]
+    for (var i = 0; i < _textDescriptors.length; i++)
+        if (_textDescriptors[i][0].test(sentence)) return _textDescriptors[i][1]
+    return ""
+}
+
 // One word for /bin/sh: double-quoted, with the four characters that stay
 // special inside double quotes (\ " ` $) escaped.
 function shellQuote(s) {

@@ -111,10 +111,10 @@ PlasmoidItem {
                 if (bucket <= nowBucket) best = hourlyForecast[i]
             }
             if (best)
-                return Helpers.bomIcon(best.icon_descriptor,
+                return Helpers.bomIcon(Helpers.iconDescriptor(best),
                                        root.hasAstro ? root.isNight : best.is_night)
         }
-        return Helpers.bomIcon(forecast[0].icon_descriptor, root.isNight)
+        return Helpers.bomIcon(Helpers.iconDescriptor(forecast[0]), root.isNight)
     }
 
     readonly property bool hasWarnings: Array.isArray(warnings) && warnings.length > 0
@@ -754,7 +754,7 @@ PlasmoidItem {
                             Layout.alignment: Qt.AlignHCenter
                             Layout.preferredWidth:  Kirigami.Units.iconSizes.medium
                             Layout.preferredHeight: Kirigami.Units.iconSizes.medium
-                            source: Helpers.bomIcon(modelData.icon_descriptor, modelData.is_night)
+                            source: Helpers.bomIcon(Helpers.iconDescriptor(modelData), modelData.is_night)
 
                             HoverHandler { id: hourHover }
                             PlasmaComponents.ToolTip {
@@ -860,7 +860,7 @@ PlasmoidItem {
                             Layout.alignment: Qt.AlignHCenter
                             Layout.preferredWidth:  Kirigami.Units.iconSizes.large
                             Layout.preferredHeight: Kirigami.Units.iconSizes.large
-                            source: Helpers.bomIcon(modelData.icon_descriptor, false)
+                            source: Helpers.bomIcon(Helpers.iconDescriptor(modelData), false)
 
                             HoverHandler { id: dayHover }
                             PlasmaComponents.ToolTip {

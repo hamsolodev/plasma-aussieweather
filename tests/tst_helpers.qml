@@ -86,6 +86,31 @@ TestCase {
         compare(Helpers.bomIcon("THUNDERSTORM", false), "weather-storm")
     }
 
+    // ── iconDescriptor ────────────────────────────────────────────────────
+
+    function test_iconDescriptor_prefers_bom_descriptor() {
+        compare(Helpers.iconDescriptor({ icon_descriptor: "storm", short_text: "Sunny." }), "storm")
+    }
+
+    // The external territories (Lord Howe, Norfolk, Christmas and Cocos
+    // Islands) get forecasts with short_text but a null descriptor.
+    function test_iconDescriptor_from_short_text() {
+        compare(Helpers.iconDescriptor({ icon_descriptor: null, short_text: "Showers." }), "shower")
+        compare(Helpers.iconDescriptor({ icon_descriptor: null, short_text: "Shower or two." }), "light_shower")
+        compare(Helpers.iconDescriptor({ icon_descriptor: null,
+            short_text: "Partly cloudy. Medium chance of a shower or two." }), "partly_cloudy")
+        compare(Helpers.iconDescriptor({ icon_descriptor: null, short_text: "Mostly sunny." }), "mostly_sunny")
+        compare(Helpers.iconDescriptor({ icon_descriptor: null, short_text: "Possible thunderstorm." }), "storm")
+        compare(Helpers.iconDescriptor({ icon_descriptor: null, short_text: "Cloudy." }), "cloudy")
+        compare(Helpers.iconDescriptor({ icon_descriptor: null, short_text: "Fine." }), "sunny")
+    }
+
+    function test_iconDescriptor_nothing_to_go_on() {
+        compare(Helpers.iconDescriptor({ icon_descriptor: null, short_text: null }), "")
+        compare(Helpers.iconDescriptor({ short_text: "Volcanic ash." }), "")
+        compare(Helpers.iconDescriptor(null), "")
+    }
+
     // ── windStr ───────────────────────────────────────────────────────────
 
     function test_windStr_with_direction() {
