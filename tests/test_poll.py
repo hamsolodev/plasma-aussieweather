@@ -9,6 +9,7 @@ import contextlib
 import os
 import pathlib
 import tempfile
+import time
 import io
 import json
 import unittest
@@ -374,6 +375,25 @@ class SanitiseHtmlTest(unittest.TestCase):
         self.assertEqual(out.count("<div>"), poll.MAX_DEPTH)
         self.assertEqual(out.count("</div>"), poll.MAX_DEPTH)
         self.assertIn("x", out)
+
+    def test_line_break_floods_collapse(self):
+        # RichText's layout time grows faster than the number of lines:
+        # 240,000 <br> held the GUI for a minute.
+        out = poll.sanitise("<p>a" + "<br>" * 100000 + "b</p>").html
+        self.assertEqual(out, "<p>a<br><br>b</p>")
+
+    def test_elements_are_capped(self):
+        out = poll.sanitise("x<br>" * 100000).html
+        self.assertLessEqual(out.count("<br>"), poll.MAX_ELEMENTS)
+        # The budget can be overrun by the closing tags of what is open.
+        self.assertLessEqual(len(out), poll.MAX_OUTPUT + 100)
+
+    def test_unclosed_tags_cost_linear_time(self):
+        # Scanning the open-tag stack on every tag made a megabyte of <b>
+        # take tens of minutes.
+        started = time.monotonic()
+        poll.sanitise("<b>" * 200000 + "</i>" * 200000)
+        self.assertLess(time.monotonic() - started, 5)
 
     def test_text_is_capped(self):
         out = poll.sanitise("<p>" + "a" * (poll.MAX_TEXT + 500) + "</p><p>tail</p>").html

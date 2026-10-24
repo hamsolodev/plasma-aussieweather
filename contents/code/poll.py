@@ -179,6 +179,14 @@ VOID_TAGS = {"br", "hr"}
 DROPPED_WITH_CONTENT = {"script", "style"}
 MAX_DEPTH = 8
 MAX_TEXT = 20000
+# RichText's layout time grows with the markup, not only the text, so the
+# elements and the whole markup are capped too, and runs of line breaks
+# collapse to two. At most MAX_STACK open elements are tracked; deeper ones
+# are dropped outright.
+MAX_ELEMENTS = 1000
+MAX_OUTPUT = 40000
+MAX_BREAKS = 2
+MAX_STACK = 256
 
 PNG_URI_PREFIX = "data:image/png;base64,"
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -230,19 +238,31 @@ class _Sanitiser(HTMLParser):
         self.images = []
         # Every allowed element still open, as (tag, emitted): one past
         # MAX_DEPTH is tracked but not emitted, so its end tag closes it and
-        # not an outer element.
+        # not an outer element. depth (emitted ones) and open_count keep each
+        # step's bookkeeping constant-time.
         self.stack = []
+        self.open_count = collections.Counter()
+        self.depth = 0
         self.dropping = 0
         self.text_left = MAX_TEXT
+        self.output_left = MAX_OUTPUT
+        self.elements_left = MAX_ELEMENTS
+        self.breaks = 0
+        # Set once a budget is spent: nothing more is emitted, and result()
+        # closes what is open.
+        self.full = False
 
-    def depth(self):
-        return sum(emitted for _, emitted in self.stack)
+    def emit(self, markup):
+        self.out.append(markup)
+        self.output_left -= len(markup)
+        if self.output_left <= 0:
+            self.full = True
 
     def handle_starttag(self, tag, attrs):
         if tag in DROPPED_WITH_CONTENT:
             self.dropping += 1
             return
-        if self.dropping or self.text_left <= 0:
+        if self.dropping or self.full:
             return
         if tag == "img":
             data = png_bytes(dict(attrs).get("src") or "")
@@ -251,6 +271,12 @@ class _Sanitiser(HTMLParser):
             return
         if tag not in ALLOWED_TAGS:
             return
+        if tag == "br":
+            if self.breaks >= MAX_BREAKS:
+                return
+            self.breaks += 1
+        else:
+            self.breaks = 0
         if tag == "a":
             href = dict(attrs).get("href") or ""
             if not href.lower().startswith("https://"):
@@ -259,12 +285,19 @@ class _Sanitiser(HTMLParser):
         else:
             start = "<" + tag + ">"
         if tag in VOID_TAGS:
-            self.out.append(start)
+            if self.elements_left > 0:
+                self.elements_left -= 1
+                self.emit(start)
             return
-        emitted = self.depth() < MAX_DEPTH
+        if len(self.stack) >= MAX_STACK:
+            return
+        emitted = self.depth < MAX_DEPTH and self.elements_left > 0
         if emitted:
-            self.out.append(start)
+            self.elements_left -= 1
+            self.depth += 1
+            self.emit(start)
         self.stack.append((tag, emitted))
+        self.open_count[tag] += 1
 
     def handle_startendtag(self, tag, attrs):
         self.handle_starttag(tag, attrs)
@@ -275,22 +308,29 @@ class _Sanitiser(HTMLParser):
         if tag in DROPPED_WITH_CONTENT:
             self.dropping = max(0, self.dropping - 1)
             return
-        if self.text_left <= 0 or all(t != tag for t, _ in self.stack):
+        if self.full or not self.open_count[tag]:
             return
         while self.stack:
             closing, emitted = self.stack.pop()
+            self.open_count[closing] -= 1
             if emitted:
-                self.out.append("</" + closing + ">")
+                self.depth -= 1
+                self.emit("</" + closing + ">")
             if closing == tag:
                 break
 
     def handle_data(self, data):
-        if self.dropping or self.text_left <= 0:
+        if self.dropping or self.full:
             return
+        if data.strip():
+            self.breaks = 0
         if len(data) > self.text_left:
             data = data[:self.text_left] + "…"
+            self.full = True
         self.text_left -= len(data)
-        self.out.append(html.escape(data, quote=False))
+        if self.text_left <= 0:
+            self.full = True
+        self.emit(html.escape(data, quote=False))
 
     def result(self):
         self.close()
