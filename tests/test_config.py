@@ -16,12 +16,13 @@ KCFG = "{http://www.kde.org/standards/kcfg/1.0}"
 def defaults():
     """{entry name: default text} from main.xml."""
     root = ET.parse(CONTENTS / "config" / "main.xml").getroot()
-    return {entry.get("name"): (entry.findtext(KCFG + "default") or "")
-            for entry in root.iter(KCFG + "entry")}
+    return {
+        entry.get("name"): (entry.findtext(KCFG + "default") or "")
+        for entry in root.iter(KCFG + "entry")
+    }
 
 
 class ConfigDefaultsTest(unittest.TestCase):
-
     def test_radar_station_default_matches_radarstations(self):
         source = (CONTENTS / "ui" / "radarstations.js").read_text()
         default_id = re.search(r'^var defaultId = "([^"]+)"', source, re.MULTILINE)

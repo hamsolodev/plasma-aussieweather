@@ -62,13 +62,24 @@ def main():
         test.write_text(TEST % json.dumps(rows))
         # A private config directory: KDE modules write config as they load,
         # and an unwritable one makes KConfig pop up a dialog.
-        env = dict(os.environ, QT_QPA_PLATFORM="offscreen",
-                   XDG_CONFIG_HOME=str(pathlib.Path(tmp) / "config"))
-        result = subprocess.run([runner, "-input", str(test)], env=env, check=False,
-                                capture_output=True, text=True, timeout=300)
+        env = dict(
+            os.environ,
+            QT_QPA_PLATFORM="offscreen",
+            XDG_CONFIG_HOME=str(pathlib.Path(tmp) / "config"),
+        )
+        result = subprocess.run(
+            [runner, "-input", str(test)],
+            env=env,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
     print(result.stdout + result.stderr)
-    passed = sum(line.startswith("PASS   : ") and "::test_compile(" in line
-                 for line in result.stdout.splitlines())
+    passed = sum(
+        line.startswith("PASS   : ") and "::test_compile(" in line
+        for line in result.stdout.splitlines()
+    )
     if result.returncode != 0 or passed != len(files):
         print(f"FAIL: {passed} of {len(files)} QML files compiled", file=sys.stderr)
         return 1

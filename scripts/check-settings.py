@@ -40,8 +40,14 @@ EXPECTED_MESSAGES = ("Could not find any platform plugin", "fallback to QtQuick 
 
 
 def run(config_home):
-    os.environ.update({"XDG_CONFIG_HOME": config_home, "QT_QPA_PLATFORM": "offscreen",
-                       "QT_QPA_PLATFORMTHEME": "kde", "QT_QUICK_BACKEND": "software"})
+    os.environ.update(
+        {
+            "XDG_CONFIG_HOME": config_home,
+            "QT_QPA_PLATFORM": "offscreen",
+            "QT_QPA_PLATFORMTHEME": "kde",
+            "QT_QUICK_BACKEND": "software",
+        }
+    )
     from PySide6.QtCore import (
         Q_ARG,
         Q_RETURN_ARG,
@@ -64,7 +70,9 @@ def run(config_home):
     qInstallMessageHandler(on_message)
     app = QGuiApplication(sys.argv)
     engine = QQmlApplicationEngine()
-    i18n_component = QQmlComponent(engine, QUrl.fromLocalFile(str(ROOT / "scripts" / "render-i18n.qml")))
+    i18n_component = QQmlComponent(
+        engine, QUrl.fromLocalFile(str(ROOT / "scripts" / "render-i18n.qml"))
+    )
     i18n = i18n_component.create()
     QQmlEngine.setObjectOwnership(i18n, QQmlEngine.ObjectOwnership.CppOwnership)
     engine.rootContext().setContextObject(i18n)
@@ -82,8 +90,9 @@ def run(config_home):
         app.exec()
 
     def call(name, *args):
-        return QMetaObject.invokeMethod(window, name, Q_RETURN_ARG("QVariant"),
-                                        *[Q_ARG("QVariant", a) for a in args])
+        return QMetaObject.invokeMethod(
+            window, name, Q_RETURN_ARG("QVariant"), *[Q_ARG("QVariant", a) for a in args]
+        )
 
     def open_page(places, location, radar="IDR023"):
         if not call("open", places, location, radar):
@@ -175,8 +184,10 @@ def run(config_home):
         print("FAIL: no checks ran", file=sys.stderr)
         return 1
     if failures or messages:
-        print(f"FAIL: {len(failures)} of {checks} checks failed, {len(messages)} QML messages",
-              file=sys.stderr)
+        print(
+            f"FAIL: {len(failures)} of {checks} checks failed, {len(messages)} QML messages",
+            file=sys.stderr,
+        )
         return 1
     print(f"OK: {checks} settings page checks")
     return 0
@@ -184,7 +195,9 @@ def run(config_home):
 
 def main():
     with tempfile.TemporaryDirectory(prefix="aussieweather-settings-") as config_home:
-        shutil.copy("/usr/share/color-schemes/BreezeLight.colors", pathlib.Path(config_home) / "kdeglobals")
+        shutil.copy(
+            "/usr/share/color-schemes/BreezeLight.colors", pathlib.Path(config_home) / "kdeglobals"
+        )
         return run(config_home)
 
 

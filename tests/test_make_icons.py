@@ -29,12 +29,16 @@ def png(edge, stamp=None, colour=6):
     channels = {2: 3, 6: 4}[colour]
     rows = b"".join(b"\0" + bytes(edge * channels) for _ in range(edge))
     text = chunk(b"tEXt", make_icons.STAMP_KEY.encode() + b"\0" + stamp.encode()) if stamp else b""
-    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", edge, edge, 8, colour, 0, 0, 0))
-            + text + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", edge, edge, 8, colour, 0, 0, 0))
+        + text
+        + chunk(b"IDAT", zlib.compress(rows))
+        + chunk(b"IEND", b"")
+    )
 
 
 class CheckTest(unittest.TestCase):
-
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.root = pathlib.Path(self.directory.name)
@@ -68,18 +72,29 @@ class CheckTest(unittest.TestCase):
 
     def test_a_source_changed_without_remaking(self):
         self.write("branding/icon.svg", b'<svg id="changed"/>')
-        self.assertEqual(len([p for p in self.problems() if "not today's branding/icon.svg" in p]),
-                         sum(key == "icon" for key, _ in make_icons.PNGS.values()))
+        self.assertEqual(
+            len([p for p in self.problems() if "not today's branding/icon.svg" in p]),
+            sum(key == "icon" for key, _ in make_icons.PNGS.values()),
+        )
 
     def test_a_png_made_from_the_other_source(self):
         self.write("contents/screenshot.png", png(256, self.sha("small")))
-        self.assertEqual(self.problems(), [("contents/screenshot.png: made from "
-                                            "branding/icon-small.svg, not today's branding/icon.svg")])
+        self.assertEqual(
+            self.problems(),
+            [
+                (
+                    "contents/screenshot.png: made from "
+                    "branding/icon-small.svg, not today's branding/icon.svg"
+                )
+            ],
+        )
 
     def test_a_png_not_made_by_the_script(self):
         self.write("docs/icon.png", png(256))
-        self.assertEqual(self.problems(), [("docs/icon.png: made from an unrecorded source, "
-                                            "not today's branding/icon.svg")])
+        self.assertEqual(
+            self.problems(),
+            [("docs/icon.png: made from an unrecorded source, not today's branding/icon.svg")],
+        )
 
     def test_the_wrong_size(self):
         self.write("contents/screenshot.png", png(128, self.sha("icon")))
@@ -92,7 +107,9 @@ class CheckTest(unittest.TestCase):
 
     def test_a_stale_svg_copy(self):
         self.write("docs/favicon.svg", b'<svg id="old"/>')
-        self.assertEqual(self.problems(), ["docs/favicon.svg: differs from branding/icon-small.svg"])
+        self.assertEqual(
+            self.problems(), ["docs/favicon.svg: differs from branding/icon-small.svg"]
+        )
 
     def test_a_missing_target(self):
         (self.root / "contents/screenshot.png").unlink()

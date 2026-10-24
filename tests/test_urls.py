@@ -15,7 +15,6 @@ CONTENTS = pathlib.Path(__file__).resolve().parent.parent / "contents"
 
 
 class UrlSchemeTest(unittest.TestCase):
-
     def test_no_plain_http_urls(self):
         examined = 0
         found = []

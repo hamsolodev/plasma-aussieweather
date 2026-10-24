@@ -28,19 +28,21 @@ def frame(minute, station="IDR022"):
 
 
 class FrameNamesTest(unittest.TestCase):
-
     def test_latest_frames_of_the_station_oldest_first(self):
         names = [frame(m) for m in range(0, 60, 6)]
         names += [frame(54, "IDR023"), "IDR022.gif", "IDR02.T.202610240054.png"]
-        self.assertEqual(radar.frame_names(names, "IDR022", NOW),
-                         [frame(m) for m in range(24, 60, 6)])
+        self.assertEqual(
+            radar.frame_names(names, "IDR022", NOW), [frame(m) for m in range(24, 60, 6)]
+        )
 
     def test_names_must_match_exactly(self):
-        names = [frame(30),
-                 frame(31) + ".png",
-                 "IDR022.T.202610240032.png/../../IDR023.T.202610240032.png",
-                 "IDR022.T.2026102400333.png",
-                 "xIDR022.T.202610240034.png"]
+        names = [
+            frame(30),
+            frame(31) + ".png",
+            "IDR022.T.202610240032.png/../../IDR023.T.202610240032.png",
+            "IDR022.T.2026102400333.png",
+            "xIDR022.T.202610240034.png",
+        ]
         self.assertEqual(radar.frame_names(names, "IDR022", NOW), [frame(30)])
 
     def test_frames_older_than_an_hour_are_dropped(self):
@@ -49,8 +51,9 @@ class FrameNamesTest(unittest.TestCase):
 
     def test_timestamps_are_ascii_digits(self):
         # strptime's %Y reads any Unicode digit.
-        self.assertEqual(radar.frame_names(["IDR022.T.٢٠٢٦10240030.png", frame(30)], "IDR022", NOW),
-                         [frame(30)])
+        self.assertEqual(
+            radar.frame_names(["IDR022.T.٢٠٢٦10240030.png", frame(30)], "IDR022", NOW), [frame(30)]
+        )
 
     def test_impossible_and_future_timestamps_are_dropped(self):
         names = [frame(30), "IDR022.T.202613240030.png", "IDR022.T.202610240130.png"]
@@ -62,6 +65,7 @@ def run_main(station, names):
 
     NAMES may be an exception instance, raised by the listing instead.
     """
+
     def list_names():
         if isinstance(names, Exception):
             raise names
@@ -76,22 +80,30 @@ def run_main(station, names):
 
 
 class MainTest(unittest.TestCase):
-
     def test_frames_are_https_urls_naming_their_station(self):
         now = datetime.now(UTC).strftime("%Y%m%d%H%M")
         result = run_main("IDR022", [f"IDR022.T.{now}.png"])
-        self.assertEqual(result, {"ok": True, "station": "IDR022",
-                                  "frames": [f"https://www.bom.gov.au/radar/IDR022.T.{now}.png"]})
+        self.assertEqual(
+            result,
+            {
+                "ok": True,
+                "station": "IDR022",
+                "frames": [f"https://www.bom.gov.au/radar/IDR022.T.{now}.png"],
+            },
+        )
 
     def test_invalid_station_is_permanent_and_lists_nothing(self):
         result = run_main("IDR02;x", AssertionError("listed"))
-        self.assertEqual((result["ok"], result["station"], result["error"], result["permanent"]),
-                         (False, "IDR02;x", "invalid_station", True))
+        self.assertEqual(
+            (result["ok"], result["station"], result["error"], result["permanent"]),
+            (False, "IDR02;x", "invalid_station", True),
+        )
 
     def test_no_recent_frames_is_a_failure(self):
         result = run_main("IDR022", ["IDR022.T.202001010000.png"])
-        self.assertEqual((result["ok"], result["error"], result["permanent"]),
-                         (False, "no_frames", False))
+        self.assertEqual(
+            (result["ok"], result["error"], result["permanent"]), (False, "no_frames", False)
+        )
 
     def test_server_text_is_not_shown(self):
         # The listing is plain FTP: whoever is on the path writes the reply.
@@ -108,13 +120,13 @@ class MainTest(unittest.TestCase):
 
     def test_listing_failure_is_a_network_failure(self):
         result = run_main("IDR022", ConnectionRefusedError(111, "Connection refused"))
-        self.assertEqual((result["ok"], result["error"], result["permanent"]),
-                         (False, "network", False))
+        self.assertEqual(
+            (result["ok"], result["error"], result["permanent"]), (False, "network", False)
+        )
         self.assertIn("Connection refused", result["detail"])
 
 
 class BoundedFtpTest(unittest.TestCase):
-
     def test_endless_multiline_reply_is_cut_off(self):
         # A banner of "220-" lines that never ends grew radar.py to
         # gigabytes within the listing's deadline.
@@ -131,20 +143,21 @@ class BoundedFtpTest(unittest.TestCase):
 
 
 class MemoryLimitTest(unittest.TestCase):
-
     def test_scripts_cap_their_own_memory(self):
         for name in ("radar", "poll"):
-            code = (f"import resource, sys; sys.path.insert(0, {str(TESTS)!r})\n"
-                    "from codeloader import load\n"
-                    f"load({name!r}).limit_memory()\n"
-                    "print(resource.getrlimit(resource.RLIMIT_AS)[0])")
-            out = subprocess.run([sys.executable, "-I", "-B", "-c", code],
-                                 capture_output=True, text=True, check=True).stdout
+            code = (
+                f"import resource, sys; sys.path.insert(0, {str(TESTS)!r})\n"
+                "from codeloader import load\n"
+                f"load({name!r}).limit_memory()\n"
+                "print(resource.getrlimit(resource.RLIMIT_AS)[0])"
+            )
+            out = subprocess.run(
+                [sys.executable, "-I", "-B", "-c", code], capture_output=True, text=True, check=True
+            ).stdout
             self.assertEqual(int(out), 512 * 1024 * 1024, name)
 
 
 class NameCollectorTest(unittest.TestCase):
-
     def test_collects_names(self):
         collect = radar.NameCollector()
         collect("IDR022.T.202610240000.png")
@@ -162,13 +175,21 @@ class NameCollectorTest(unittest.TestCase):
 
 
 class StationTest(unittest.TestCase):
-
     def test_valid_station_ids(self):
         for station in ("IDR022", "IDR644", "IDR1141"):
             self.assertTrue(radar.is_station(station), station)
 
     def test_invalid_station_ids(self):
-        for station in ("", "IDR02", "IDR025", "IDR02.T", "IDR022 ", "../IDR022", "idr022", "IDR٠٢2"):
+        for station in (
+            "",
+            "IDR02",
+            "IDR025",
+            "IDR02.T",
+            "IDR022 ",
+            "../IDR022",
+            "idr022",
+            "IDR٠٢2",
+        ):
             self.assertFalse(radar.is_station(station), station)
 
 

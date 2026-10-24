@@ -54,6 +54,8 @@ def limit_memory():
     _, hard = resource.getrlimit(resource.RLIMIT_AS)
     limit = MEMORY_LIMIT if hard == resource.RLIM_INFINITY else min(hard, MEMORY_LIMIT)
     resource.setrlimit(resource.RLIMIT_AS, (limit, hard))
+
+
 # The states and territories as BoM names them; OT is the other
 # territories (Norfolk, Christmas and the Cocos Islands).
 STATES = {"ACT", "NSW", "NT", "OT", "QLD", "SA", "TAS", "VIC", "WA"}
@@ -235,8 +237,29 @@ def is_current(warning, now):
 # this allowlist rather than passed through: links survive only as https,
 # nesting and text are capped, and images leave the markup (see ImageStore).
 ALLOWED_TAGS = {
-    "a", "b", "br", "div", "em", "h1", "h2", "h3", "h4", "h5", "h6", "hr",
-    "i", "li", "ol", "p", "pre", "span", "strong", "sub", "sup", "u", "ul",
+    "a",
+    "b",
+    "br",
+    "div",
+    "em",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "hr",
+    "i",
+    "li",
+    "ol",
+    "p",
+    "pre",
+    "span",
+    "strong",
+    "sub",
+    "sup",
+    "u",
+    "ul",
 }
 VOID_TAGS = {"br", "hr"}
 DROPPED_WITH_CONTENT = {"script", "style"}
@@ -287,7 +310,7 @@ def png_bytes(src):
     None."""
     if not src.lower().startswith(PNG_URI_PREFIX):
         return None
-    payload = "".join(src[len(PNG_URI_PREFIX):].split())
+    payload = "".join(src[len(PNG_URI_PREFIX) :].split())
     try:
         data = base64.b64decode(payload, validate=True)
     except (binascii.Error, ValueError):
@@ -306,7 +329,6 @@ def png_bytes(src):
 
 
 class _Sanitiser(HTMLParser):
-
     def __init__(self):
         super().__init__(convert_charrefs=True)
         self.out = []
@@ -402,7 +424,7 @@ class _Sanitiser(HTMLParser):
         if data.strip():
             self.breaks = 0
         if len(data) > self.text_left:
-            data = data[:self.text_left] + "…"
+            data = data[: self.text_left] + "…"
             self.full = True
         self.text_left -= len(data)
         if self.text_left <= 0:
@@ -535,7 +557,8 @@ class ImageStore:
         are private now."""
         try:
             return private_cache(self.cache, create=False) and all(
-                private_directory(path, create=False) for path in self._own)
+                private_directory(path, create=False) for path in self._own
+            )
         except OSError:
             return False
 
@@ -543,8 +566,7 @@ class ImageStore:
         """Store DATA; its file's path, or None once this poll has saved
         MAX_POLL_IMAGES images or MAX_POLL_IMAGE_BYTES, or if the directory
         is not private (problem says why)."""
-        if (len(self.kept) >= MAX_POLL_IMAGES
-                or self.saved_bytes + len(data) > MAX_POLL_IMAGE_BYTES):
+        if len(self.kept) >= MAX_POLL_IMAGES or self.saved_bytes + len(data) > MAX_POLL_IMAGE_BYTES:
             return None
         name = hashlib.sha256(data).hexdigest() + ".png"
         path = self.directory / name
@@ -553,8 +575,9 @@ class ImageStore:
             if self._holds(path, data):
                 os.utime(path)  # still shown: not one for prune
             else:
-                with tempfile.NamedTemporaryFile(dir=self.directory, suffix=".tmp",
-                                                 delete=False) as f:
+                with tempfile.NamedTemporaryFile(
+                    dir=self.directory, suffix=".tmp", delete=False
+                ) as f:
                     f.write(data)
                 os.replace(f.name, path)
         except OSError as e:
@@ -575,8 +598,12 @@ class ImageStore:
             info = path.lstat()
         except FileNotFoundError:
             return False
-        return (stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid()
-                and info.st_nlink == 1 and path.read_bytes() == data)
+        return (
+            stat.S_ISREG(info.st_mode)
+            and info.st_uid == os.getuid()
+            and info.st_nlink == 1
+            and path.read_bytes() == data
+        )
 
     def prune(self, older_than=PRUNE_AFTER):
         """Delete the images and leftover temporary files no current
@@ -614,8 +641,11 @@ def prune_former_places(cache, geohash):
     if not ImageStore(cache, CACHE_NAME, "warnings").secure_existing():
         return
     try:
-        places = [p for p in (cache / CACHE_NAME / "warnings").iterdir()
-                  if p.name != geohash and GEOHASH.fullmatch(p.name)]
+        places = [
+            p
+            for p in (cache / CACHE_NAME / "warnings").iterdir()
+            if p.name != geohash and GEOHASH.fullmatch(p.name)
+        ]
     except OSError:
         return
     for place in places:
@@ -648,11 +678,12 @@ def linkify(text):
         url = match.group(0)
         trail = TRAILING_PUNCTUATION.search(url)
         if trail:
-            url = url[:trail.start()]
-        pieces.append((html.escape(text[last:match.start()], quote=False), False))
+            url = url[: trail.start()]
+        pieces.append((html.escape(text[last : match.start()], quote=False), False))
         if len(url) <= MAX_HREF:
-            pieces.append((f'<a href="{html.escape(url)}">{html.escape(url, quote=False)}</a>',
-                           True))
+            pieces.append(
+                (f'<a href="{html.escape(url)}">{html.escape(url, quote=False)}</a>', True)
+            )
         else:
             pieces.append((html.escape(url, quote=False), False))
         last = match.start() + len(url)
@@ -794,12 +825,15 @@ def main(argv):
     previous = signal.signal(signal.SIGALRM, _deadline_passed)
     signal.alarm(POLL_DEADLINE)
     try:
-        result = collect(make_get(version), geohash, query, datetime.now(UTC),
-                         user_cache())
+        result = collect(make_get(version), geohash, query, datetime.now(UTC), user_cache())
     except (Exception, PollTimedOut) as e:  # noqa: BLE001 (every outcome is one JSON object)
         failure = failure_from(e)
-        result = {"ok": False, "error": failure.kind, "detail": failure.detail,
-                  "permanent": failure.permanent}
+        result = {
+            "ok": False,
+            "error": failure.kind,
+            "detail": failure.detail,
+            "permanent": failure.permanent,
+        }
     finally:
         signal.alarm(0)
         signal.signal(signal.SIGALRM, previous)

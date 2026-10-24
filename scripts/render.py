@@ -58,8 +58,19 @@ MIN_WIDGET_TEXT_ITEMS = 70
 # A poll's fields that are not shown as text: times, icon names, ids, and
 # the warning body, which poll.py has sanitised to RichText.
 NOT_SHOWN_AS_TEXT = {
-    "request", "geohash", "id", "phase", "html", "images", "icon_descriptor", "date",
-    "time", "issue_time", "expiry_time", "sunrise_time", "sunset_time",
+    "request",
+    "geohash",
+    "id",
+    "phase",
+    "html",
+    "images",
+    "icon_descriptor",
+    "date",
+    "time",
+    "issue_time",
+    "expiry_time",
+    "sunrise_time",
+    "sunset_time",
 }
 # Each is FullView's <name>Tab index.
 TABS = ["weather", "radar", "warnings"]
@@ -92,13 +103,16 @@ def warning_map(path, width=580, height=420):
         rows.append(bytes(row))
 
     def chunk(kind, data):
-        return (struct.pack(">I", len(data)) + kind + data
-                + struct.pack(">I", zlib.crc32(kind + data)))
+        return (
+            struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+        )
 
-    path.write_bytes(b"\x89PNG\r\n\x1a\n"
-                     + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
-                     + chunk(b"IDAT", zlib.compress(b"".join(rows), 9))
-                     + chunk(b"IEND", b""))
+    path.write_bytes(
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(b"".join(rows), 9))
+        + chunk(b"IEND", b"")
+    )
     return str(path)
 
 
@@ -107,8 +121,9 @@ def marked(value):
     shown wrapped in <b>...</b>. A label that renders it as markup shows
     bold text rather than the tags."""
     if isinstance(value, dict):
-        return {key: item if key in NOT_SHOWN_AS_TEXT else marked(item)
-                for key, item in value.items()}
+        return {
+            key: item if key in NOT_SHOWN_AS_TEXT else marked(item) for key, item in value.items()
+        }
     if isinstance(value, list):
         return [marked(item) for item in value]
     if isinstance(value, str):
@@ -122,71 +137,118 @@ def fixture(now, map_path):
     midnight = datetime(now.year, now.month, now.day, 13, tzinfo=UTC)
     if midnight > now:
         midnight -= timedelta(days=1)
-    texts = ["Partly cloudy.", "Shower or two.", "Sunny.", "Rain.", "Possible thunderstorm.",
-             "Mostly sunny.", "Cloudy.", "Windy."]
-    descriptors = ["partly_cloudy", "light_shower", "sunny", "rain", "storm",
-                   "mostly_sunny", "cloudy", "windy"]
+    texts = [
+        "Partly cloudy.",
+        "Shower or two.",
+        "Sunny.",
+        "Rain.",
+        "Possible thunderstorm.",
+        "Mostly sunny.",
+        "Cloudy.",
+        "Windy.",
+    ]
+    descriptors = [
+        "partly_cloudy",
+        "light_shower",
+        "sunny",
+        "rain",
+        "storm",
+        "mostly_sunny",
+        "cloudy",
+        "windy",
+    ]
     forecast = []
     for day in range(8):
         date = midnight + timedelta(days=day)
-        forecast.append({
-            "date": iso(date),
-            "icon_descriptor": descriptors[day],
-            "short_text": texts[day],
-            "extended_text": "Partly cloudy. Medium chance of showers, most likely in the "
-                             "afternoon. Winds southerly 15 to 25 km/h." if day == 0 else texts[day],
-            "temp_max": [24, 19, 31, 17, 36, 22, 20, 18][day],
-            "temp_min": [13, 11, 16, 12, 21, 12, 10, 9][day],
-            "rain": {"chance": [30, 60, 0, 90, 70, 10, 20, 40][day],
-                     "amount": {"min": 0, "max": [1, 4, None, 15, 10, None, 1, 2][day]}},
-            "uv": {"category": "veryhigh" if day == 0 else None, "max_index": 8 if day == 0 else None},
-            "astronomical": {"sunrise_time": iso(date + timedelta(hours=6, minutes=20)),
-                             "sunset_time": iso(date + timedelta(hours=19, minutes=42))},
-        })
+        forecast.append(
+            {
+                "date": iso(date),
+                "icon_descriptor": descriptors[day],
+                "short_text": texts[day],
+                "extended_text": "Partly cloudy. Medium chance of showers, most likely in the "
+                "afternoon. Winds southerly 15 to 25 km/h."
+                if day == 0
+                else texts[day],
+                "temp_max": [24, 19, 31, 17, 36, 22, 20, 18][day],
+                "temp_min": [13, 11, 16, 12, 21, 12, 10, 9][day],
+                "rain": {
+                    "chance": [30, 60, 0, 90, 70, 10, 20, 40][day],
+                    "amount": {"min": 0, "max": [1, 4, None, 15, 10, None, 1, 2][day]},
+                },
+                "uv": {
+                    "category": "veryhigh" if day == 0 else None,
+                    "max_index": 8 if day == 0 else None,
+                },
+                "astronomical": {
+                    "sunrise_time": iso(date + timedelta(hours=6, minutes=20)),
+                    "sunset_time": iso(date + timedelta(hours=19, minutes=42)),
+                },
+            }
+        )
     hour = now.replace(minute=0, second=0, microsecond=0)
     hourly = []
     for slot in range(12):
         start = hour + timedelta(hours=slot)
-        hourly.append({
-            "time": iso(start),
-            "icon_descriptor": ["partly_cloudy", "partly_cloudy", "light_shower", "shower",
-                                "shower", "cloudy", "cloudy", "partly_cloudy", "sunny",
-                                "sunny", "mostly_sunny", "sunny"][slot],
-            "is_night": False,
-            "temp": 21 - slot % 5,
-            "temp_feels_like": 19 - slot % 5,
-            "relative_humidity": 60 + slot,
-            "dew_point": 12,
-            "uv": 5,
-            "wind": {"speed_kilometre": 20, "direction": "SSW", "gust_speed_kilometre": 33},
-            "rain": {"chance": [10, 20, 40, 60, 70, 30, 10, 0, 0, 0, 5, 0][slot],
-                     "amount": {"min": 0, "max": 2}},
-        })
+        hourly.append(
+            {
+                "time": iso(start),
+                "icon_descriptor": [
+                    "partly_cloudy",
+                    "partly_cloudy",
+                    "light_shower",
+                    "shower",
+                    "shower",
+                    "cloudy",
+                    "cloudy",
+                    "partly_cloudy",
+                    "sunny",
+                    "sunny",
+                    "mostly_sunny",
+                    "sunny",
+                ][slot],
+                "is_night": False,
+                "temp": 21 - slot % 5,
+                "temp_feels_like": 19 - slot % 5,
+                "relative_humidity": 60 + slot,
+                "dew_point": 12,
+                "uv": 5,
+                "wind": {"speed_kilometre": 20, "direction": "SSW", "gust_speed_kilometre": 33},
+                "rain": {
+                    "chance": [10, 20, 40, 60, 70, 30, 10, 0, 0, 0, 5, 0][slot],
+                    "amount": {"min": 0, "max": 2},
+                },
+            }
+        )
     poll = {
         "ok": True,
         "request": {"query": "Seaford VIC", "geohash": ""},
         "geohash": "r1ppnx",
         "locationName": "Seaford, VIC",
         "observations": {
-            "temp": 21.4, "temp_feels_like": 19.8, "humidity": 64, "rain_since_9am": 0.4,
+            "temp": 21.4,
+            "temp_feels_like": 19.8,
+            "humidity": 64,
+            "rain_since_9am": 0.4,
             "wind": {"speed_kilometre": 22, "direction": "SSW"},
             "gust": {"speed_kilometre": 35},
             "station": {"name": "Frankston (Ballam Park)", "distance": 4300},
         },
         "forecast": forecast,
         "hourly": hourly,
-        "warnings": [{
-            "id": "VIC_X_1",
-            "title": "Severe Thunderstorm Warning for Port Phillip forecast district",
-            "phase": "update",
-            "issue_time": iso(now - timedelta(hours=1)),
-            "expiry_time": iso(now + timedelta(hours=5)),
-            "html": "<h2>Severe Thunderstorm Warning</h2><p>For people in <b>Port Phillip</b>."
-                    "</p><ul><li>Damaging winds</li><li>Heavy rainfall</li></ul>"
-                    '<p>See <a href="https://www.bom.gov.au/vic/warnings/">current '
-                    "warnings</a>.</p>",
-            "images": [map_path],
-        }],
+        "warnings": [
+            {
+                "id": "VIC_X_1",
+                "title": "Severe Thunderstorm Warning for Port Phillip forecast district",
+                "phase": "update",
+                "issue_time": iso(now - timedelta(hours=1)),
+                "expiry_time": iso(now + timedelta(hours=5)),
+                "html": "<h2>Severe Thunderstorm Warning</h2><p>For people in <b>Port Phillip</b>."
+                "</p><ul><li>Damaging winds</li><li>Heavy rainfall</li></ul>"
+                '<p>See <a href="https://www.bom.gov.au/vic/warnings/">current '
+                "warnings</a>.</p>",
+                "images": [map_path],
+            }
+        ],
     }
     return {"now": iso(now), "station": "IDR023", "poll": poll}
 
@@ -195,10 +257,14 @@ def live(place, station, now, cache):
     """BoM's weather for PLACE now, as fixture() shapes it: poll.py's
     answer, its warning maps saved under CACHE, shown with the radar
     product STATION."""
-    result = subprocess.run([sys.executable, "-I", str(ROOT / "contents" / "code" / "poll.py"),
-                             "render", "", place],
-                            env=dict(os.environ, XDG_CACHE_HOME=cache),
-                            capture_output=True, text=True, timeout=180, check=True)
+    result = subprocess.run(
+        [sys.executable, "-I", str(ROOT / "contents" / "code" / "poll.py"), "render", "", place],
+        env=dict(os.environ, XDG_CACHE_HOME=cache),
+        capture_output=True,
+        text=True,
+        timeout=180,
+        check=True,
+    )
     poll = json.loads(result.stdout)
     if not poll.get("ok"):
         sys.exit(f"render: BoM's weather for {place}: {poll.get('error')} {poll.get('detail')}")
@@ -210,30 +276,45 @@ def main():
     parser.add_argument("outdir", type=pathlib.Path)
     parser.add_argument("--scheme", choices=sorted(SCHEMES), default="light")
     parser.add_argument("--radar-wait", type=float, default=20.0)
-    parser.add_argument("--offline", action="store_true",
-                        help="keep the radar inactive: no network")
-    parser.add_argument("--live", metavar="PLACE",
-                        help="show BoM's weather for PLACE now, not the fixture")
-    parser.add_argument("--station", default="IDR023",
-                        help="the radar product shown with --live (default: Melbourne, 128 km)")
-    parser.add_argument("--scale", type=float, default=1.0,
-                        help="device pixels to each pixel (default: 1)")
+    parser.add_argument(
+        "--offline", action="store_true", help="keep the radar inactive: no network"
+    )
+    parser.add_argument(
+        "--live", metavar="PLACE", help="show BoM's weather for PLACE now, not the fixture"
+    )
+    parser.add_argument(
+        "--station",
+        default="IDR023",
+        help="the radar product shown with --live (default: Melbourne, 128 km)",
+    )
+    parser.add_argument(
+        "--scale", type=float, default=1.0, help="device pixels to each pixel (default: 1)"
+    )
     options = parser.parse_args()
 
     # The KDE platform theme reads its colours from kdeglobals; a private
     # config home with the chosen Breeze scheme's colours sets light or dark.
     with tempfile.TemporaryDirectory(prefix="aussieweather-render-") as config_home:
-        shutil.copy(f"/usr/share/color-schemes/{SCHEMES[options.scheme]}.colors",
-                    pathlib.Path(config_home) / "kdeglobals")
+        shutil.copy(
+            f"/usr/share/color-schemes/{SCHEMES[options.scheme]}.colors",
+            pathlib.Path(config_home) / "kdeglobals",
+        )
         return render(options, config_home)
 
 
 def render(options, config_home):
     # The software renderer: the same pixels with or without a GPU (CI's
     # container has none, and Qt would warn as it fell back to it).
-    os.environ.update({"XDG_CONFIG_HOME": config_home, "QT_QPA_PLATFORM": "offscreen",
-                       "QT_QPA_PLATFORMTHEME": "kde", "QT_QUICK_BACKEND": "software",
-                       "TZ": "Australia/Melbourne", "QT_SCALE_FACTOR": str(options.scale)})
+    os.environ.update(
+        {
+            "XDG_CONFIG_HOME": config_home,
+            "QT_QPA_PLATFORM": "offscreen",
+            "QT_QPA_PLATFORMTHEME": "kde",
+            "QT_QUICK_BACKEND": "software",
+            "TZ": "Australia/Melbourne",
+            "QT_SCALE_FACTOR": str(options.scale),
+        }
+    )
 
     import shiboken6
     from PySide6.QtCore import QMetaObject, QObject, QTimer, QtMsgType, QUrl, qInstallMessageHandler
@@ -259,7 +340,9 @@ def render(options, config_home):
     engine = QQmlApplicationEngine()
     # Bare i18n() calls resolve through the root context object, as they do
     # through KLocalizedContext in plasmashell.
-    i18n_component = QQmlComponent(engine, QUrl.fromLocalFile(str(ROOT / "scripts" / "render-i18n.qml")))
+    i18n_component = QQmlComponent(
+        engine, QUrl.fromLocalFile(str(ROOT / "scripts" / "render-i18n.qml"))
+    )
     i18n = i18n_component.create()
     if i18n is None:
         print("FAIL: render-i18n.qml did not load", file=sys.stderr)
@@ -273,13 +356,16 @@ def render(options, config_home):
         shown = fixture(now, warning_map(pathlib.Path(config_home) / "warning-map.png"))
     engine.rootContext().setContextProperty("fixtureJson", json.dumps(shown))
     engine.rootContext().setContextProperty(
-        "markedFixtureJson", json.dumps(dict(shown, poll=marked(shown["poll"]))))
+        "markedFixtureJson", json.dumps(dict(shown, poll=marked(shown["poll"])))
+    )
     engine.rootContext().setContextProperty("liveRadar", not options.offline)
     engine.load(str(ROOT / "scripts" / "render.qml"))
     if not engine.rootObjects():
         print("FAIL: render.qml did not load", file=sys.stderr)
         return 1
-    window = shiboken6.wrapInstance(shiboken6.getCppPointer(engine.rootObjects()[0])[0], QQuickWindow)
+    window = shiboken6.wrapInstance(
+        shiboken6.getCppPointer(engine.rootObjects()[0])[0], QQuickWindow
+    )
     view = window.findChild(QObject, "fullView")
 
     def settle(seconds):
@@ -316,7 +402,8 @@ def render(options, config_home):
         print(f"{path}: popup height {heights[name]:.0f}")
 
     panel = shiboken6.wrapInstance(
-        shiboken6.getCppPointer(window.findChild(QWindow, "panelWindow"))[0], QQuickWindow)
+        shiboken6.getCppPointer(window.findChild(QWindow, "panelWindow"))[0], QQuickWindow
+    )
     path = options.outdir / f"{options.scheme}-panel.png"
     panel.grabWindow().save(str(path))
     print(f"{path}: panel")
@@ -343,8 +430,11 @@ def render(options, config_home):
             return text_format == RICH_TEXT
         if text_format == PLAIN_TEXT:
             return True
-        return (text_format == AUTO_TEXT and not declared_by_widget(item)
-                and not re.search("[<&]", str(item.property("text"))))
+        return (
+            text_format == AUTO_TEXT
+            and not declared_by_widget(item)
+            and not re.search("[<&]", str(item.property("text")))
+        )
 
     def everything(*roots):
         """Every object under ROOTS, by object tree and by item tree: a
@@ -363,21 +453,30 @@ def render(options, config_home):
                 pending.extend(shiboken6.wrapInstance(key, QQuickItem).childItems())
         return list(found.values())
 
-    text_items = [item for item in everything(window, panel)
-                  if item.inherits("QQuickText") or item.inherits("QQuickTextEdit")]
+    text_items = [
+        item
+        for item in everything(window, panel)
+        if item.inherits("QQuickText") or item.inherits("QQuickTextEdit")
+    ]
     for item in text_items:
         # Read through the engine: PySide cannot convert the C++ enum.
         text_format = engine.newQObject(item).property("textFormat").toInt()
         if not shows_plain_text(item, text_format):
-            problems.append(f"{item.metaObject().className()} {item.objectName()!r} renders format "
-                            f"{text_format}: {str(item.property('text'))[:60]!r}")
+            problems.append(
+                f"{item.metaObject().className()} {item.objectName()!r} renders format "
+                f"{text_format}: {str(item.property('text'))[:60]!r}"
+            )
     widget_items = sum(map(declared_by_widget, text_items))
     marked_items = sum("<b>" in str(item.property("text")) for item in text_items)
-    print(f"{len(text_items)} text items checked for plain text, {widget_items} of them declared"
-          f" by the widget, {marked_items} showing marked-up data")
+    print(
+        f"{len(text_items)} text items checked for plain text, {widget_items} of them declared"
+        f" by the widget, {marked_items} showing marked-up data"
+    )
     if len(text_items) < MIN_TEXT_ITEMS or widget_items < MIN_WIDGET_TEXT_ITEMS:
-        problems.append(f"only {len(text_items)} text items found to check, {widget_items} of them"
-                        " the widget's: is the walk broken?")
+        problems.append(
+            f"only {len(text_items)} text items found to check, {widget_items} of them"
+            " the widget's: is the walk broken?"
+        )
     if not marked_items:
         problems.append("no text item shows the marked-up poll: is it applied?")
 
@@ -386,8 +485,9 @@ def render(options, config_home):
     place_items = [item for item in everything(window, panel) if item.objectName() == "placeItem"]
     shown_items = [item for item in place_items if item.property("checked")]
     if len(place_items) != 2 or len(shown_items) != 1:
-        problems.append(f"place menu: {len(place_items)} items, {len(shown_items)} checked,"
-                        " not 2 and 1")
+        problems.append(
+            f"place menu: {len(place_items)} items, {len(shown_items)} checked, not 2 and 1"
+        )
     else:
         QMetaObject.invokeMethod(shown_items[0], "click")
         settle(0.1)
@@ -399,8 +499,13 @@ def render(options, config_home):
     # Each WeatherSource's first poll, at start, must run: poll.py answers
     # both of these at once, without the network.
     for name, location, expected in (
-            ("unconfiguredWeather", "no location", "No location set. Choose one in the widget's settings."),
-            ("configuredWeather", "the location Mt", "Location not found: Mt")):
+        (
+            "unconfiguredWeather",
+            "no location",
+            "No location set. Choose one in the widget's settings.",
+        ),
+        ("configuredWeather", "the location Mt", "Location not found: Mt"),
+    ):
         weather = window.findChild(QObject, name)
         for _ in range(100):
             if weather.property("errorText"):

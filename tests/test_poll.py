@@ -27,6 +27,7 @@ from codeloader import load
 
 poll = load("poll")
 
+
 class FakeApi:
     """Stands in for poll.make_get: answers API paths from a dict.
 
@@ -83,19 +84,21 @@ def http_error(code):
 def run_main(api, geohash, query):
     """poll.main's JSON output, with API calls answered by API."""
     out = io.StringIO()
-    with (mock.patch.object(poll, "make_get", lambda version: api),
-          mock.patch.dict(os.environ, {"XDG_CACHE_HOME": _IMAGE_DIR.name}),
-          contextlib.redirect_stdout(out)):
+    with (
+        mock.patch.object(poll, "make_get", lambda version: api),
+        mock.patch.dict(os.environ, {"XDG_CACHE_HOME": _IMAGE_DIR.name}),
+        contextlib.redirect_stdout(out),
+    ):
         poll.main(["poll.py", "1.8.0", geohash, query])
     return json.loads(out.getvalue())
 
 
 class ResponseSizeTest(unittest.TestCase):
-
     def test_oversized_response_is_refused(self):
         class Opener:
             def open(self, request, timeout):
                 return io.BytesIO(b" " * (poll.MAX_RESPONSE + 1))
+
         with mock.patch.object(poll.urllib.request, "build_opener", lambda *handlers: Opener()):
             get = poll.make_get("1.8.0")
             with self.assertRaises(poll.Failure) as caught:
@@ -104,14 +107,14 @@ class ResponseSizeTest(unittest.TestCase):
 
 
 class RedirectTest(unittest.TestCase):
-
     def setUp(self):
         self.handler = poll.HttpsOnlyRedirects()
         self.request = urllib.request.Request("https://api.weather.bom.gov.au/v1/x")
 
     def test_https_redirect_is_followed(self):
         followed = self.handler.redirect_request(
-            self.request, None, 302, "Found", {}, "https://api.weather.bom.gov.au/v1/y")
+            self.request, None, 302, "Found", {}, "https://api.weather.bom.gov.au/v1/y"
+        )
         self.assertEqual(followed.full_url, "https://api.weather.bom.gov.au/v1/y")
 
     def test_redirect_off_https_is_refused(self):
@@ -122,7 +125,6 @@ class RedirectTest(unittest.TestCase):
 
 
 class SplitStateTest(unittest.TestCase):
-
     def test_state_suffix_in_any_case(self):
         self.assertEqual(poll.split_state("Seaford VIC"), ("Seaford", "VIC"))
         self.assertEqual(poll.split_state("seaford vic"), ("seaford", "VIC"))
@@ -139,7 +141,6 @@ class SplitStateTest(unittest.TestCase):
 
 
 class ResolveTest(unittest.TestCase):
-
     def test_state_suffix_prefers_that_state(self):
         api = FakeApi({"/locations?search=Seaford": {"data": [SEAFORD_VIC, SEAFORD_SA]}})
         self.assertEqual(poll.resolve(api, "Seaford SA"), ("r1f93c", "Seaford, SA"))
@@ -159,16 +160,24 @@ class ResolveTest(unittest.TestCase):
         # does, as it did when any short capitalised suffix was taken for a
         # state.
         sydney = {"geohash": "r3gx2fz", "name": "Sydney", "state": "NSW"}
-        api = FakeApi({"/locations?search=Sydney%20CBD": {"data": []},
-                       "/locations?search=Sydney": {"data": [sydney]}})
+        api = FakeApi(
+            {
+                "/locations?search=Sydney%20CBD": {"data": []},
+                "/locations?search=Sydney": {"data": [sydney]},
+            }
+        )
         self.assertEqual(poll.resolve(api, "Sydney CBD"), ("r3gx2f", "Sydney, NSW"))
 
     def test_dropped_suffix_must_leave_the_place_itself(self):
         # A misspelt place must not become whatever BoM lists first for its
         # first word: "Glen Waverly" is not Glen Alice, NSW.
         glen_alice = {"geohash": "r65t0ez", "name": "Glen Alice", "state": "NSW"}
-        api = FakeApi({"/locations?search=Glen%20Waverly": {"data": []},
-                       "/locations?search=Glen": {"data": [glen_alice]}})
+        api = FakeApi(
+            {
+                "/locations?search=Glen%20Waverly": {"data": []},
+                "/locations?search=Glen": {"data": [glen_alice]},
+            }
+        )
         with self.assertRaises(poll.Failure) as caught:
             poll.resolve(api, "Glen Waverly")
         self.assertEqual(caught.exception.kind, "not_found")
@@ -176,14 +185,22 @@ class ResolveTest(unittest.TestCase):
     def test_dropped_suffix_allows_bom_spelling_out_mount(self):
         # BoM lists "Mt Buller" as Mount Buller.
         buller = {"geohash": "r1u7m0z", "name": "Mount Buller", "state": "VIC"}
-        api = FakeApi({"/locations?search=Mt%20Buller%20Village": {"data": []},
-                       "/locations?search=Mt%20Buller": {"data": [buller]}})
+        api = FakeApi(
+            {
+                "/locations?search=Mt%20Buller%20Village": {"data": []},
+                "/locations?search=Mt%20Buller": {"data": [buller]},
+            }
+        )
         self.assertEqual(poll.resolve(api, "Mt Buller Village"), ("r1u7m0", "Mount Buller, VIC"))
 
     def test_pt_may_be_point_as_well_as_port(self):
         cook = {"geohash": "r1r0v2z", "name": "Point Cook", "state": "VIC"}
-        api = FakeApi({"/locations?search=Pt%20Cook%20Village": {"data": []},
-                       "/locations?search=Pt%20Cook": {"data": [cook]}})
+        api = FakeApi(
+            {
+                "/locations?search=Pt%20Cook%20Village": {"data": []},
+                "/locations?search=Pt%20Cook": {"data": [cook]},
+            }
+        )
         self.assertEqual(poll.resolve(api, "Pt Cook Village"), ("r1r0v2", "Point Cook, VIC"))
 
     def test_abbreviations_do_not_match_other_words(self):
@@ -193,8 +210,9 @@ class ResolveTest(unittest.TestCase):
     def test_too_short_to_search_is_not_found(self):
         # BoM answers a search of fewer than three characters with 403,
         # which would be reported as a failure rather than "not found".
-        api = FakeApi({"/locations?search=Pt%20Fairy": {"data": []},
-                       "/locations?search=Pt": http_error(403)})
+        api = FakeApi(
+            {"/locations?search=Pt%20Fairy": {"data": []}, "/locations?search=Pt": http_error(403)}
+        )
         with self.assertRaises(poll.Failure) as caught:
             poll.resolve(api, "Pt Fairy")
         self.assertEqual((caught.exception.kind, caught.exception.permanent), ("not_found", True))
@@ -214,22 +232,26 @@ class ResolveTest(unittest.TestCase):
 
 
 class ErrorKindTest(unittest.TestCase):
-
     def test_empty_location_is_permanent_and_asks_nothing(self):
         api = FakeApi({})
         result = run_main(api, "", "   ")
-        self.assertEqual((result["ok"], result["error"], result["permanent"]),
-                         (False, "no_location", True))
+        self.assertEqual(
+            (result["ok"], result["error"], result["permanent"]), (False, "no_location", True)
+        )
         self.assertEqual(api.requested, [])
 
     def test_not_found_is_permanent(self):
         result = run_main(FakeApi({"/locations?search=Nowhere": {"data": []}}), "", "Nowhere")
-        self.assertEqual((result["error"], result["permanent"], result["detail"]),
-                         ("not_found", True, "Nowhere"))
+        self.assertEqual(
+            (result["error"], result["permanent"], result["detail"]), ("not_found", True, "Nowhere")
+        )
 
     def test_client_error_is_permanent(self):
-        result = run_main(location_api("r1ppnx", **{"/locations/r1ppnx/observations": http_error(403)}),
-                          "r1ppnx", "Seaford VIC")
+        result = run_main(
+            location_api("r1ppnx", **{"/locations/r1ppnx/observations": http_error(403)}),
+            "r1ppnx",
+            "Seaford VIC",
+        )
         self.assertEqual((result["error"], result["permanent"]), ("http", True))
         self.assertIn("403", result["detail"])
 
@@ -244,6 +266,7 @@ class ErrorKindTest(unittest.TestCase):
         # timeout; the whole poll must still end.
         def slow(path):
             time.sleep(10)
+
         started = time.monotonic()
         with mock.patch.object(poll, "POLL_DEADLINE", 1):
             result = run_main(slow, "r1ppnx", "Seaford VIC")
@@ -251,8 +274,12 @@ class ErrorKindTest(unittest.TestCase):
         self.assertEqual((result["error"], result["permanent"]), ("network", False))
 
     def test_network_failure_is_retried(self):
-        api = location_api("r1ppnx", **{"/locations/r1ppnx/observations":
-                                        urllib.error.URLError("Name or service not known")})
+        api = location_api(
+            "r1ppnx",
+            **{
+                "/locations/r1ppnx/observations": urllib.error.URLError("Name or service not known")
+            },
+        )
         result = run_main(api, "r1ppnx", "Seaford VIC")
         self.assertEqual((result["error"], result["permanent"]), ("network", False))
 
@@ -268,7 +295,6 @@ class ErrorKindTest(unittest.TestCase):
 
 
 class CollectTest(unittest.TestCase):
-
     def test_cached_geohash_skips_the_lookup(self):
         api = location_api("r1ppnx")
         out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW, IMAGE_DIR)
@@ -289,8 +315,13 @@ class CollectTest(unittest.TestCase):
         self.assertEqual(out["locationName"], "Seaford, VIC")
 
     def test_failed_extras_are_unknown_not_empty(self):
-        api = location_api("r1ppnx", **{"/locations/r1ppnx/forecasts/hourly": http_error(503),
-                                        "/locations/r1ppnx/warnings": http_error(503)})
+        api = location_api(
+            "r1ppnx",
+            **{
+                "/locations/r1ppnx/forecasts/hourly": http_error(503),
+                "/locations/r1ppnx/warnings": http_error(503),
+            },
+        )
         out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW, IMAGE_DIR)
         self.assertIsNone(out["hourly"])
         self.assertIsNone(out["warnings"])
@@ -310,8 +341,10 @@ class CollectTest(unittest.TestCase):
             os.utime(saved, (eleven_minutes_ago, eleven_minutes_ago))
             poll.collect(location_api("r1ppnx"), "r1ppnx", "Seaford VIC", NOW, cache)
             self.assertTrue(pathlib.Path(saved).exists())
-            self.assertEqual(pathlib.Path(saved).parent,
-                             cache / "net.tropism.plasma.aussieweather" / "warnings" / "r1f93c")
+            self.assertEqual(
+                pathlib.Path(saved).parent,
+                cache / "net.tropism.plasma.aussieweather" / "warnings" / "r1f93c",
+            )
 
     def test_a_former_places_images_go_after_a_day(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -321,7 +354,9 @@ class CollectTest(unittest.TestCase):
             recent = warnings / "r4152n"
             for place in (old, recent):
                 place.mkdir(parents=True, mode=0o700)
-                (place / (hashlib.sha256(place.name.encode()).hexdigest() + ".png")).write_bytes(PNG)
+                (place / (hashlib.sha256(place.name.encode()).hexdigest() + ".png")).write_bytes(
+                    PNG
+                )
             for f in old.iterdir():
                 os.utime(f, (0, 0))
             poll.collect(location_api("r1ppnx"), "r1ppnx", "Seaford VIC", NOW, cache)
@@ -351,15 +386,15 @@ class CollectTest(unittest.TestCase):
 
     def test_warning_detail_is_merged(self):
         summary = {"id": "VIC_X_1", "title": "Flood Warning"}
-        api = location_api("r1ppnx", warnings=[summary],
-                           details={"VIC_X_1": {"message": "<p>Detail</p>"}})
+        api = location_api(
+            "r1ppnx", warnings=[summary], details={"VIC_X_1": {"message": "<p>Detail</p>"}}
+        )
         out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW, IMAGE_DIR)
         self.assertEqual(out["warnings"][0]["html"], "<p>Detail</p>")
         self.assertEqual(out["warnings"][0]["title"], "Flood Warning")
 
 
 class CurrentWarningsTest(unittest.TestCase):
-
     def test_cancelled_and_expired_warnings_are_dropped(self):
         live = {"id": "A", "phase": "renewal", "expiry_time": "2026-10-25T13:30:00Z"}
         cancelled = {"id": "B", "phase": "cancelled", "expiry_time": "2026-10-24T04:16:30Z"}
@@ -372,28 +407,40 @@ class CurrentWarningsTest(unittest.TestCase):
 
     def test_a_bad_detail_does_not_fail_the_rest(self):
         # The warning still shows, by its summary, whatever went wrong.
-        for error in (poll.Failure("bad_response", "too large"),
-                      http.client.IncompleteRead(b""), RecursionError()):
+        for error in (
+            poll.Failure("bad_response", "too large"),
+            http.client.IncompleteRead(b""),
+            RecursionError(),
+        ):
             with self.subTest(type(error).__name__):
-                api = location_api("r1ppnx", warnings=[{"id": "A", "title": "Flood"},
-                                                       {"id": "B", "title": "Wind"}],
-                                   details={"A": {}, "B": {}}, **{"/warnings/A": error})
+                api = location_api(
+                    "r1ppnx",
+                    warnings=[{"id": "A", "title": "Flood"}, {"id": "B", "title": "Wind"}],
+                    details={"A": {}, "B": {}},
+                    **{"/warnings/A": error},
+                )
                 out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW, IMAGE_DIR)
                 self.assertEqual([w["title"] for w in out["warnings"]], ["Flood", "Wind"])
 
     def test_a_malformed_warning_does_not_fail_the_rest(self):
-        api = location_api("r1ppnx", warnings=["junk", {"id": 7, "title": "Flood"},
-                                               {"id": "B", "title": "Wind"}],
-                           details={"B": {"message": ["not", "text"], "title": 3}})
+        api = location_api(
+            "r1ppnx",
+            warnings=["junk", {"id": 7, "title": "Flood"}, {"id": "B", "title": "Wind"}],
+            details={"B": {"message": ["not", "text"], "title": 3}},
+        )
         out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW, IMAGE_DIR)
         # A detail's field of the wrong type does not hide the summary's.
         self.assertEqual([w["title"] for w in out["warnings"]], ["Flood", "Wind"])
         self.assertEqual([w["html"] for w in out["warnings"]], ["", ""])
 
     def test_a_time_without_a_zone_does_not_fail_the_rest(self):
-        api = location_api("r1ppnx", warnings=[{"id": "A", "title": "Flood", "expiry_time": "2026-10-25"},
-                                               {"id": "B", "title": "Wind",
-                                                "expiry_time": "2026-10-25T10:00:00"}])
+        api = location_api(
+            "r1ppnx",
+            warnings=[
+                {"id": "A", "title": "Flood", "expiry_time": "2026-10-25"},
+                {"id": "B", "title": "Wind", "expiry_time": "2026-10-25T10:00:00"},
+            ],
+        )
         out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW, IMAGE_DIR)
         self.assertEqual([w["title"] for w in out["warnings"]], ["Flood", "Wind"])
 
@@ -417,8 +464,13 @@ def png(width, height):
     """The start of a PNG: its signature and IHDR chunk, enough for the
     checks poll.py makes."""
     ihdr = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
-    return (b"\x89PNG\r\n\x1a\n" + struct.pack(">I", len(ihdr)) + b"IHDR" + ihdr
-            + struct.pack(">I", zlib.crc32(b"IHDR" + ihdr)))
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + struct.pack(">I", len(ihdr))
+        + b"IHDR"
+        + ihdr
+        + struct.pack(">I", zlib.crc32(b"IHDR" + ihdr))
+    )
 
 
 PNG = png(580, 820)
@@ -430,12 +482,15 @@ def data_uri(mime, payload):
 
 
 class SanitiseHtmlTest(unittest.TestCase):
-
     def test_bom_markup_survives_without_attributes(self):
-        html = ('<div class="product"><h2>Heatwave</h2><p style="x">Hot <b>days</b>.</p>'
-                '<ul class="l"><li>one</li></ul><br/></div>')
-        self.assertEqual(poll.sanitise(html).html,
-                         "<div><h2>Heatwave</h2><p>Hot <b>days</b>.</p><ul><li>one</li></ul><br></div>")
+        html = (
+            '<div class="product"><h2>Heatwave</h2><p style="x">Hot <b>days</b>.</p>'
+            '<ul class="l"><li>one</li></ul><br/></div>'
+        )
+        self.assertEqual(
+            poll.sanitise(html).html,
+            "<div><h2>Heatwave</h2><p>Hot <b>days</b>.</p><ul><li>one</li></ul><br></div>",
+        )
 
     def test_scripts_styles_and_unknown_tags_are_dropped(self):
         html = '<p>a<script>alert(1)</script><style>p{}</style><iframe src="x">b</iframe>c</p>'
@@ -445,21 +500,26 @@ class SanitiseHtmlTest(unittest.TestCase):
         self.assertEqual(poll.sanitise('<p onclick="x()">t</p>').html, "<p>t</p>")
 
     def test_only_https_links_survive(self):
-        html = ('<a href="https://nt.gov.au/h?a=1&amp;b=2">ok</a>'
-                '<a href="javascript:alert(1)">js</a><a href="file:///etc/passwd">f</a>'
-                '<a href="http://bom.gov.au">plain</a>')
-        self.assertEqual(poll.sanitise(html).html,
-                         '<a href="https://nt.gov.au/h?a=1&amp;b=2">ok</a>jsfplain')
+        html = (
+            '<a href="https://nt.gov.au/h?a=1&amp;b=2">ok</a>'
+            '<a href="javascript:alert(1)">js</a><a href="file:///etc/passwd">f</a>'
+            '<a href="http://bom.gov.au">plain</a>'
+        )
+        self.assertEqual(
+            poll.sanitise(html).html, '<a href="https://nt.gov.au/h?a=1&amp;b=2">ok</a>jsfplain'
+        )
 
     def test_images_leave_the_markup(self):
         # Qt RichText hands a data: image to every image plugin's sniffer
         # (LibRaw claims some PNG-signature data by size alone), so no
         # image stays in the markup; real PNGs are kept aside instead.
-        html = (f'<p>a<img alt="map" src="{data_uri("image/png", PNG)}">b</p>'
-                + '<img src="https://tracker.example/p.png">'
-                + f'<img src="{data_uri("image/png", EPS)}">'
-                + f'<img src="{data_uri("image/svg+xml", b"<svg/>")}">'
-                + '<img src="data:image/png;base64,!!!">')
+        html = (
+            f'<p>a<img alt="map" src="{data_uri("image/png", PNG)}">b</p>'
+            + '<img src="https://tracker.example/p.png">'
+            + f'<img src="{data_uri("image/png", EPS)}">'
+            + f'<img src="{data_uri("image/svg+xml", b"<svg/>")}">'
+            + '<img src="data:image/png;base64,!!!">'
+        )
         result = poll.sanitise(html)
         self.assertEqual(result.html, "<p>ab</p>")
         self.assertEqual(result.images, [PNG])
@@ -470,15 +530,21 @@ class SanitiseHtmlTest(unittest.TestCase):
         for width, height in ((1, 1024), (1024, 1), (4096, 4096), (0, 10), (2049, 300)):
             html = f'<img src="{data_uri("image/png", png(width, height))}">'
             self.assertEqual(poll.sanitise(html).images, [], (width, height))
-        self.assertEqual(len(poll.sanitise(f'<img src="{data_uri("image/png", png(580, 820))}">').images), 1)
+        self.assertEqual(
+            len(poll.sanitise(f'<img src="{data_uri("image/png", png(580, 820))}">').images), 1
+        )
 
     def test_png_needs_its_header(self):
         bare_signature = b"\x89PNG\r\n\x1a\n" + b"\0" * 16
-        self.assertEqual(poll.sanitise(f'<img src="{data_uri("image/png", bare_signature)}">').images, [])
+        self.assertEqual(
+            poll.sanitise(f'<img src="{data_uri("image/png", bare_signature)}">').images, []
+        )
 
     def test_images_are_capped(self):
-        html = "".join(f'<img src="{data_uri("image/png", PNG + bytes([i]))}">'
-                       for i in range(poll.MAX_IMAGES + 3))
+        html = "".join(
+            f'<img src="{data_uri("image/png", PNG + bytes([i]))}">'
+            for i in range(poll.MAX_IMAGES + 3)
+        )
         self.assertEqual(len(poll.sanitise(html).images), poll.MAX_IMAGES)
 
     def test_tables_are_dropped(self):
@@ -530,8 +596,9 @@ class SanitiseHtmlTest(unittest.TestCase):
 
     def test_a_link_cannot_overrun_the_budget(self):
         # A quote escapes to six characters: a 2000-character href, to 12000.
-        markup = ("<p>" + "&amp;" * 7000 + "</p><a href='https://x.example/" + '"' * 2000
-                  + "'>map</a>")
+        markup = (
+            "<p>" + "&amp;" * 7000 + "</p><a href='https://x.example/" + '"' * 2000 + "'>map</a>"
+        )
         self.assertLessEqual(len(poll.sanitise(markup).html), poll.MAX_OUTPUT + 100)
 
     def test_the_ellipsis_stays_out_of_links(self):
@@ -556,21 +623,23 @@ class SanitiseHtmlTest(unittest.TestCase):
         self.assertTrue(out.endswith("…</p>"))
 
     def test_text_stays_escaped(self):
-        self.assertEqual(poll.sanitise("<p>a &lt;b&gt; &amp; c</p>").html,
-                         "<p>a &lt;b&gt; &amp; c</p>")
+        self.assertEqual(
+            poll.sanitise("<p>a &lt;b&gt; &amp; c</p>").html, "<p>a &lt;b&gt; &amp; c</p>"
+        )
 
     def test_attribute_quotes_cannot_break_out(self):
-        html = '<a href=\'https://x.au/"onmouseover="y\'>t</a>'
-        self.assertEqual(poll.sanitise(html).html,
-                         '<a href="https://x.au/&quot;onmouseover=&quot;y">t</a>')
+        html = "<a href='https://x.au/\"onmouseover=\"y'>t</a>"
+        self.assertEqual(
+            poll.sanitise(html).html, '<a href="https://x.au/&quot;onmouseover=&quot;y">t</a>'
+        )
 
     def test_unclosed_and_stray_tags_are_balanced(self):
-        self.assertEqual(poll.sanitise("<ul><li>x</b></ul></p><p>y").html,
-                         "<ul><li>x</li></ul><p>y</p>")
+        self.assertEqual(
+            poll.sanitise("<ul><li>x</b></ul></p><p>y").html, "<ul><li>x</li></ul><p>y</p>"
+        )
 
 
 class ImageStoreTest(unittest.TestCase):
-
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.store = poll.ImageStore(pathlib.Path(self.directory.name), "warnings")
@@ -579,13 +648,17 @@ class ImageStoreTest(unittest.TestCase):
         self.directory.cleanup()
 
     def test_images_per_poll_are_capped(self):
-        saved = [self.store.save(PNG + i.to_bytes(4, "big")) for i in range(poll.MAX_POLL_IMAGES + 5)]
+        saved = [
+            self.store.save(PNG + i.to_bytes(4, "big")) for i in range(poll.MAX_POLL_IMAGES + 5)
+        ]
         self.assertEqual(sum(path is not None for path in saved), poll.MAX_POLL_IMAGES)
 
     def test_image_bytes_per_poll_are_capped(self):
         size = poll.MAX_IMAGE_BYTES
-        saved = [self.store.save(PNG + i.to_bytes(8, "big") + b"\0" * (size - len(PNG) - 8))
-                 for i in range(12)]
+        saved = [
+            self.store.save(PNG + i.to_bytes(8, "big") + b"\0" * (size - len(PNG) - 8))
+            for i in range(12)
+        ]
         kept = sum(path is not None for path in saved)
         self.assertEqual(kept, poll.MAX_POLL_IMAGE_BYTES // size)
 
@@ -625,11 +698,15 @@ class ImageStoreTest(unittest.TestCase):
         me = pwd.getpwuid(os.getuid())
         group = grp.struct_group((me.pw_name, "x", me.pw_gid, []))
         other = pwd.struct_passwd(("other", "x", me.pw_uid + 1, me.pw_gid, "", "/", "/bin/sh"))
-        with (mock.patch.object(poll.grp, "getgrgid", lambda gid: group),
-              mock.patch.object(poll.pwd, "getpwall", lambda: [me, other])):
+        with (
+            mock.patch.object(poll.grp, "getgrgid", lambda gid: group),
+            mock.patch.object(poll.pwd, "getpwall", lambda: [me, other]),
+        ):
             self.assertFalse(poll.group_is_private(me.pw_gid))
-        with (mock.patch.object(poll.grp, "getgrgid", lambda gid: group),
-              mock.patch.object(poll.pwd, "getpwall", lambda: [me])):
+        with (
+            mock.patch.object(poll.grp, "getgrgid", lambda gid: group),
+            mock.patch.object(poll.pwd, "getpwall", lambda: [me]),
+        ):
             self.assertTrue(poll.group_is_private(me.pw_gid))
 
     def test_a_file_of_another_user_is_not_reused(self):
@@ -737,22 +814,23 @@ class ImageStoreTest(unittest.TestCase):
 
 
 class LinkifyTest(unittest.TestCase):
-
     def test_plain_text_is_escaped(self):
-        self.assertEqual(poll.linkify("storms & gusts <severe>"),
-                         "storms &amp; gusts &lt;severe&gt;")
+        self.assertEqual(
+            poll.linkify("storms & gusts <severe>"), "storms &amp; gusts &lt;severe&gt;"
+        )
 
     def test_https_url_becomes_a_link_without_trailing_punctuation(self):
-        self.assertEqual(poll.linkify("More at https://bom.gov.au/x?a=1&b=2."),
-                         'More at <a href="https://bom.gov.au/x?a=1&amp;b=2">'
-                         'https://bom.gov.au/x?a=1&amp;b=2</a>.')
+        self.assertEqual(
+            poll.linkify("More at https://bom.gov.au/x?a=1&b=2."),
+            'More at <a href="https://bom.gov.au/x?a=1&amp;b=2">'
+            "https://bom.gov.au/x?a=1&amp;b=2</a>.",
+        )
 
     def test_http_url_stays_text(self):
         self.assertEqual(poll.linkify("see http://bom.gov.au/x"), "see http://bom.gov.au/x")
 
 
 class WarningViewTest(unittest.TestCase):
-
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.store = poll.ImageStore(pathlib.Path(self.directory.name), "warnings")
@@ -761,7 +839,10 @@ class WarningViewTest(unittest.TestCase):
         self.directory.cleanup()
 
     def test_images_are_saved_as_png_files(self):
-        view = poll.warning_view([{"id": "A", "message": f'<p>Map:</p><img src="{data_uri("image/png", PNG)}">'}], self.store)
+        view = poll.warning_view(
+            [{"id": "A", "message": f'<p>Map:</p><img src="{data_uri("image/png", PNG)}">'}],
+            self.store,
+        )
         self.assertEqual(view["html"], "<p>Map:</p>")
         [path] = view["images"]
         self.assertTrue(path.endswith(".png"))
@@ -769,25 +850,44 @@ class WarningViewTest(unittest.TestCase):
         self.assertEqual(pathlib.Path(path).parent, self.store.directory)
 
     def test_html_message_is_sanitised(self):
-        view = poll.warning_view([{"id": "A", "title": "Flood Warning", "phase": "new",
-                                   "issue_time": "2026-10-24T00:00:00Z",
-                                   "expiry_time": "2026-10-25T00:00:00Z",
-                                   "message": "<p>Rising<script>x</script></p>"}], self.store)
-        self.assertEqual(view, {"id": "A", "title": "Flood Warning", "phase": "new",
-                                "issue_time": "2026-10-24T00:00:00Z",
-                                "expiry_time": "2026-10-25T00:00:00Z",
-                                "html": "<p>Rising</p>", "images": []})
+        view = poll.warning_view(
+            [
+                {
+                    "id": "A",
+                    "title": "Flood Warning",
+                    "phase": "new",
+                    "issue_time": "2026-10-24T00:00:00Z",
+                    "expiry_time": "2026-10-25T00:00:00Z",
+                    "message": "<p>Rising<script>x</script></p>",
+                }
+            ],
+            self.store,
+        )
+        self.assertEqual(
+            view,
+            {
+                "id": "A",
+                "title": "Flood Warning",
+                "phase": "new",
+                "issue_time": "2026-10-24T00:00:00Z",
+                "expiry_time": "2026-10-25T00:00:00Z",
+                "html": "<p>Rising</p>",
+                "images": [],
+            },
+        )
 
     def test_summary_without_detail_falls_back(self):
-        view = poll.warning_view([{}, {"id": "A", "short_title": "Sheep Graziers Warning"}],
-                                 self.store)
+        view = poll.warning_view(
+            [{}, {"id": "A", "short_title": "Sheep Graziers Warning"}], self.store
+        )
         self.assertEqual(view["title"], "Sheep Graziers Warning")
         self.assertEqual(view["html"], "")
 
     def test_plain_text_body_is_linkified(self):
         view = poll.warning_view([{"id": "A", "text": "See https://bom.gov.au now"}], self.store)
-        self.assertEqual(view["html"],
-                         'See <a href="https://bom.gov.au">https://bom.gov.au</a> now')
+        self.assertEqual(
+            view["html"], 'See <a href="https://bom.gov.au">https://bom.gov.au</a> now'
+        )
 
 
 if __name__ == "__main__":

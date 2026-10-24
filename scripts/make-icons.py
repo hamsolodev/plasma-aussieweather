@@ -53,9 +53,22 @@ def render(svg_path, edge):
     """SVG_PATH as an RGBA image EDGE pixels square: rendered large and
     downsampled, as the design was chosen from."""
     from PIL import Image
-    png = subprocess.run(["magick", "-background", "none", "-density", "1536", str(svg_path),
-                          "-resize", f"{edge}x{edge}", "png:-"],
-                         check=True, capture_output=True).stdout
+
+    png = subprocess.run(
+        [
+            "magick",
+            "-background",
+            "none",
+            "-density",
+            "1536",
+            str(svg_path),
+            "-resize",
+            f"{edge}x{edge}",
+            "png:-",
+        ],
+        check=True,
+        capture_output=True,
+    ).stdout
     image = Image.open(io.BytesIO(png))
     image.load()
     if image.size != (edge, edge):
@@ -66,6 +79,7 @@ def render(svg_path, edge):
 def stamped_png(image, sha):
     """IMAGE as PNG bytes recording SHA, its source's hash."""
     from PIL.PngImagePlugin import PngInfo
+
     info = PngInfo()
     info.add_text(STAMP_KEY, sha)
     out = io.BytesIO()
@@ -75,14 +89,15 @@ def stamped_png(image, sha):
 
 # --- Reading back: the standard library only, for CI. ---
 
+
 def png_facts(data):
     """(width, height, PNG colour type, the recorded source hash or None)."""
     if data[:8] != b"\x89PNG\r\n\x1a\n":
         raise ValueError("not a PNG")
     position, size, colour, stamp = 8, None, None, None
     while position < len(data):
-        length, kind = struct.unpack(">I4s", data[position:position + 8])
-        body = data[position + 8:position + 8 + length]
+        length, kind = struct.unpack(">I4s", data[position : position + 8])
+        body = data[position + 8 : position + 8 + length]
         if kind == b"IHDR":
             width, height, _, colour = struct.unpack(">IIBB", body[:10])
             size = (width, height)
@@ -125,8 +140,9 @@ def check(root):
         if (width, height) != (edge, edge):
             problems.append(f"{path}: {width}x{height}, wants {edge}x{edge}")
         if stamp != shas[key]:
-            made_from = next((SOURCES[k] for k, sha in shas.items() if sha == stamp),
-                             "an unrecorded source")
+            made_from = next(
+                (SOURCES[k] for k, sha in shas.items() if sha == stamp), "an unrecorded source"
+            )
             problems.append(f"{path}: made from {made_from}, not today's {SOURCES[key]}")
         if colour not in (4, 6):
             problems.append(path + ": no alpha channel, but the tile has transparent corners")

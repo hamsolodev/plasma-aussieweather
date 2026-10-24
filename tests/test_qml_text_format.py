@@ -42,19 +42,46 @@ UI = pathlib.Path(__file__).resolve().parent.parent / "contents" / "ui"
 
 # Types with a textFormat property that show text.
 TEXT_TYPES = {
-    "Text", "TextEdit", "Label", "ToolTip", "TextArea", "Heading", "SelectableLabel",
-    "LinkButton", "UrlButton", "DescriptiveLabel", "ToolTipArea",
+    "Text",
+    "TextEdit",
+    "Label",
+    "ToolTip",
+    "TextArea",
+    "Heading",
+    "SelectableLabel",
+    "LinkButton",
+    "UrlButton",
+    "DescriptiveLabel",
+    "ToolTipArea",
 }
 # Library types that draw their own text, as AutoText or with no textFormat
 # to set, and the properties they draw it from. A TextField's text is what
 # is typed, shown by a TextInput, which has no rich text; its placeholder is
 # drawn as AutoText.
 SELF_DRAWN = {
-    **{name: ("text",) for name in (
-        "Button", "TabButton", "ToolButton", "RoundButton", "DelayButton", "CheckBox",
-        "RadioButton", "Switch", "ItemDelegate", "CheckDelegate", "RadioDelegate",
-        "SwitchDelegate", "SwipeDelegate", "MenuItem", "Action", "InlineMessage",
-        "ListSectionHeader", "Chip")},
+    **{
+        name: ("text",)
+        for name in (
+            "Button",
+            "TabButton",
+            "ToolButton",
+            "RoundButton",
+            "DelayButton",
+            "CheckBox",
+            "RadioButton",
+            "Switch",
+            "ItemDelegate",
+            "CheckDelegate",
+            "RadioDelegate",
+            "SwitchDelegate",
+            "SwipeDelegate",
+            "MenuItem",
+            "Action",
+            "InlineMessage",
+            "ListSectionHeader",
+            "Chip",
+        )
+    },
     "GroupBox": ("title",),
     "PlaceholderMessage": ("text", "explanation"),
     "TextField": ("placeholderText",),
@@ -154,7 +181,7 @@ def bound(bindings, name_pattern):
     for match in re.finditer(r"(?:^|[;\n])\s*(?:" + name_pattern + r")\s*:", bindings):
         depth = 0
         out = []
-        for char in bindings[match.end():]:
+        for char in bindings[match.end() :]:
             if char in ";\n" and depth == 0:
                 break
             depth += (char in "([") - (char in ")]")
@@ -200,8 +227,11 @@ def check(ui):
             elif kind in TEXT_TYPES:
                 examined += 1
                 if text_format != "Text.PlainText":
-                    rich_ok = (text_format == "Text.RichText" and path.name == RICH_TEXT_FILE
-                               and binding(bindings, "text") == RICH_TEXT)
+                    rich_ok = (
+                        text_format == "Text.RichText"
+                        and path.name == RICH_TEXT_FILE
+                        and binding(bindings, "text") == RICH_TEXT
+                    )
                     if rich_ok:
                         exemptions += 1
                     else:
@@ -233,7 +263,6 @@ def check(ui):
 
 
 class TextFormatTest(unittest.TestCase):
-
     def test_every_text_element_renders_plain_text(self):
         examined, exemptions, problems = check(UI)
         self.assertGreater(examined, 30, "too few text elements found: is the scan broken?")
@@ -249,101 +278,168 @@ class CheckerTest(unittest.TestCase):
     # An object added inside an Item in Injected.qml: (QML, the problem it
     # must cause).
     INJECTED: ClassVar[dict[str, tuple[str, str]]] = {
-        "inline delegate":       ("Repeater { delegate: PlasmaComponents.Label { text: w.title } }",
-                                  "textFormat is unstated"),
-        "styled PlainLabel":     ("PlainLabel { textFormat: Text.StyledText; text: w.title }",
-                                  "overrides PlainLabel's textFormat"),
-        "AutoText":              ("Text { textFormat: Text.AutoText; text: w.title }",
-                                  "textFormat is Text.AutoText"),
-        "format in a comment":   ("Text { /* textFormat: Text.PlainText */ text: w.title }",
-                                  "textFormat is unstated"),
-        "format in a string":    ("Text { text: \"textFormat: Text.PlainText\" + w.title }",
-                                  "textFormat is unstated"),
-        "contentItem":           ("Item { property Item contentItem: Text { text: w.title } }",
-                                  "textFormat is unstated"),
-        "bare Label":            ("Label { text: w.title }", "textFormat is unstated"),
-        "rich text elsewhere":   ("Text { textFormat: Text.RichText; text: w.title }",
-                                  "textFormat is Text.RichText"),
-        "message from data":     ("Kirigami.InlineMessage { text: w.title }",
-                                  "text is not constant"),
+        "inline delegate": (
+            "Repeater { delegate: PlasmaComponents.Label { text: w.title } }",
+            "textFormat is unstated",
+        ),
+        "styled PlainLabel": (
+            "PlainLabel { textFormat: Text.StyledText; text: w.title }",
+            "overrides PlainLabel's textFormat",
+        ),
+        "AutoText": (
+            "Text { textFormat: Text.AutoText; text: w.title }",
+            "textFormat is Text.AutoText",
+        ),
+        "format in a comment": (
+            "Text { /* textFormat: Text.PlainText */ text: w.title }",
+            "textFormat is unstated",
+        ),
+        "format in a string": (
+            'Text { text: "textFormat: Text.PlainText" + w.title }',
+            "textFormat is unstated",
+        ),
+        "contentItem": (
+            "Item { property Item contentItem: Text { text: w.title } }",
+            "textFormat is unstated",
+        ),
+        "bare Label": ("Label { text: w.title }", "textFormat is unstated"),
+        "rich text elsewhere": (
+            "Text { textFormat: Text.RichText; text: w.title }",
+            "textFormat is Text.RichText",
+        ),
+        "message from data": ("Kirigami.InlineMessage { text: w.title }", "text is not constant"),
         # The second review's forms.
-        "descriptive label":     ("PlasmaExtras.DescriptiveLabel { text: w.title }",
-                                  "textFormat is unstated"),
-        "link button":           ("Kirigami.LinkButton { text: w.title }", "textFormat is unstated"),
-        "tooltip area":          ("PlasmaCore.ToolTipArea { mainText: w.title }",
-                                  "textFormat is unstated"),
-        "form label from data":  ("Item { Kirigami.FormData.label: w.title }",
-                                  "attached text is not constant"),
-        "imperative format":     ("PlainLabel { Component.onCompleted: textFormat = Text.StyledText }",
-                                  "names textFormat outside a binding"),
-        "Binding":               ("Binding { target: x; property: \"textFormat\"; value: Text.AutoText }",
-                                  "names textFormat in a string"),
-        "PropertyChanges":       ("PropertyChanges { target: x; textFormat: Text.AutoText }",
-                                  "sets textFormat"),
+        "descriptive label": (
+            "PlasmaExtras.DescriptiveLabel { text: w.title }",
+            "textFormat is unstated",
+        ),
+        "link button": ("Kirigami.LinkButton { text: w.title }", "textFormat is unstated"),
+        "tooltip area": ("PlasmaCore.ToolTipArea { mainText: w.title }", "textFormat is unstated"),
+        "form label from data": (
+            "Item { Kirigami.FormData.label: w.title }",
+            "attached text is not constant",
+        ),
+        "imperative format": (
+            "PlainLabel { Component.onCompleted: textFormat = Text.StyledText }",
+            "names textFormat outside a binding",
+        ),
+        "Binding": (
+            'Binding { target: x; property: "textFormat"; value: Text.AutoText }',
+            "names textFormat in a string",
+        ),
+        "PropertyChanges": (
+            "PropertyChanges { target: x; textFormat: Text.AutoText }",
+            "sets textFormat",
+        ),
         # The third review's forms.
-        "alias property":        ("Item { property alias f: x.textFormat }",
-                                  "names textFormat outside a binding"),
-        "set by name":           ("Item { Component.onCompleted: x[\"textFormat\"] = 4 }",
-                                  "names textFormat in a string"),
-        "section header":        ("Kirigami.ListSectionHeader { text: w.title }",
-                                  "text is not constant"),
-        "button with data":      ("PlasmaComponents.Button { text: w.title }", "text is not constant"),
+        "alias property": (
+            "Item { property alias f: x.textFormat }",
+            "names textFormat outside a binding",
+        ),
+        "set by name": (
+            'Item { Component.onCompleted: x["textFormat"] = 4 }',
+            "names textFormat in a string",
+        ),
+        "section header": ("Kirigami.ListSectionHeader { text: w.title }", "text is not constant"),
+        "button with data": ("PlasmaComponents.Button { text: w.title }", "text is not constant"),
         # The fourth review's forms.
-        "data as an argument":   ("PlasmaComponents.Button { text: i18n(\"%1\", w.title) }",
-                                  "text is not constant"),
-        "data added on":         ("PlasmaComponents.TabButton { text: i18n(\"x\") + w.title }",
-                                  "text is not constant"),
-        "check box":             ("QQC2.CheckBox { text: w.title }", "text is not constant"),
-        "menu item":             ("PlasmaComponents.MenuItem { text: w.title }", "text is not constant"),
-        "action":                ("Kirigami.Action { text: w.title }", "text is not constant"),
-        "group box":             ("QQC2.GroupBox { title: w.title }", "title is not constant"),
-        "attached tooltip":      ("Item { QQC2.ToolTip.text: w.title }", "attached text is not constant"),
-        "unaliased type":        ("Heading { text: w.title }", "textFormat is unstated"),
-        "placeholder":           ("PlasmaExtras.PlaceholderMessage { explanation: w.title }",
-                                  "explanation is not constant"),
-        "Object.assign":         ("Item { Component.onCompleted: Object.assign(x, {textFormat: 4}) }",
-                                  "names textFormat outside a binding"),
-        "rich tooltip":          ("PlasmoidItem { toolTipTextFormat: Text.RichText }",
-                                  "toolTipTextFormat is not Text.PlainText"),
-        "unstated tooltip":      ("PlasmoidItem { toolTipMainText: w.title }",
-                                  "toolTipTextFormat is not Text.PlainText"),
-        "format elsewhere":      ("Item { property int f: x.toolTipTextFormat }",
-                                  "names textFormat outside a binding"),
+        "data as an argument": (
+            'PlasmaComponents.Button { text: i18n("%1", w.title) }',
+            "text is not constant",
+        ),
+        "data added on": (
+            'PlasmaComponents.TabButton { text: i18n("x") + w.title }',
+            "text is not constant",
+        ),
+        "check box": ("QQC2.CheckBox { text: w.title }", "text is not constant"),
+        "menu item": ("PlasmaComponents.MenuItem { text: w.title }", "text is not constant"),
+        "action": ("Kirigami.Action { text: w.title }", "text is not constant"),
+        "group box": ("QQC2.GroupBox { title: w.title }", "title is not constant"),
+        "attached tooltip": (
+            "Item { QQC2.ToolTip.text: w.title }",
+            "attached text is not constant",
+        ),
+        "unaliased type": ("Heading { text: w.title }", "textFormat is unstated"),
+        "placeholder": (
+            "PlasmaExtras.PlaceholderMessage { explanation: w.title }",
+            "explanation is not constant",
+        ),
+        "Object.assign": (
+            "Item { Component.onCompleted: Object.assign(x, {textFormat: 4}) }",
+            "names textFormat outside a binding",
+        ),
+        "rich tooltip": (
+            "PlasmoidItem { toolTipTextFormat: Text.RichText }",
+            "toolTipTextFormat is not Text.PlainText",
+        ),
+        "unstated tooltip": (
+            "PlasmoidItem { toolTipMainText: w.title }",
+            "toolTipTextFormat is not Text.PlainText",
+        ),
+        "format elsewhere": (
+            "Item { property int f: x.toolTipTextFormat }",
+            "names textFormat outside a binding",
+        ),
         # The fifth review's forms.
-        "template literal":      ("Item { Component.onCompleted: `${x.textFormat = 2}` }",
-                                  "template literal substitution"),
-        "placeholder text":      ("QQC2.TextField { placeholderText: w.title }",
-                                  "placeholderText is not constant"),
+        "template literal": (
+            "Item { Component.onCompleted: `${x.textFormat = 2}` }",
+            "template literal substitution",
+        ),
+        "placeholder text": (
+            "QQC2.TextField { placeholderText: w.title }",
+            "placeholderText is not constant",
+        ),
     }
 
     # Whole files added to the UI: {file name: (source, the problem it must
     # cause)}.
     INJECTED_FILES: ClassVar[dict[str, tuple[str, str, str]]] = {
-        "type built on PlainLabel": ("Injected.qml", "PlainLabel { textFormat: Text.StyledText }",
-                                     "overrides PlainLabel's textFormat"),
-        "PC.Label": ("Injected.qml",
-                     "import org.kde.plasma.components as PC\nItem { PC.Label { text: w.title } }",
-                     "textFormat is unstated"),
-        "QQ.Text": ("Injected.qml", "import QtQuick as QQ\nQQ.Item { QQ.Text { text: w.title } }",
-                    "textFormat is unstated"),
-        "Basic": ("Injected.qml",
-                  "import QtQuick.Controls.Basic as B\nItem { B.Label { text: w.title } }",
-                  "textFormat is unstated"),
-        "K.FormData": ("Injected.qml",
-                       "import org.kde.kirigami as K\nItem { Item { K.FormData.label: w.title } }",
-                       "attached text is not constant"),
-        "format set in a .js file": ("injected.js", "function f(x) { x.textFormat = 2 }",
-                                     "injected.js names textFormat"),
-        "own type named like a library one": ("Heading.qml", "PlainLabel {}",
-                                              "Heading.qml is named like a library type"),
+        "type built on PlainLabel": (
+            "Injected.qml",
+            "PlainLabel { textFormat: Text.StyledText }",
+            "overrides PlainLabel's textFormat",
+        ),
+        "PC.Label": (
+            "Injected.qml",
+            "import org.kde.plasma.components as PC\nItem { PC.Label { text: w.title } }",
+            "textFormat is unstated",
+        ),
+        "QQ.Text": (
+            "Injected.qml",
+            "import QtQuick as QQ\nQQ.Item { QQ.Text { text: w.title } }",
+            "textFormat is unstated",
+        ),
+        "Basic": (
+            "Injected.qml",
+            "import QtQuick.Controls.Basic as B\nItem { B.Label { text: w.title } }",
+            "textFormat is unstated",
+        ),
+        "K.FormData": (
+            "Injected.qml",
+            "import org.kde.kirigami as K\nItem { Item { K.FormData.label: w.title } }",
+            "attached text is not constant",
+        ),
+        "format set in a .js file": (
+            "injected.js",
+            "function f(x) { x.textFormat = 2 }",
+            "injected.js names textFormat",
+        ),
+        "own type named like a library one": (
+            "Heading.qml",
+            "PlainLabel {}",
+            "Heading.qml is named like a library type",
+        ),
     }
 
     # Edits to the real UI: {name: (file, text, replacement, the problem it
     # must cause)}.
     INJECTED_EDITS: ClassVar[dict[str, tuple[str, str, str, str]]] = {
         "data added to the warning body": (
-            "WarningsTab.qml", "text: modelData.html", "text: modelData.html + modelData.title",
-            "textFormat is Text.RichText"),
+            "WarningsTab.qml",
+            "text: modelData.html",
+            "text: modelData.html + modelData.title",
+            "textFormat is Text.RichText",
+        ),
     }
 
     def problems(self, files=(), edit=None):
@@ -364,11 +460,14 @@ class CheckerTest(unittest.TestCase):
 
     def test_typed_text_is_not_flagged(self):
         # What is typed in a TextField is shown as typed.
-        self.assertEqual(self.problems([("Injected.qml", "Item { QQC2.TextField { text: w.title } }")]), [])
+        self.assertEqual(
+            self.problems([("Injected.qml", "Item { QQC2.TextField { text: w.title } }")]), []
+        )
 
     def assertCaught(self, problems, expected):
-        self.assertTrue(any(expected in problem for problem in problems),
-                        f"{expected!r} not among {problems!r}")
+        self.assertTrue(
+            any(expected in problem for problem in problems), f"{expected!r} not among {problems!r}"
+        )
 
     def test_each_injection_is_caught_by_its_rule(self):
         for name, (snippet, expected) in self.INJECTED.items():
