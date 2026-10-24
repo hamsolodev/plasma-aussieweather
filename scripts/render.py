@@ -40,7 +40,10 @@ from datetime import datetime, timedelta, timezone
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SCHEMES = {"light": "BreezeLight", "dark": "BreezeDark"}
 # Text.TextFormat's values.
-TEXT_FORMATS = {"PlainText": 0, "RichText": 1}
+PLAIN_TEXT, RICH_TEXT, AUTO_TEXT = 0, 1, 2
+# Fewer text items than this means the walk missed some: the fixture
+# builds 108.
+MIN_TEXT_ITEMS = 100
 # Each is FullView's <name>Tab index.
 TABS = ["weather", "radar", "warnings"]
 # Logged by the offscreen setup itself, not by the widget: KWindowSystem has
@@ -262,35 +265,27 @@ def render(options, config_home):
     panel.grabWindow().save(str(path))
     print(f"{path}: panel")
 
-    # Every text item, as built: plain text only, but for the sanitised
-    # warning body. tests/test_qml_text_format.py checks the source; this
-    # catches whatever form it misses. Controls draw their own labels
-    # (AutoText, not configurable); the widget gives them only translated
-    # strings and station names from its own table, and the source check
-    # requires translated button text.
+    # Every text item, as built, shows its text as plain text, but for the
+    # sanitised warning body. tests/test_qml_text_format.py checks the
+    # source; this catches whatever form it misses. Text items Plasma's
+    # components declare inside themselves (a button's label) render
+    # AutoText, which the widget cannot change: those pass while their text
+    # holds no markup, and the source check gives those components only
+    # translated text.
     rich_text = {"warningBody"}
-    controls = ("QQuickAbstractButton", "QQuickComboBox")
+    widget_ui = (ROOT / "contents" / "ui").as_uri() + "/"
 
-    def inside_control(item):
-        """Whether ITEM belongs to a control, by object or visual parent
-        (a combo box's drop-down entries are reached only the second way)."""
-        pending = [item]
-        seen = set()
-        while pending:
-            obj = pending.pop()
-            key = shiboken6.getCppPointer(obj)[0]
-            if key in seen:
-                continue
-            seen.add(key)
-            if obj is not item and any(obj.inherits(c) for c in controls):
-                return True
-            if obj.parent() is not None:
-                pending.append(obj.parent())
-            if obj.inherits("QQuickItem"):
-                parent_item = shiboken6.wrapInstance(key, QQuickItem).parentItem()
-                if parent_item is not None:
-                    pending.append(parent_item)
-        return False
+    def declared_by_widget(item):
+        context = QQmlEngine.contextForObject(item)
+        return context is not None and context.baseUrl().toString().startswith(widget_ui)
+
+    def shows_plain_text(item, text_format):
+        if item.objectName() in rich_text and declared_by_widget(item):
+            return text_format == RICH_TEXT
+        if text_format == PLAIN_TEXT:
+            return True
+        return (text_format == AUTO_TEXT and not declared_by_widget(item)
+                and "<" not in str(item.property("text")))
 
     def everything(*roots):
         """Every object under ROOTS, by object tree and by item tree: a
@@ -310,20 +305,19 @@ def render(options, config_home):
         return list(found.values())
 
     text_items = [item for item in everything(window, panel)
-                  if (item.inherits("QQuickText") or item.inherits("QQuickTextEdit"))
-                  and not inside_control(item)]
+                  if item.inherits("QQuickText") or item.inherits("QQuickTextEdit")]
     for item in text_items:
-        expected = TEXT_FORMATS["RichText" if item.objectName() in rich_text else "PlainText"]
         # Read through the engine: PySide cannot convert the C++ enum.
-        actual = engine.newQObject(item).property("textFormat").toInt()
-        if actual != expected:
+        text_format = engine.newQObject(item).property("textFormat").toInt()
+        if not shows_plain_text(item, text_format):
             problems.append("%s %r renders format %d: %r" % (item.metaObject().className(),
-                                                             item.objectName(), actual,
+                                                             item.objectName(), text_format,
                                                              str(item.property("text"))[:60]))
-    if not text_items:
-        problems.append("no text items found to check")
-    else:
-        print("%d text items checked for plain text" % len(text_items))
+    print("%d text items checked for plain text, %d of them declared by the widget"
+          % (len(text_items), sum(map(declared_by_widget, text_items))))
+    if len(text_items) < MIN_TEXT_ITEMS:
+        problems.append("only %d text items found to check: is the walk broken?"
+                        % len(text_items))
 
     unconfigured = window.findChild(QObject, "unconfiguredWeather")
     expected = "No location set. Choose one in the widget's settings."

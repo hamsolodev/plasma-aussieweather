@@ -11,17 +11,21 @@ comes from the BoM API. So:
 - an element that has a textFormat states Text.PlainText, except the one
   sanitised warning body (WarningsTab.qml), which is RichText;
 - PlainLabel, and the types built on it, never override its textFormat;
-- Kirigami.InlineMessage, which has no textFormat (it shows its text in a
-  SelectableLabel), and Kirigami.FormData.label are given only translated
-  string literals;
-- textFormat is never set any other way: imperatively, or through a
-  Binding or PropertyChanges.
+- the PlasmoidItem's tooltip states Text.PlainText;
+- library types that draw their own text, as AutoText or with no
+  textFormat to set (buttons, tabs, menu items, actions, Kirigami's
+  messages and headers), and the attached FormData.label and ToolTip.text,
+  are given only translated string literals, whose only arguments are
+  counts (".length");
+- textFormat is named nowhere else: not in script, an alias, a Binding,
+  a PropertyChanges or a string.
 
-Types are matched under the import names below, whatever alias a file
-gives a module.
+Types are matched by name alone, whatever module or alias they come from.
+ComboBox models are not checked: the widget's come from its own tables.
 
 Comments and string literals are blanked before checking, so neither can
-satisfy or dodge a rule.
+satisfy or dodge a rule. scripts/render.py checks every text item the
+widget declares as it is built, which catches what a source check misses.
 """
 
 import pathlib
@@ -31,42 +35,28 @@ import unittest
 
 UI = pathlib.Path(__file__).resolve().parent.parent / "contents" / "ui"
 
-# The import name each module's types are matched under.
-MODULE_NAMES = {
-    "QtQuick": "",
-    "QtQuick.Controls": "QQC2",
-    "QtQuick.Controls.Basic": "QQC2",
-    "QtQuick.Templates": "QQC2",
-    "org.kde.plasma.components": "PlasmaComponents",
-    "org.kde.plasma.extras": "PlasmaExtras",
-    "org.kde.plasma.core": "PlasmaCore",
-    "org.kde.kirigami": "Kirigami",
-}
-IMPORT = re.compile(r"^\s*import\s+([\w.]+)(?:\s+[\d.]+)?\s+as\s+(\w+)", re.MULTILINE)
-
 # Types with a textFormat property that show text.
 TEXT_TYPES = {
-    "Text", "TextEdit", "Label", "ToolTip", "TextArea",
-    "PlasmaComponents.Label", "PlasmaComponents.ToolTip", "PlasmaComponents.TextArea",
-    "QQC2.Label", "QQC2.ToolTip", "QQC2.TextArea",
-    "Kirigami.Heading", "Kirigami.SelectableLabel", "Kirigami.LinkButton",
-    "Kirigami.UrlButton", "PlasmaExtras.Heading", "PlasmaExtras.DescriptiveLabel",
-    "PlasmaCore.ToolTipArea",
+    "Text", "TextEdit", "Label", "ToolTip", "TextArea", "Heading", "SelectableLabel",
+    "LinkButton", "UrlButton", "DescriptiveLabel", "ToolTipArea",
 }
-CONSTANT_TEXT_TYPES = {
-    "Kirigami.InlineMessage", "InlineMessage", "Kirigami.ListSectionHeader",
-    "Kirigami.PlaceholderMessage", "Kirigami.Chip",
+# Library types that draw their own text, as AutoText or with no textFormat
+# to set, and the properties they draw it from.
+SELF_DRAWN_TYPES = {
+    "Button", "TabButton", "ToolButton", "RoundButton", "DelayButton", "CheckBox",
+    "RadioButton", "Switch", "ItemDelegate", "CheckDelegate", "RadioDelegate",
+    "SwitchDelegate", "SwipeDelegate", "MenuItem", "Action", "GroupBox",
+    "InlineMessage", "ListSectionHeader", "PlaceholderMessage", "Chip",
 }
-# Controls draw their labels as AutoText, which cannot be changed: their
-# text must be translated (i18n), never data.
-BUTTON_TYPES = {
-    "Button", "TabButton", "ToolButton", "ItemDelegate",
-    "QQC2.Button", "QQC2.TabButton", "QQC2.ToolButton", "QQC2.ItemDelegate",
-    "PlasmaComponents.Button", "PlasmaComponents.TabButton", "PlasmaComponents.ToolButton",
-    "PlasmaComponents.ItemDelegate",
-}
-TRANSLATED_CALL = re.compile(r"i18n[cp]*\(S.*\)")
-TRANSLATED_LITERALS = re.compile(r"(i18nc?\(S(\+S)*(,S(\+S)*)?\)\+?)+")
+SELF_DRAWN_PROPERTIES = ("text", "title", "explanation")
+# Attached properties drawn as AutoText.
+ATTACHED_TEXT = (r"(?:\w+\.)*FormData\.label", r"(?:\w+\.)*ToolTip\.text")
+# i18n calls on string literals, whose only other arguments are counts.
+_LITERALS = r"S(?:\+S)*"
+_CALL = r"i18n[cp]*\(%s(?:,%s)*(?:,[\w.]+\.length)*\)" % (_LITERALS, _LITERALS)
+TRANSLATED = re.compile(r"%s(?:\+%s)*" % (_CALL, _CALL))
+FORMAT_NAMES = re.compile(r"\b(?:textFormat|toolTipTextFormat)\b")
+FORMAT_STRING = re.compile(r"""(["'`])\s*(?:textFormat|toolTipTextFormat)\s*\1""")
 # The one element allowed to render RichText: the warning body, which
 # poll.py's allowlist has already rebuilt.
 RICH_TEXT_FILE = "WarningsTab.qml"
@@ -119,33 +109,22 @@ def own_bindings(code, open_brace):
     return "".join(out)
 
 
-def canonical(kind, aliases):
-    """KIND with its import alias replaced by the name in MODULE_NAMES."""
-    prefix, dot, name = kind.rpartition(".")
-    if not dot:
-        return kind
-    module = aliases.get(prefix, prefix)
-    return module + "." + name if module else name
-
-
-def import_aliases(source):
-    """{alias: name in MODULE_NAMES} for the imports in SOURCE."""
-    return {alias: MODULE_NAMES.get(module, alias) for module, alias in IMPORT.findall(source)}
+def type_name(kind):
+    """KIND without its module or alias: "Kirigami.Heading" is Heading."""
+    return kind.rpartition(".")[2]
 
 
 def declarations(path):
-    """(type, own bindings) for every object declared in PATH."""
-    source = path.read_text()
-    aliases = import_aliases(source)
-    code = blank_comments_and_strings(source)
+    """(type name, own bindings) for every object declared in PATH."""
+    code = blank_comments_and_strings(path.read_text())
     for match in DECLARATION.finditer(code):
-        yield canonical(match.group(1), aliases), own_bindings(code, match.end() - 1)
+        yield type_name(match.group(1)), own_bindings(code, match.end() - 1)
 
 
 def root_type(path):
     code = blank_comments_and_strings(path.read_text())
     match = DECLARATION.search(code)
-    return match.group(1) if match else None
+    return type_name(match.group(1)) if match else None
 
 
 def plain_label_types(ui):
@@ -159,20 +138,27 @@ def plain_label_types(ui):
         found |= more
 
 
+def bound(bindings, name_pattern):
+    """The expressions bound to each property whose name matches the regex
+    NAME_PATTERN, each read on past line ends while brackets are open."""
+    for match in re.finditer(r"(?:^|[;\n])\s*(?:" + name_pattern + r")\s*:", bindings):
+        depth = 0
+        out = []
+        for char in bindings[match.end():]:
+            if char in ";\n" and depth == 0:
+                break
+            depth += (char in "([") - (char in ")]")
+            out.append(char)
+        yield "".join(out).strip()
+
+
 def binding(bindings, name):
-    """The expression bound to NAME, read on past line ends while brackets
-    are open; None if NAME is not bound."""
-    match = re.search(r"(?:^|[;\n])\s*" + re.escape(name) + r"\s*:", bindings)
-    if not match:
-        return None
-    depth = 0
-    out = []
-    for char in bindings[match.end():]:
-        if char in ";\n" and depth == 0:
-            break
-        depth += (char in "([") - (char in ")]")
-        out.append(char)
-    return "".join(out).strip()
+    """The expression bound to NAME; None if NAME is not bound."""
+    return next(bound(bindings, re.escape(name)), None)
+
+
+def is_translated(expression):
+    return TRANSLATED.fullmatch(re.sub(r"\s", "", expression)) is not None
 
 
 def check(ui):
@@ -184,51 +170,48 @@ def check(ui):
     for path in sorted(ui.glob("*.qml")):
         source = path.read_text()
         code = blank_comments_and_strings(source)
-        kirigami_aliases = ["Kirigami"] + [a for a, m in import_aliases(source).items()
-                                           if m == "Kirigami" and a != "Kirigami"]
+        formats_bound = 0
         for kind, bindings in declarations(path):
             where = "%s %s" % (path.name, kind)
             text_format = binding(bindings, "textFormat")
+            tooltip_format = binding(bindings, "toolTipTextFormat")
+            formats_bound += (text_format is not None) + (tooltip_format is not None)
             if kind in plain and path.stem != kind:
                 examined += 1
                 if text_format is not None:
                     problems.append(where + " overrides PlainLabel's textFormat")
             elif kind in TEXT_TYPES:
                 examined += 1
-                if text_format == "Text.PlainText":
-                    continue
-                rich_ok = (text_format == "Text.RichText" and path.name == RICH_TEXT_FILE
-                           and RICH_TEXT_BINDING in bindings)
-                if rich_ok:
-                    exemptions += 1
-                else:
-                    problems.append("%s textFormat is %s" % (where, text_format or "unstated"))
-            elif kind in CONSTANT_TEXT_TYPES:
-                examined += 1
-                text = re.sub(r"\s", "", binding(bindings, "text") or "")
-                if not TRANSLATED_LITERALS.fullmatch(text):
-                    problems.append(where + " text is not translated literals only")
-            elif kind in BUTTON_TYPES:
-                examined += 1
-                text = re.sub(r"\s", "", binding(bindings, "text") or "")
-                if text and not TRANSLATED_CALL.fullmatch(text):
-                    problems.append(where + " text is not translated")
-            elif kind == "PropertyChanges" and text_format is not None:
+                if text_format != "Text.PlainText":
+                    rich_ok = (text_format == "Text.RichText" and path.name == RICH_TEXT_FILE
+                               and RICH_TEXT_BINDING in bindings)
+                    if rich_ok:
+                        exemptions += 1
+                    else:
+                        problems.append("%s textFormat is %s" % (where, text_format or "unstated"))
+            elif text_format is not None:
                 problems.append(where + " sets textFormat")
-            for alias in kirigami_aliases:
-                label = binding(bindings, alias + ".FormData.label")
-                if label is not None:
+            if kind == "PlasmoidItem":
+                examined += 1
+                if tooltip_format != "Text.PlainText":
+                    problems.append(where + " toolTipTextFormat is not Text.PlainText")
+            elif tooltip_format is not None:
+                problems.append(where + " sets toolTipTextFormat")
+            if kind in SELF_DRAWN_TYPES:
+                examined += 1
+                for name in SELF_DRAWN_PROPERTIES:
+                    text = binding(bindings, name)
+                    if text is not None and not is_translated(text):
+                        problems.append("%s %s is not translated literals only" % (where, name))
+            for pattern in ATTACHED_TEXT:
+                for text in bound(bindings, pattern):
                     examined += 1
-                    if not TRANSLATED_LITERALS.fullmatch(re.sub(r"\s", "", label)):
-                        problems.append(where + " FormData.label is not translated literals only")
-        if re.search(r"textFormat\s*=(?!=)", code):
-            problems.append(path.name + " assigns textFormat in script")
-        if re.search(r"""property\s*:\s*["']textFormat["']""", source):
-            problems.append(path.name + " binds textFormat through a Binding")
-        if re.search(r"""\[\s*["']textFormat["']\s*\]""", source):
-            problems.append(path.name + " reaches textFormat by name")
-        if re.search(r"\balias\s+\w+\s*:\s*[\w.]*\btextFormat\b", code):
-            problems.append(path.name + " aliases a textFormat")
+                    if not is_translated(text):
+                        problems.append(where + " attached text is not translated literals only")
+        if len(FORMAT_NAMES.findall(code)) != formats_bound:
+            problems.append(path.name + " names textFormat outside a binding of it")
+        if FORMAT_STRING.search(source):
+            problems.append(path.name + " names textFormat in a string")
     return examined, exemptions, problems
 
 
@@ -268,6 +251,20 @@ class CheckerTest(unittest.TestCase):
         "set by name":           "Item { Component.onCompleted: x[\"textFormat\"] = 4 }",
         "section header":        "Kirigami.ListSectionHeader { text: w.title }",
         "button with data":      "PlasmaComponents.Button { text: w.title }",
+        # The fourth review's forms.
+        "data as an argument":   "PlasmaComponents.Button { text: i18n(\"%1\", w.title) }",
+        "data added on":         "PlasmaComponents.TabButton { text: i18n(\"x\") + w.title }",
+        "check box":             "QQC2.CheckBox { text: w.title }",
+        "menu item":             "PlasmaComponents.MenuItem { text: w.title }",
+        "action":                "Kirigami.Action { text: w.title }",
+        "group box":             "QQC2.GroupBox { title: w.title }",
+        "attached tooltip":      "Item { QQC2.ToolTip.text: w.title }",
+        "unaliased type":        "Heading { text: w.title }",
+        "placeholder":           "PlasmaExtras.PlaceholderMessage { explanation: w.title }",
+        "Object.assign":         "Item { Component.onCompleted: Object.assign(x, {textFormat: 4}) }",
+        "rich tooltip":          "PlasmoidItem { toolTipTextFormat: Text.RichText }",
+        "unstated tooltip":      "PlasmoidItem { toolTipMainText: w.title }",
+        "format elsewhere":      "Item { property int f: x.toolTipTextFormat }",
     }
 
     # Under an alias the module's types must still be recognised.
