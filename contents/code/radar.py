@@ -20,6 +20,7 @@ https by the widget. Every outcome is one JSON object on stdout carrying
 import ftplib
 import json
 import re
+import resource
 import signal
 import sys
 from datetime import datetime, timedelta, timezone
@@ -33,6 +34,18 @@ FRAME_COUNT = 6
 MAX_FRAME_AGE = timedelta(hours=1)
 MAX_CLOCK_SKEW = timedelta(minutes=10)
 STATION = re.compile(r"IDR[0-9]{2,3}[1-4]")
+
+
+# A backstop for anything else a hostile reply could make grow: the script
+# runs out of memory, not the machine. It needs under 30 MB.
+MEMORY_LIMIT = 512 * 1024 * 1024
+
+
+def limit_memory():
+    """Cap this process's address space at MEMORY_LIMIT."""
+    _, hard = resource.getrlimit(resource.RLIMIT_AS)
+    limit = MEMORY_LIMIT if hard == resource.RLIM_INFINITY else min(hard, MEMORY_LIMIT)
+    resource.setrlimit(resource.RLIMIT_AS, (limit, hard))
 
 
 def is_station(station):
@@ -57,6 +70,27 @@ class ListingTimedOut(Exception):
     """The listing took longer than LISTING_DEADLINE."""
 
 
+class BoundedFTP(ftplib.FTP):
+    """ftplib's client, refusing a multi-line reply longer than
+    MAX_REPLY_LINES. On the plain connection anyone on the path can write
+    the replies, and ftplib joins a multi-line one without limit (it caps
+    only each line's length)."""
+
+    MAX_REPLY_LINES = 100
+
+    def getmultiline(self):
+        line = self.getline()
+        if line[3:4] != "-":
+            return line
+        code = line[:3]
+        for _ in range(self.MAX_REPLY_LINES):
+            next_line = self.getline()
+            line = line + "\n" + next_line
+            if next_line[:3] == code and next_line[3:4] != "-":
+                return line
+        raise ListingTooLarge()
+
+
 class NameCollector:
     """Collects an NLST listing's names, refusing an endless one."""
 
@@ -74,7 +108,7 @@ class NameCollector:
 def list_names():
     """Every file name in BoM's radar directory."""
     collect = NameCollector()
-    ftp = ftplib.FTP(FTP_HOST, timeout=15)
+    ftp = BoundedFTP(FTP_HOST, timeout=15)
     try:
         ftp.login()
         ftp.cwd(FTP_DIR)
@@ -110,7 +144,7 @@ def frame_names(names, station, now):
     The listing arrives over unencrypted FTP, so names must match BoM's
     pattern exactly (STATION.T.yyyymmddhhmm.png, UTC) to be used.
     """
-    pattern = re.compile(re.escape(station) + r"\.T\.(\d{12})\.png")
+    pattern = re.compile(re.escape(station) + r"\.T\.([0-9]{12})\.png")
     frames = []
     for name in names:
         match = pattern.fullmatch(name)
@@ -161,4 +195,5 @@ def main(argv):
 
 
 if __name__ == "__main__":
+    limit_memory()
     main(sys.argv)

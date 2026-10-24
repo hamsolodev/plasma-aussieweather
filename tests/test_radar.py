@@ -6,6 +6,9 @@ import contextlib
 import ftplib
 import io
 import json
+import pathlib
+import subprocess
+import sys
 import time
 import unittest
 from unittest import mock
@@ -14,6 +17,7 @@ from datetime import datetime, timezone
 from codeloader import load
 
 radar = load("radar")
+TESTS = pathlib.Path(__file__).resolve().parent
 
 NOW = datetime(2026, 10, 24, 1, 0, tzinfo=timezone.utc)
 
@@ -42,6 +46,11 @@ class FrameNamesTest(unittest.TestCase):
     def test_frames_older_than_an_hour_are_dropped(self):
         names = ["IDR022.T.202610232359.png", frame(0), frame(30)]
         self.assertEqual(radar.frame_names(names, "IDR022", NOW), [frame(0), frame(30)])
+
+    def test_timestamps_are_ascii_digits(self):
+        # strptime's %Y reads any Unicode digit.
+        self.assertEqual(radar.frame_names(["IDR022.T.٢٠٢٦10240030.png", frame(30)], "IDR022", NOW),
+                         [frame(30)])
 
     def test_impossible_and_future_timestamps_are_dropped(self):
         names = [frame(30), "IDR022.T.202613240030.png", "IDR022.T.202610240130.png"]
@@ -102,6 +111,36 @@ class MainTest(unittest.TestCase):
         self.assertEqual((result["ok"], result["error"], result["permanent"]),
                          (False, "network", False))
         self.assertIn("Connection refused", result["detail"])
+
+
+class BoundedFtpTest(unittest.TestCase):
+
+    def test_endless_multiline_reply_is_cut_off(self):
+        # A banner of "220-" lines that never ends grew radar.py to
+        # gigabytes within the listing's deadline.
+        ftp = radar.BoundedFTP()
+        ftp.getline = lambda: "220-more"
+        with self.assertRaises(radar.ListingTooLarge):
+            ftp.getmultiline()
+
+    def test_ordinary_multiline_reply(self):
+        ftp = radar.BoundedFTP()
+        lines = iter(["220-Welcome", "220-to BoM", "220 Ready"])
+        ftp.getline = lambda: next(lines)
+        self.assertEqual(ftp.getmultiline(), "220-Welcome\n220-to BoM\n220 Ready")
+
+
+class MemoryLimitTest(unittest.TestCase):
+
+    def test_scripts_cap_their_own_memory(self):
+        for name in ("radar", "poll"):
+            code = ("import resource, sys; sys.path.insert(0, %r)\n"
+                    "from codeloader import load\n"
+                    "load(%r).limit_memory()\n"
+                    "print(resource.getrlimit(resource.RLIMIT_AS)[0])" % (str(TESTS), name))
+            out = subprocess.run([sys.executable, "-I", "-B", "-c", code],
+                                 capture_output=True, text=True, check=True).stdout
+            self.assertEqual(int(out), 512 * 1024 * 1024, name)
 
 
 class NameCollectorTest(unittest.TestCase):

@@ -25,6 +25,7 @@ import json
 import os
 import pathlib
 import re
+import resource
 import struct
 import sys
 import tempfile
@@ -36,6 +37,17 @@ from datetime import datetime, timezone
 from html.parser import HTMLParser
 
 API = "https://api.weather.bom.gov.au/v1"
+
+# A backstop for anything else a hostile reply could make grow: the script
+# runs out of memory, not the machine. It needs under 30 MB.
+MEMORY_LIMIT = 512 * 1024 * 1024
+
+
+def limit_memory():
+    """Cap this process's address space at MEMORY_LIMIT."""
+    _, hard = resource.getrlimit(resource.RLIMIT_AS)
+    limit = MEMORY_LIMIT if hard == resource.RLIM_INFINITY else min(hard, MEMORY_LIMIT)
+    resource.setrlimit(resource.RLIMIT_AS, (limit, hard))
 # The states and territories as BoM names them; OT is the other
 # territories (Norfolk, Christmas and the Cocos Islands).
 STATES = {"ACT", "NSW", "NT", "OT", "QLD", "SA", "TAS", "VIC", "WA"}
@@ -533,4 +545,5 @@ def main(argv):
 
 
 if __name__ == "__main__":
+    limit_memory()
     main(sys.argv)
