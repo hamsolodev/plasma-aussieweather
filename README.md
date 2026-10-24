@@ -38,7 +38,7 @@ UV index, severe weather warnings, and an animated rain radar loop.
 - **Warnings tab:** appears only while warnings are current for your
   location; full warning text in a scrollable list, plus a banner on the
   Weather tab
-- **Radar stations:** all 68 active BoM radar sites, enumerated with their
+- **Radar stations:** all 69 active BoM radar sites, enumerated with their
   available ranges (512/256/128/64 km), selectable by name — no product IDs
   to look up
 
