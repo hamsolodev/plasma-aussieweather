@@ -78,6 +78,19 @@ Window {
         interval: 600000
         weather: unconfigured
     }
+    // And with one: a location's first evaluation signals a change while
+    // WeatherSource is being made, which an empty one does not. "Mt" is
+    // too short for BoM to search, so poll.py answers it at once too.
+    WeatherModel {
+        id: configured
+        objectName: "configuredWeather"
+    }
+    WeatherSource {
+        config: ({ locationSearch: "Mt", lastLocationSearch: "", lastGeohash: "", lastLocationName: "" })
+        version: "render"
+        interval: 600000
+        weather: configured
+    }
 
     FullView {
         id: view

@@ -354,17 +354,21 @@ def render(options, config_home):
     if not marked_items:
         problems.append("no text item shows the marked-up poll: is it applied?")
 
-    unconfigured = window.findChild(QObject, "unconfiguredWeather")
-    expected = "No location set. Choose one in the widget's settings."
-    for _ in range(100):
-        if unconfigured.property("errorText"):
-            break
-        settle(0.1)
-    said = unconfigured.property("errorText")
-    if said == expected:
-        print("WeatherSource ran poll.py: " + said)
-    else:
-        problems.append("WeatherSource with no location said %r, not %r" % (said, expected))
+    # Each WeatherSource's first poll, at start, must run: poll.py answers
+    # both of these at once, without the network.
+    for name, location, expected in (
+            ("unconfiguredWeather", "no location", "No location set. Choose one in the widget's settings."),
+            ("configuredWeather", "the location Mt", "Location not found: Mt")):
+        weather = window.findChild(QObject, name)
+        for _ in range(100):
+            if weather.property("errorText"):
+                break
+            settle(0.1)
+        said = weather.property("errorText")
+        if said == expected:
+            print("WeatherSource with %s ran poll.py: %s" % (location, said))
+        else:
+            problems.append("WeatherSource with %s said %r, not %r" % (location, said, expected))
 
     if network:
         print(f"note: {len(network)} radar image(s) failed to load from BoM", file=sys.stderr)

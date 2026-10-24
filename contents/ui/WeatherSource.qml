@@ -34,6 +34,12 @@ QtObject {
     property string _geohash: ""
     property real _lastPollMs: 0
     property int _retryCount: 0
+    // Set once everything here is made, on the event loop's next turn, as in
+    // RadarSource: a poll asked of the script runner before then is lost,
+    // yet would count as an attempt, and none would follow for an interval.
+    // Until then refresh() does nothing, and the location's first
+    // evaluation, which signals a change, is not taken for one.
+    property bool _ready: false
 
     // Start from the last successful lookup so the widget works across
     // restarts without waiting for a fresh one, but only if that lookup was
@@ -45,10 +51,15 @@ QtObject {
             if (config.lastGeohash) _geohash = config.lastGeohash
             if (config.lastLocationName) weather.locationName = config.lastLocationName
         }
-        _due.start()
+        Qt.callLater(() => {
+            _ready = true
+            _due.start()
+        })
     }
 
     onLocationSearchChanged: {
+        if (!_ready)
+            return
         _geohash = ""
         config.lastGeohash        = ""
         config.lastLocationName   = ""
@@ -61,6 +72,8 @@ QtObject {
     }
 
     function refresh() {
+        if (!_ready)
+            return
         _lastPollMs = Date.now()
         _poller.run([version, _geohash, locationSearch])
     }
