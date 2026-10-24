@@ -39,6 +39,8 @@ from datetime import datetime, timedelta, timezone
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SCHEMES = {"light": "BreezeLight", "dark": "BreezeDark"}
+# Text.TextFormat's values.
+TEXT_FORMATS = {"PlainText": 0, "RichText": 1}
 # Each is FullView's <name>Tab index.
 TABS = ["weather", "radar", "warnings"]
 # Logged by the offscreen setup itself, not by the widget: KWindowSystem has
@@ -182,7 +184,7 @@ def render(options, config_home):
     from PySide6.QtCore import QObject, QTimer, QUrl, qInstallMessageHandler, QtMsgType
     from PySide6.QtGui import QGuiApplication, QWindow
     from PySide6.QtQml import QQmlApplicationEngine, QQmlComponent, QQmlEngine
-    from PySide6.QtQuick import QQuickWindow
+    from PySide6.QtQuick import QQuickItem, QQuickWindow
     import shiboken6
 
     problems = []
@@ -259,6 +261,69 @@ def render(options, config_home):
     path = options.outdir / f"{options.scheme}-panel.png"
     panel.grabWindow().save(str(path))
     print(f"{path}: panel")
+
+    # Every text item, as built: plain text only, but for the sanitised
+    # warning body. tests/test_qml_text_format.py checks the source; this
+    # catches whatever form it misses. Controls draw their own labels
+    # (AutoText, not configurable); the widget gives them only translated
+    # strings and station names from its own table, and the source check
+    # requires translated button text.
+    rich_text = {"warningBody"}
+    controls = ("QQuickAbstractButton", "QQuickComboBox")
+
+    def inside_control(item):
+        """Whether ITEM belongs to a control, by object or visual parent
+        (a combo box's drop-down entries are reached only the second way)."""
+        pending = [item]
+        seen = set()
+        while pending:
+            obj = pending.pop()
+            key = shiboken6.getCppPointer(obj)[0]
+            if key in seen:
+                continue
+            seen.add(key)
+            if obj is not item and any(obj.inherits(c) for c in controls):
+                return True
+            if obj.parent() is not None:
+                pending.append(obj.parent())
+            if obj.inherits("QQuickItem"):
+                parent_item = shiboken6.wrapInstance(key, QQuickItem).parentItem()
+                if parent_item is not None:
+                    pending.append(parent_item)
+        return False
+
+    def everything(*roots):
+        """Every object under ROOTS, by object tree and by item tree: a
+        Repeater's delegates are in the second only, a popup's contents in
+        the first only."""
+        found = {}
+        pending = list(roots)
+        while pending:
+            obj = pending.pop()
+            key = shiboken6.getCppPointer(obj)[0]
+            if key in found:
+                continue
+            found[key] = obj
+            pending.extend(obj.children())
+            if obj.inherits("QQuickItem"):
+                pending.extend(shiboken6.wrapInstance(key, QQuickItem).childItems())
+        return list(found.values())
+
+    text_items = [item for item in everything(window, panel)
+                  if (item.inherits("QQuickText") or item.inherits("QQuickTextEdit"))
+                  and not inside_control(item)]
+    for item in text_items:
+        expected = TEXT_FORMATS["RichText" if item.objectName() in rich_text else "PlainText"]
+        # Read through the engine: PySide cannot convert the C++ enum.
+        actual = engine.newQObject(item).property("textFormat").toInt()
+        if actual != expected:
+            problems.append("%s %r renders format %d: %r" % (item.metaObject().className(),
+                                                             item.objectName(), actual,
+                                                             str(item.property("text"))[:60]))
+    if not text_items:
+        problems.append("no text items found to check")
+    else:
+        print("%d text items checked for plain text" % len(text_items))
 
     unconfigured = window.findChild(QObject, "unconfiguredWeather")
     expected = "No location set. Choose one in the widget's settings."

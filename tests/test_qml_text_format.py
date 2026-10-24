@@ -33,7 +33,10 @@ UI = pathlib.Path(__file__).resolve().parent.parent / "contents" / "ui"
 
 # The import name each module's types are matched under.
 MODULE_NAMES = {
+    "QtQuick": "",
     "QtQuick.Controls": "QQC2",
+    "QtQuick.Controls.Basic": "QQC2",
+    "QtQuick.Templates": "QQC2",
     "org.kde.plasma.components": "PlasmaComponents",
     "org.kde.plasma.extras": "PlasmaExtras",
     "org.kde.plasma.core": "PlasmaCore",
@@ -50,7 +53,19 @@ TEXT_TYPES = {
     "Kirigami.UrlButton", "PlasmaExtras.Heading", "PlasmaExtras.DescriptiveLabel",
     "PlasmaCore.ToolTipArea",
 }
-CONSTANT_TEXT_TYPES = {"Kirigami.InlineMessage", "InlineMessage"}
+CONSTANT_TEXT_TYPES = {
+    "Kirigami.InlineMessage", "InlineMessage", "Kirigami.ListSectionHeader",
+    "Kirigami.PlaceholderMessage", "Kirigami.Chip",
+}
+# Controls draw their labels as AutoText, which cannot be changed: their
+# text must be translated (i18n), never data.
+BUTTON_TYPES = {
+    "Button", "TabButton", "ToolButton", "ItemDelegate",
+    "QQC2.Button", "QQC2.TabButton", "QQC2.ToolButton", "QQC2.ItemDelegate",
+    "PlasmaComponents.Button", "PlasmaComponents.TabButton", "PlasmaComponents.ToolButton",
+    "PlasmaComponents.ItemDelegate",
+}
+TRANSLATED_CALL = re.compile(r"i18n[cp]*\(S.*\)")
 TRANSLATED_LITERALS = re.compile(r"(i18nc?\(S(\+S)*(,S(\+S)*)?\)\+?)+")
 # The one element allowed to render RichText: the warning body, which
 # poll.py's allowlist has already rebuilt.
@@ -107,13 +122,21 @@ def own_bindings(code, open_brace):
 def canonical(kind, aliases):
     """KIND with its import alias replaced by the name in MODULE_NAMES."""
     prefix, dot, name = kind.rpartition(".")
-    return aliases.get(prefix, prefix) + dot + name if dot else kind
+    if not dot:
+        return kind
+    module = aliases.get(prefix, prefix)
+    return module + "." + name if module else name
+
+
+def import_aliases(source):
+    """{alias: name in MODULE_NAMES} for the imports in SOURCE."""
+    return {alias: MODULE_NAMES.get(module, alias) for module, alias in IMPORT.findall(source)}
 
 
 def declarations(path):
     """(type, own bindings) for every object declared in PATH."""
     source = path.read_text()
-    aliases = {alias: MODULE_NAMES.get(module, alias) for module, alias in IMPORT.findall(source)}
+    aliases = import_aliases(source)
     code = blank_comments_and_strings(source)
     for match in DECLARATION.finditer(code):
         yield canonical(match.group(1), aliases), own_bindings(code, match.end() - 1)
@@ -159,6 +182,10 @@ def check(ui):
     exemptions = 0
     problems = []
     for path in sorted(ui.glob("*.qml")):
+        source = path.read_text()
+        code = blank_comments_and_strings(source)
+        kirigami_aliases = ["Kirigami"] + [a for a, m in import_aliases(source).items()
+                                           if m == "Kirigami" and a != "Kirigami"]
         for kind, bindings in declarations(path):
             where = "%s %s" % (path.name, kind)
             text_format = binding(bindings, "textFormat")
@@ -181,19 +208,27 @@ def check(ui):
                 text = re.sub(r"\s", "", binding(bindings, "text") or "")
                 if not TRANSLATED_LITERALS.fullmatch(text):
                     problems.append(where + " text is not translated literals only")
+            elif kind in BUTTON_TYPES:
+                examined += 1
+                text = re.sub(r"\s", "", binding(bindings, "text") or "")
+                if text and not TRANSLATED_CALL.fullmatch(text):
+                    problems.append(where + " text is not translated")
             elif kind == "PropertyChanges" and text_format is not None:
                 problems.append(where + " sets textFormat")
-            label = binding(bindings, "Kirigami.FormData.label")
-            if label is not None:
-                examined += 1
-                if not TRANSLATED_LITERALS.fullmatch(re.sub(r"\s", "", label)):
-                    problems.append(where + " FormData.label is not translated literals only")
-        source = path.read_text()
-        code = blank_comments_and_strings(source)
+            for alias in kirigami_aliases:
+                label = binding(bindings, alias + ".FormData.label")
+                if label is not None:
+                    examined += 1
+                    if not TRANSLATED_LITERALS.fullmatch(re.sub(r"\s", "", label)):
+                        problems.append(where + " FormData.label is not translated literals only")
         if re.search(r"textFormat\s*=(?!=)", code):
             problems.append(path.name + " assigns textFormat in script")
         if re.search(r"""property\s*:\s*["']textFormat["']""", source):
             problems.append(path.name + " binds textFormat through a Binding")
+        if re.search(r"""\[\s*["']textFormat["']\s*\]""", source):
+            problems.append(path.name + " reaches textFormat by name")
+        if re.search(r"\balias\s+\w+\s*:\s*[\w.]*\btextFormat\b", code):
+            problems.append(path.name + " aliases a textFormat")
     return examined, exemptions, problems
 
 
@@ -228,13 +263,20 @@ class CheckerTest(unittest.TestCase):
         "imperative format":     "PlainLabel { Component.onCompleted: textFormat = Text.StyledText }",
         "Binding":               "Binding { target: x; property: \"textFormat\"; value: Text.AutoText }",
         "PropertyChanges":       "PropertyChanges { target: x; textFormat: Text.AutoText }",
+        # The third review's forms.
+        "alias property":        "Item { property alias f: x.textFormat }",
+        "set by name":           "Item { Component.onCompleted: x[\"textFormat\"] = 4 }",
+        "section header":        "Kirigami.ListSectionHeader { text: w.title }",
+        "button with data":      "PlasmaComponents.Button { text: w.title }",
     }
 
     # Under an alias the module's types must still be recognised.
-    INJECTED_ALIASED = (
-        "import org.kde.plasma.components as PC\n"
-        "Item {\n    PC.Label { text: w.title }\n}\n"
-    )
+    INJECTED_ALIASED = {
+        "PC.Label": "import org.kde.plasma.components as PC\nItem { PC.Label { text: w.title } }\n",
+        "QQ.Text": "import QtQuick as QQ\nQQ.Item { QQ.Text { text: w.title } }\n",
+        "Basic": "import QtQuick.Controls.Basic as B\nItem { B.Label { text: w.title } }\n",
+        "K.FormData": "import org.kde.kirigami as K\nItem { Item { K.FormData.label: w.title } }\n",
+    }
 
     # A whole file: a new type built on PlainLabel that undoes it.
     INJECTED_FILES = {
@@ -257,8 +299,9 @@ class CheckerTest(unittest.TestCase):
         for name, source in self.INJECTED_FILES.items():
             with self.subTest(name):
                 self.assertTrue(self.caught(source + "\n"), source)
-        with self.subTest("aliased import"):
-            self.assertTrue(self.caught(self.INJECTED_ALIASED))
+        for name, source in self.INJECTED_ALIASED.items():
+            with self.subTest(name):
+                self.assertTrue(self.caught(source), source)
 
 
 if __name__ == "__main__":

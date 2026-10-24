@@ -51,6 +51,8 @@ QQC2.ScrollView {
                     text: modelData.title || i18n("Warning")
                 }
                 PlasmaComponents.Label {
+                    // render.py's plain-text check allows RichText here only.
+                    objectName: "warningBody"
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
                     visible: modelData.html !== ""
