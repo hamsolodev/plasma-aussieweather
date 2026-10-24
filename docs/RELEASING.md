@@ -19,11 +19,12 @@
    git push origin v1.x
    ```
 
-3. The release workflow runs automatically: it runs the tests, builds the
-   `.plasmoid` (with compiled translations) with `scripts/package.sh`,
-   checks the tag matches `metadata.json`, extracts the CHANGELOG section,
-   and creates a GitHub Release with the `.plasmoid` and `SHA256SUMS`
-   attached.
+3. The release workflow runs automatically. It first runs all of CI's
+   checks (the tests, the QML compiled and rendered against real Plasma,
+   the translation template); then it builds the `.plasmoid` (with
+   compiled translations) with `scripts/package.sh`, checks the tag
+   matches `metadata.json`, extracts the CHANGELOG section, and creates a
+   GitHub Release with the `.plasmoid` and `SHA256SUMS` attached.
 4. Upload to the KDE Store manually (see below).
 5. Bump the submodule pointer in the `plasmoids` repo.
 

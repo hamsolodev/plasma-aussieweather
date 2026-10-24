@@ -12,7 +12,14 @@ permissions:
   contents: read
 
 jobs:
+  # Everything CI checks on main: the tests, the QML compiled and rendered
+  # against real Plasma, the translation template. A tag on a commit that
+  # fails any of them publishes nothing.
+  checks:
+    uses: ./.github/workflows/ci.yml
+
   release:
+    needs: checks
     runs-on: ubuntu-latest
     permissions:
       contents: write # create the release and upload its assets
@@ -24,17 +31,15 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            gettext zip \
-            qt6-declarative-dev-tools qml6-module-qttest qml6-module-qtquick \
-            qml6-module-qtquick-window qml6-module-qtqml-workerscript
+          sudo apt-get install -y --no-install-recommends gettext zip
 
-      - name: Run tests
-        run: bash scripts/test.sh
-
+      # Assigned before it is written out: inside echo, a failing
+      # package.sh would go unnoticed.
       - name: Build .plasmoid
         id: build
-        run: echo "package=$(bash scripts/package.sh)" >> "$GITHUB_OUTPUT"
+        run: |
+          package="$(bash scripts/package.sh)"
+          echo "package=$package" >> "$GITHUB_OUTPUT"
 
       - name: Tag matches metadata.json
         env:
