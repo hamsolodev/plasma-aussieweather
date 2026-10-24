@@ -1375,12 +1375,20 @@ PlasmoidItem {
                             wrapMode: Text.WordWrap
                             font.pointSize: Kirigami.Theme.defaultFont.pointSize
                             opacity: 0.6
-                            visible: !!(modelData.valid_from)
+                            visible: text !== ""
+                            // BoM gives each warning an issue and an expiry time;
+                            // "final" is the last issue for the event.
                             text: {
-                                if (!modelData.valid_from) return ""
-                                var from = Qt.formatDateTime(new Date(modelData.valid_from), "d MMM h:mm ap")
-                                if (!modelData.valid_to) return "From: " + from
-                                return "Valid: " + from + " – " + Qt.formatDateTime(new Date(modelData.valid_to), "d MMM h:mm ap")
+                                var parts = []
+                                if (modelData.phase === "final")
+                                    parts.push(i18n("Final warning"))
+                                if (modelData.issue_time)
+                                    parts.push(i18n("Issued %1", Qt.formatDateTime(
+                                        new Date(modelData.issue_time), "d MMM h:mm ap")))
+                                if (modelData.expiry_time)
+                                    parts.push(i18n("Expires %1", Qt.formatDateTime(
+                                        new Date(modelData.expiry_time), "d MMM h:mm ap")))
+                                return parts.join("  ·  ")
                             }
                         }
                         Kirigami.Separator {
