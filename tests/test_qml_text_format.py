@@ -13,8 +13,9 @@ comes from the BoM API. So:
 - PlainLabel, and the types built on it, never override its textFormat;
 - the PlasmoidItem's tooltip states Text.PlainText;
 - library types that draw their own text, as AutoText or with no
-  textFormat to set (buttons, tabs, menu items, actions, Kirigami's
-  messages and headers), and the attached FormData.label and ToolTip.text,
+  textFormat to set (buttons, tabs, menu items, actions, a text field's
+  placeholder, Kirigami's messages and headers), and the attached
+  FormData.label and ToolTip.text,
   are given only constant text: string literals, translated or not, whose
   only arguments are counts (".length");
 - textFormat is named nowhere else: not in script (nor any .js file), an
@@ -44,14 +45,19 @@ TEXT_TYPES = {
     "LinkButton", "UrlButton", "DescriptiveLabel", "ToolTipArea",
 }
 # Library types that draw their own text, as AutoText or with no textFormat
-# to set, and the properties they draw it from.
-SELF_DRAWN_TYPES = {
-    "Button", "TabButton", "ToolButton", "RoundButton", "DelayButton", "CheckBox",
-    "RadioButton", "Switch", "ItemDelegate", "CheckDelegate", "RadioDelegate",
-    "SwitchDelegate", "SwipeDelegate", "MenuItem", "Action", "GroupBox", "TextField",
-    "InlineMessage", "ListSectionHeader", "PlaceholderMessage", "Chip",
+# to set, and the properties they draw it from. A TextField's text is what
+# is typed, shown by a TextInput, which has no rich text; its placeholder is
+# drawn as AutoText.
+SELF_DRAWN = {
+    **{name: ("text",) for name in (
+        "Button", "TabButton", "ToolButton", "RoundButton", "DelayButton", "CheckBox",
+        "RadioButton", "Switch", "ItemDelegate", "CheckDelegate", "RadioDelegate",
+        "SwitchDelegate", "SwipeDelegate", "MenuItem", "Action", "InlineMessage",
+        "ListSectionHeader", "Chip")},
+    "GroupBox": ("title",),
+    "PlaceholderMessage": ("text", "explanation"),
+    "TextField": ("placeholderText",),
 }
-SELF_DRAWN_PROPERTIES = ("text", "title", "explanation", "placeholderText")
 # Attached properties drawn as AutoText.
 ATTACHED_TEXT = (r"(?:\w+\.)*FormData\.label", r"(?:\w+\.)*ToolTip\.text")
 # String literals, and i18n calls on them whose only other arguments are
@@ -177,7 +183,7 @@ def check(ui):
         source = path.read_text()
         code = blank_comments_and_strings(source)
         formats_bound = 0
-        if path.stem in TEXT_TYPES | SELF_DRAWN_TYPES | {"PlasmoidItem"}:
+        if path.stem in TEXT_TYPES | set(SELF_DRAWN) | {"PlasmoidItem"}:
             problems.append(path.name + " is named like a library type")
         if "${" in source:
             problems.append(path.name + " has a template literal substitution")
@@ -207,9 +213,9 @@ def check(ui):
                     problems.append(where + " toolTipTextFormat is not Text.PlainText")
             elif tooltip_format is not None:
                 problems.append(where + " sets toolTipTextFormat")
-            if kind in SELF_DRAWN_TYPES:
+            if kind in SELF_DRAWN:
                 examined += 1
-                for name in SELF_DRAWN_PROPERTIES:
+                for name in SELF_DRAWN[kind]:
                     text = binding(bindings, name)
                     if text is not None and not is_constant(text):
                         problems.append("%s %s is not constant text" % (where, name))
@@ -354,6 +360,10 @@ class CheckerTest(unittest.TestCase):
                 self.assertEqual(source.count(text), 1, text)
                 (ui / name).write_text(source.replace(text, replacement))
             return check(ui)[2]
+
+    def test_typed_text_is_not_flagged(self):
+        # What is typed in a TextField is shown as typed.
+        self.assertEqual(self.problems([("Injected.qml", "Item { QQC2.TextField { text: w.title } }")]), [])
 
     def assertCaught(self, problems, expected):
         self.assertTrue(any(expected in problem for problem in problems),
