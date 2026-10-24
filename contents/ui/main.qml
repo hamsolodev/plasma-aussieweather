@@ -78,7 +78,7 @@ PlasmoidItem {
     readonly property string updatedText: {
         if (!lastSuccessMs) return ""
         var today = Helpers.isSameDay(lastSuccessMs, currentTime.getTime())
-        return Qt.formatDateTime(new Date(lastSuccessMs), today ? "h:mm ap" : "d MMM h:mm ap")
+        return today ? clockText(new Date(lastSuccessMs)) : dateClockText(new Date(lastSuccessMs))
     }
 
     // Night by astronomical sunrise/sunset (minute precision, reactive to
@@ -135,6 +135,14 @@ PlasmoidItem {
         Helpers.upcomingSlots(hourlyForecast, currentHour * 3600000).slice(0, 8)
     readonly property bool use24Hour:
         Qt.locale().timeFormat(Locale.ShortFormat).toLowerCase().indexOf("ap") < 0
+
+    // Clock times, on the locale's 12- or 24-hour clock.
+    function clockText(date) {
+        return Qt.formatTime(date, Helpers.clockFormat(use24Hour))
+    }
+    function dateClockText(date) {
+        return Qt.formatDateTime(date, "d MMM " + Helpers.clockFormat(use24Hour))
+    }
 
     // Today's UV category (Helpers.uvKey), "" when BoM gave none.
     readonly property string todayUvKey:
@@ -1017,8 +1025,8 @@ PlasmoidItem {
                     text: {
                         if (!root.today || !root.today.astronomical) return ""
                         var a = root.today.astronomical
-                        return "🌅 " + Qt.formatTime(new Date(a.sunrise_time), "h:mm ap").replace(" ", "")
-                               + "  ·  🌇 " + Qt.formatTime(new Date(a.sunset_time), "h:mm ap").replace(" ", "")
+                        return "🌅 " + root.clockText(new Date(a.sunrise_time))
+                               + "  ·  🌇 " + root.clockText(new Date(a.sunset_time))
                     }
                 }
 
@@ -1028,7 +1036,17 @@ PlasmoidItem {
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     text: {
                         var mp = Helpers.moonPhase(root.currentTime)
-                        return mp.emoji + "  " + mp.name
+                        var name = {
+                            new:             i18nc("moon phase", "New Moon"),
+                            waxing_crescent: i18nc("moon phase", "Waxing Crescent"),
+                            first_quarter:   i18nc("moon phase", "First Quarter"),
+                            waxing_gibbous:  i18nc("moon phase", "Waxing Gibbous"),
+                            full:            i18nc("moon phase", "Full Moon"),
+                            waning_gibbous:  i18nc("moon phase", "Waning Gibbous"),
+                            last_quarter:    i18nc("moon phase", "Last Quarter"),
+                            waning_crescent: i18nc("moon phase", "Waning Crescent")
+                        }[mp.key]
+                        return mp.emoji + "  " + name
                     }
                 }
             }
@@ -1078,7 +1096,7 @@ PlasmoidItem {
                 }
                 PlasmaComponents.Button {
                     icon.name: "internet-web-browser-symbolic"
-                    text: "BoM"
+                    text: i18nc("abbreviation of Bureau of Meteorology", "BoM")
                     onClicked: Qt.openUrlExternally("https://www.bom.gov.au/location/australia")
                 }
             }
@@ -1153,7 +1171,8 @@ PlasmoidItem {
                         var ageSecs = Math.floor(
                             (root.currentTime.getTime() - root._radarLastRefreshMs) / 1000)
                         if (ageSecs < 60) return i18n("Updated just now")
-                        return i18n("Updated %1m ago", Math.floor(ageSecs / 60))
+                        return i18np("Updated a minute ago", "Updated %1 minutes ago",
+                                     Math.floor(ageSecs / 60))
                     }
                 }
 
@@ -1285,9 +1304,9 @@ PlasmoidItem {
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     opacity: 0.55
                     text: root.radarFrameUrls.length > 0
-                        ? i18n("Radar: %1  ·  %2 frames",
-                               root.activeRadarStation,
-                               root.radarFrameUrls.length)
+                        ? i18np("Radar: %2  ·  %1 frame", "Radar: %2  ·  %1 frames",
+                                root.radarFrameUrls.length,
+                                root.activeRadarStation)
                         : root.radarError
                             ? i18n("Radar: %1", root.activeRadarStation)
                             : i18n("Radar: %1  ·  Loading…",
@@ -1398,11 +1417,11 @@ PlasmoidItem {
                                 if (modelData.phase === "final")
                                     parts.push(i18n("Final warning"))
                                 if (modelData.issue_time)
-                                    parts.push(i18n("Issued %1", Qt.formatDateTime(
-                                        new Date(modelData.issue_time), "d MMM h:mm ap")))
+                                    parts.push(i18n("Issued %1", root.dateClockText(
+                                        new Date(modelData.issue_time))))
                                 if (modelData.expiry_time)
-                                    parts.push(i18n("Expires %1", Qt.formatDateTime(
-                                        new Date(modelData.expiry_time), "d MMM h:mm ap")))
+                                    parts.push(i18n("Expires %1", root.dateClockText(
+                                        new Date(modelData.expiry_time))))
                                 return parts.join("  ·  ")
                             }
                         }

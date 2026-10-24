@@ -181,26 +181,34 @@ function uvKey(category) {
     return _uvKeys.indexOf(key) >= 0 ? key : ""
 }
 
-// Moon phase from date — returns {emoji, name}
+// Moon phase from date — returns {emoji, key}; the widget names the phase.
 // Reference: known new moon 2000-01-06T18:14:00Z; synodic month 29.530588853 days.
 // Eight equal bands CENTRED on the principal phase instants (new = 0,
 // first quarter = ¼ month, full = ½ month, last quarter = ¾ month) — a real
-// full moon must report "Full Moon", not the band that merely starts there.
+// full moon must report "full", not the band that merely starts there.
+var _moonPhases = [
+    {emoji: "🌑", key: "new"},
+    {emoji: "🌒", key: "waxing_crescent"},
+    {emoji: "🌓", key: "first_quarter"},
+    {emoji: "🌔", key: "waxing_gibbous"},
+    {emoji: "🌕", key: "full"},
+    {emoji: "🌖", key: "waning_gibbous"},
+    {emoji: "🌗", key: "last_quarter"},
+    {emoji: "🌘", key: "waning_crescent"}
+]
+
 function moonPhase(date) {
     var knownNewMoon = new Date("2000-01-06T18:14:00Z")
     var synodicMonth = 29.530588853
     var band = synodicMonth / 8
     var daysSince = (date.getTime() - knownNewMoon.getTime()) / 86400000
     var phase = ((daysSince % synodicMonth) + synodicMonth) % synodicMonth
-    if (phase < band * 0.5) return {emoji: "🌑", name: "New Moon"}
-    if (phase < band * 1.5) return {emoji: "🌒", name: "Waxing Crescent"}
-    if (phase < band * 2.5) return {emoji: "🌓", name: "First Quarter"}
-    if (phase < band * 3.5) return {emoji: "🌔", name: "Waxing Gibbous"}
-    if (phase < band * 4.5) return {emoji: "🌕", name: "Full Moon"}
-    if (phase < band * 5.5) return {emoji: "🌖", name: "Waning Gibbous"}
-    if (phase < band * 6.5) return {emoji: "🌗", name: "Last Quarter"}
-    if (phase < band * 7.5) return {emoji: "🌘", name: "Waning Crescent"}
-    return {emoji: "🌑", name: "New Moon"}
+    return _moonPhases[Math.floor(phase / band + 0.5) % 8]
+}
+
+// Qt time format for a clock time: the locale's 12- or 24-hour clock.
+function clockFormat(use24Hour) {
+    return use24Hour ? "HH:mm" : "h:mmap"
 }
 
 // The hour a time falls in, counted in UTC hours. BoM's hourly slots start

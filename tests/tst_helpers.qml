@@ -202,25 +202,25 @@ TestCase {
 
     function test_moonPhase_known_new_moon() {
         // Reference epoch itself
-        compare(Helpers.moonPhase(new Date("2000-01-06T18:14:00Z")).name, "New Moon")
+        compare(Helpers.moonPhase(new Date("2000-01-06T18:14:00Z")).key, "new")
         // One synodic month later
-        compare(Helpers.moonPhase(new Date("2000-02-05T07:00:00Z")).name, "New Moon")
+        compare(Helpers.moonPhase(new Date("2000-02-05T07:00:00Z")).key, "new")
     }
 
     function test_moonPhase_known_full_moon() {
         // 2000-01-21 04:40 UTC was a full moon (and a lunar eclipse)
-        compare(Helpers.moonPhase(new Date("2000-01-21T04:40:00Z")).name, "Full Moon")
+        compare(Helpers.moonPhase(new Date("2000-01-21T04:40:00Z")).key, "full")
     }
 
     function test_moonPhase_quarters() {
-        compare(Helpers.moonPhase(new Date("2000-01-14T13:34:00Z")).name, "First Quarter")
-        compare(Helpers.moonPhase(new Date("2000-01-28T07:57:00Z")).name, "Last Quarter")
+        compare(Helpers.moonPhase(new Date("2000-01-14T13:34:00Z")).key, "first_quarter")
+        compare(Helpers.moonPhase(new Date("2000-01-28T07:57:00Z")).key, "last_quarter")
     }
 
     function test_moonPhase_dates_before_epoch() {
         // Negative day deltas must still land in [0, synodicMonth)
         var mp = Helpers.moonPhase(new Date("1999-12-07T22:32:00Z"))  // new moon Dec 1999
-        compare(mp.name, "New Moon")
+        compare(mp.key, "new")
     }
 
     // ── isSafeUrl ─────────────────────────────────────────────────────────
@@ -308,6 +308,13 @@ TestCase {
     function test_todayIndex_defaults_to_the_first_entry() {
         compare(Helpers.todayIndex(days(), Date.parse("2026-10-20T00:00:00Z")), 0)
         compare(Helpers.todayIndex([], Date.parse("2026-10-24T00:00:00Z")), 0)
+    }
+
+    // ── clockFormat ───────────────────────────────────────────────────────
+
+    function test_clockFormat_follows_the_locales_clock() {
+        compare(Helpers.clockFormat(false), "h:mmap")
+        compare(Helpers.clockFormat(true), "HH:mm")
     }
 
     // ── isStale / isSameDay ───────────────────────────────────────────────
