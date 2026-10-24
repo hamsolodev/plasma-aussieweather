@@ -297,9 +297,10 @@ function backoffMs(count, baseMs, capMs) {
 // Whether a fetch last made at lastMs (0: never) is due again at nowMs.
 // Times are wall-clock (Date.now()), which keeps counting while the machine
 // sleeps, where Qt timers do not; so a periodic check of this also notices
-// a wake.
+// a wake. A clock stepped back past lastMs makes it due at once, rather
+// than after real time catches up, which could be hours.
 function isDue(lastMs, nowMs, intervalMs) {
-    return lastMs <= 0 || nowMs - lastMs >= intervalMs
+    return lastMs <= 0 || nowMs < lastMs || nowMs - lastMs >= intervalMs
 }
 
 // Milliseconds from nowMs to just past the next minute boundary, for a
@@ -309,9 +310,10 @@ function msToNextMinute(nowMs) {
 }
 
 // Whether data last fetched at lastMs is out of date at nowMs: two polls in
-// a row have been missed. False before the first fetch (lastMs 0).
+// a row have been missed, or the clock has stepped back past the fetch, so
+// its age is unknown. False before the first fetch (lastMs 0).
 function isStale(lastMs, nowMs, intervalMs) {
-    return lastMs > 0 && nowMs - lastMs > 2 * intervalMs
+    return lastMs > 0 && (nowMs < lastMs || nowMs - lastMs > 2 * intervalMs)
 }
 
 // Whether two times fall on the same local calendar day.

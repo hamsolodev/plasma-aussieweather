@@ -349,6 +349,14 @@ TestCase {
         verify(Helpers.isDue(last, last + 8 * 3600000, interval))
     }
 
+    // A clock stepped back (a dual-boot machine corrected at boot) leaves the
+    // last fetch in the future. Waiting for real time to pass it would mean
+    // hours without a poll.
+    function test_isDue_after_the_clock_steps_back() {
+        var last = Date.UTC(2026, 9, 24, 10, 0)
+        verify(Helpers.isDue(last, last - 10 * 3600000, 600000))
+    }
+
     function test_msToNextMinute_lands_just_past_the_boundary() {
         var minute = Date.UTC(2026, 9, 24, 0, 1)
         compare(Helpers.msToNextMinute(minute - 15000), 15000 + 50)
@@ -373,6 +381,11 @@ TestCase {
         var last = Date.UTC(2026, 9, 24, 0, 0)
         verify(!Helpers.isStale(last, last + 2 * interval, interval))
         verify(Helpers.isStale(last, last + 2 * interval + 1, interval))
+    }
+
+    function test_isStale_after_the_clock_steps_back() {
+        var last = Date.UTC(2026, 9, 24, 10, 0)
+        verify(Helpers.isStale(last, last - 10 * 3600000, 600000))
     }
 
     function test_isStale_not_before_the_first_poll() {

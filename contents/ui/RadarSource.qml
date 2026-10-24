@@ -41,7 +41,12 @@ QtObject {
     readonly property int dueCheckMs: 30000
 
     property var frames: []
+    // When the frames were last fetched, for "Updated N minutes ago".
     property real lastRefreshMs: 0
+    // When a fetch was last tried, successful or not, while on screen: the
+    // due check counts from this, so a failure is retried on the backoff,
+    // not at every check.
+    property real _lastAttemptMs: 0
     // Why the last refresh failed; "" when it did not.
     property string errorText: ""
     property int _retryCount: 0
@@ -54,6 +59,11 @@ QtObject {
         if (!active) {
             pickedStation = ""
             _retry.stop()
+            // Attempts count only while the radar is on screen. Coming
+            // back fetches unless the last success is recent: a failure, or
+            // a listing dropped because it arrived after leaving, is tried
+            // again.
+            _lastAttemptMs = lastRefreshMs
         }
     }
 
@@ -64,12 +74,14 @@ QtObject {
     function reset() {
         if (frames.length > 0) frames = []
         lastRefreshMs = 0
+        _lastAttemptMs = 0
         errorText     = ""
         _retryCount   = 0
         _retry.stop()
     }
 
     function refresh() {
+        _lastAttemptMs = Date.now()
         _lister.run([station])
     }
 
@@ -140,7 +152,7 @@ QtObject {
         repeat: true
         triggeredOnStart: true
         onTriggered: {
-            if (Helpers.isDue(radar.lastRefreshMs, Date.now(), radar.interval))
+            if (Helpers.isDue(radar._lastAttemptMs, Date.now(), radar.interval))
                 radar.refresh()
         }
     }

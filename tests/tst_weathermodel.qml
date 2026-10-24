@@ -53,7 +53,9 @@ TestCase {
         return m
     }
 
-    function test_temperature_only_with_data() {
+    // Not test_…_data: QtTest takes a function named so for another test's
+    // data, and never runs it.
+    function test_temperature_needs_a_poll() {
         compare(model({}).temperatureText, "21°C")
         compare(model({ hasData: false }).temperatureText, "")
     }
