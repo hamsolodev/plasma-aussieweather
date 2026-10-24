@@ -6,13 +6,22 @@
 
 # Run every test suite that needs no Plasma: the fetch scripts' Python
 # tests, then the QML tests of the helpers, the station table and
-# WeatherModel. Used by CI and the release workflow.
+# WeatherModel. Used by CI and the release workflow. "test.sh python" runs
+# the Python tests alone, as CI does on each Python the scripts support.
 set -euo pipefail
+
+case "${1:-}" in
+    "" | python) ;;
+    *) echo "usage: $0 [python]" >&2; exit 2 ;;
+esac
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 # -B: importing the scripts must not leave bytecode inside contents/.
 python3 -I -B -m unittest discover --start-directory "$ROOT/tests" --pattern 'test_*.py'
+if [ "${1:-}" = python ]; then
+    exit 0
+fi
 
 runner="$(command -v qmltestrunner || true)"
 for candidate in /usr/lib64/qt6/bin/qmltestrunner /usr/lib/qt6/bin/qmltestrunner; do

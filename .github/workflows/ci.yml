@@ -67,6 +67,35 @@ jobs:
           name: plasmoid
           path: net.tropism.plasma.aussieweather-*.plasmoid
 
+  # The fetch scripts run on the user's own python3, so their tests run on
+  # every Python from the oldest the scripts support (ruff.toml's
+  # target-version) to the newest release. setup-python uses the runner
+  # image's own build of a version when it has one, and downloads the newest
+  # patch release when it has not.
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13", "3.14", "3.15"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+
+      # The python3 the tests run on must be the one asked for, not the
+      # runner's own.
+      - name: Python tests
+        env:
+          WANT: ${{ matrix.python }}
+        run: |
+          python3 -I -c 'import os, sys; print(sys.version); sys.exit(f"{sys.version_info.major}.{sys.version_info.minor}" != os.environ["WANT"])'
+          bash scripts/test.sh python
+
   # The Python, linted and its formatting checked by the ruff that
   # requirements-dev.txt pins. Nothing here changes a file: the formatting
   # is done before each commit, by scripts/hooks/pre-commit.

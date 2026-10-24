@@ -92,9 +92,10 @@ version into a panel that is already running.
 
 ### Runtime requirement
 
-`python3` must be on `PATH`. The widget fetches BoM API data and the radar
-frame list with two small Python scripts in `contents/code/` (standard library
-only; no third-party Python packages needed).
+`python3`, version 3.11 or newer, must be on `PATH`. The widget fetches BoM
+API data and the radar frame list with two small Python scripts in
+`contents/code/` (standard library only; no third-party Python packages
+needed).
 
 Warning maps are saved as PNG files under
 `~/.cache/net.tropism.plasma.aussieweather/warnings/` (or under
@@ -167,7 +168,9 @@ web pages open them in your browser.
 
 The tests need `python3` and Qt 6's `qmltestrunner` (Fedora:
 `qt6-qtdeclarative-devel`; Debian/Ubuntu: `qt6-declarative-dev-tools` and
-`qml6-module-qttest`). `check-qml.py` and `render.py` also need KDE
+`qml6-module-qttest`). CI also runs the Python tests alone
+(`./scripts/test.sh python`) on every Python from 3.11 to the newest release.
+`check-qml.py` and `render.py` also need KDE
 Plasma 6's QML modules, and `render.py` PySide6 built against the same Qt
 (Fedora: `python3-pyside6`); CI runs both in a Fedora container. CI fails
 if `template.pot` is out of date, or if the icon's copies were not made
