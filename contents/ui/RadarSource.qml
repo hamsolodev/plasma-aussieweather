@@ -50,6 +50,11 @@ QtObject {
     // Why the last refresh failed; "" when it did not.
     property string errorText: ""
     property int _retryCount: 0
+    // Set once everything here is made, on the event loop's next turn: a
+    // fetch asked of the script runner before then is lost. Until then
+    // refresh() does nothing, and the due check, which starts then, fetches.
+    property bool _ready: false
+    Component.onCompleted: Qt.callLater(() => { _ready = true })
 
     onStationChanged: {
         reset()
@@ -81,6 +86,10 @@ QtObject {
     }
 
     function refresh() {
+        // The station's first evaluation calls this, while being made, if
+        // the radar starts on screen.
+        if (!_ready)
+            return
         _lastAttemptMs = Date.now()
         _lister.run([station])
     }
@@ -148,7 +157,7 @@ QtObject {
     // switching tabs back and forth does not refetch.
     property Timer _due: Timer {
         interval: radar.dueCheckMs
-        running: radar.active
+        running: radar.active && radar._ready
         repeat: true
         triggeredOnStart: true
         onTriggered: {
