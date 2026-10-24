@@ -58,3 +58,43 @@ jobs:
         with:
           name: plasmoid
           path: net.tropism.plasma.aussieweather-*.plasmoid
+
+  # The QML itself, against real Plasma 6 QML modules, which Ubuntu's
+  # runners lack: every file must compile (qmllint passes code that does
+  # not), and the popup must render offscreen with no QML warning. The
+  # screenshots are uploaded.
+  #
+  # The image is pinned to a build at least a week old, and packages come
+  # from Fedora 44's release repository only, not updates. To move the pin,
+  # pick a digest a week or more old from
+  # https://quay.io/api/v1/repository/fedora/fedora/tag/?specificTag=44&onlyActiveTags=false
+  # that registry.fedoraproject.org still serves (skopeo inspect).
+  qml:
+    runs-on: ubuntu-latest
+    container:
+      image: registry.fedoraproject.org/fedora@sha256:74e857c33dfb387710b2b1a0203824351a25e9844356af2d1e5792ca2a96129b # 44, built 2026-10-16
+    steps:
+      - name: Install Plasma's QML modules
+        run: |
+          dnf -y --repo=fedora --setopt=install_weak_deps=False install \
+            git python3 python3-pyside6 qt6-qtdeclarative-devel \
+            libplasma plasma5support kf6-kirigami plasma-integration \
+            plasma-breeze-common breeze-icon-theme \
+            google-noto-sans-fonts google-noto-color-emoji-fonts tzdata
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Compile every QML file
+        run: python3 -I scripts/check-qml.py
+
+      - name: Render the popup, light and dark
+        run: |
+          python3 -I scripts/render.py screenshots --offline --scheme light
+          python3 -I scripts/render.py screenshots --offline --scheme dark
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: screenshots
+          path: screenshots/
