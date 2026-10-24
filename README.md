@@ -67,6 +67,10 @@ exist; it prints the path of the `.plasmoid` it builds.
 frame list with two small Python scripts in `contents/code/` (standard library
 only; no third-party Python packages needed).
 
+Warning maps are saved as PNG files under
+`~/.cache/net.tropism.plasma.aussieweather/warnings/` (or
+`$XDG_CACHE_HOME`) while their warnings are current, and removed after.
+
 ## Configuration
 
 - **Location** — free text, `Suburb STATE` form: `Seaford VIC`, `Sydney NSW`.
@@ -100,14 +104,19 @@ only; no third-party Python packages needed).
 ## Development
 
 ```sh
-./scripts/test.sh      # Python tests of contents/code, QML tests of the helpers
-./scripts/package.sh   # build net.tropism.plasma.aussieweather-<version>.plasmoid
-./translate/merge.sh   # regenerate translate/template.pot after string changes
+./scripts/test.sh            # Python tests of contents/code, QML tests of the helpers and model
+./scripts/check-qml.py       # compile every QML file against the installed Plasma
+./scripts/render.py OUTDIR   # screenshot each tab offscreen; fails on any QML warning
+./scripts/package.sh         # build net.tropism.plasma.aussieweather-<version>.plasmoid
+./translate/merge.sh         # regenerate translate/template.pot after string changes
 ```
 
 The tests need `python3` and Qt 6's `qmltestrunner` (Fedora:
 `qt6-qtdeclarative-devel`; Debian/Ubuntu: `qt6-declarative-dev-tools` and
-`qml6-module-qttest`). CI fails if `template.pot` is out of date.
+`qml6-module-qttest`). `check-qml.py` and `render.py` also need KDE
+Plasma 6's QML modules, and `render.py` PySide6 built against the same Qt
+(Fedora: `python3-pyside6`); CI runs both in a Fedora container. CI fails
+if `template.pot` is out of date.
 
 This repo is also consumed as a git submodule by a private multi-widget
 repo; the widget package itself is `metadata.json` + `contents/` at the repo

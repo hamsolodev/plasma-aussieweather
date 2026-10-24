@@ -1,5 +1,52 @@
 # Changelog
 
+## 1.8.0 — 2026-10-24
+
+Fixes
+- Cancelled and expired warnings no longer show as active in the badge,
+  banner and Warnings tab
+- Out-of-date weather is marked as such: a failed update is shown in the
+  popup and tooltip, the panel temperature dims once two polls have been
+  missed, and the update time carries its date when it is not today
+- Errors say what went wrong (location not found, BoM refused, no
+  network, or the weather script failed, e.g. without python3) instead
+  of always "Cannot reach BoM"
+- Forecast day names are the location's: they were a day early whenever
+  the computer's time zone is behind the location's
+- "Very High" UV is recognised and coloured (BoM spells it "veryhigh")
+- Locations: the state can be written in any case; a state with no
+  matching place is reported rather than resolving to another state;
+  the other territories (OT) work
+- Lord Howe, Norfolk, Christmas and Cocos Islands get weather icons
+  instead of a question mark
+- The hourly strip moves with the clock: "Now" follows the hour, past
+  hours drop off, and half-hour time zones (SA, NT) label slots
+  correctly
+- The conditions line describes the current hour ("Clear" at night),
+  not the day's forecast; today's forecast is picked by date
+- The radar no longer shows another station's rain after a quick
+  station change, reports when a station has no recent images, and
+  retries while its tab is open
+- Readings a station did not take are hidden instead of shown as 0;
+  pressure, dew point and cloud cover, which BoM never sends, are gone
+- Warnings show when they were issued and when they expire
+- Times follow the locale's 12- or 24-hour clock, and the remaining
+  English strings are translatable
+
+Security
+- Radar overlays are fetched over https, and nothing radar-related is
+  fetched unless the radar is on screen
+- Warning text is rebuilt from a tag allowlist, with nesting and length
+  capped; warning maps are saved as PNG files and shown from there,
+  never inside rich text
+- Everything else from BoM or the config is shown as plain text
+- The radar listing (plain FTP) is validated and bounded, and its
+  server's messages are not shown
+- The fetch scripts run isolated from the user's Python environment,
+  and API redirects are followed only to https
+- Releases run the tests first, publish SHA256SUMS, and no longer use a
+  third-party release action
+
 ## 1.7.5 — 2026-07-29
 
 - Fix weather icons showing as a purple question mark in windy conditions. The
