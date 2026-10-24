@@ -22,6 +22,12 @@ ColumnLayout {
 
     signal refreshRequested()
 
+    // The tabs, in the order the bar shows them.
+    readonly property int weatherTab: 0
+    readonly property int radarTab: 1
+    readonly property int warningsTab: 2
+    property alias currentTab: tabBar.currentIndex
+
     spacing: 0
     Layout.minimumWidth:   Kirigami.Units.gridUnit * 20
     Layout.preferredWidth: Kirigami.Units.gridUnit * 22
@@ -59,8 +65,8 @@ ColumnLayout {
     Connections {
         target: full.weather
         function onHasWarningsChanged() {
-            if (!full.weather.hasWarnings && tabBar.currentIndex === 2)
-                tabBar.currentIndex = 0
+            if (!full.weather.hasWarnings && full.currentTab === full.warningsTab)
+                full.currentTab = full.weatherTab
         }
     }
 
@@ -69,7 +75,7 @@ ColumnLayout {
     Binding {
         target: full.radar
         property: "active"
-        value: (full.expanded || !full.inPanelPopup) && tabBar.currentIndex === 1
+        value: (full.expanded || !full.inPanelPopup) && full.currentTab === full.radarTab
     }
 
     // Tab bodies in a ColumnLayout with visible bindings, so only the
@@ -79,23 +85,23 @@ ColumnLayout {
         spacing: 0
 
         WeatherTab {
-            visible: tabBar.currentIndex === 0
+            visible: full.currentTab === full.weatherTab
             Layout.fillWidth: true
             weather: full.weather
             clock: full.clock
-            onWarningsRequested: tabBar.currentIndex = 2
+            onWarningsRequested: full.currentTab = full.warningsTab
             onRefreshRequested: full.refreshRequested()
         }
 
         RadarTab {
-            visible: tabBar.currentIndex === 1
+            visible: full.currentTab === full.radarTab
             Layout.fillWidth: true
             radar: full.radar
             clock: full.clock
         }
 
         WarningsTab {
-            visible: tabBar.currentIndex === 2
+            visible: full.currentTab === full.warningsTab
             Layout.fillWidth: true
             weather: full.weather
             clock: full.clock

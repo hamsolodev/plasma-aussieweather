@@ -32,17 +32,12 @@ Window {
         now: new Date(window.fixture.now)
     }
 
+    // The fixture's poll goes in as WeatherSource puts a real one in,
+    // fetched four minutes before the moment shown.
     WeatherModel {
         id: weather
         now: clock.now
-        hasData: true
-        errorText: window.fixture.errorText
-        observations: window.fixture.observations
-        forecast: window.fixture.forecast
-        hourlyForecast: window.fixture.hourly
-        warnings: window.fixture.warnings
-        locationName: window.fixture.locationName
-        lastSuccessMs: Date.parse(window.fixture.now) - 4 * 60000
+        Component.onCompleted: apply(window.fixture.poll, Date.parse(window.fixture.now) - 4 * 60000)
     }
 
     RadarSource {

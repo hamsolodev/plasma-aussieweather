@@ -28,12 +28,15 @@ import os
 import pathlib
 import re
 import shutil
+import struct
 import sys
 import tempfile
+import zlib
 from datetime import datetime, timedelta, timezone
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SCHEMES = {"light": "BreezeLight", "dark": "BreezeDark"}
+# Each is FullView's <name>Tab index.
 TABS = ["weather", "radar", "warnings"]
 # Logged by the offscreen setup itself, not by the widget: KWindowSystem has
 # no plugin for the offscreen platform, and the KDE platform theme (6.6, as
@@ -52,8 +55,31 @@ def iso(moment):
     return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def fixture(now):
-    """Weather shaped like poll.py's output, for Seaford VIC at NOW (UTC)."""
+def warning_map(path, width=580, height=420):
+    """Write a stand-in warning map to PATH: bands of heat, cool to severe,
+    as a PNG (the widget shows warning images from PNG files)."""
+    colours = [(255, 238, 170), (255, 200, 120), (245, 140, 80), (210, 60, 50), (140, 20, 40)]
+    rows = []
+    for y in range(height):
+        row = bytearray([0])  # filter: none
+        for x in range(width):
+            row += bytes(colours[(x + y // 2) * len(colours) // (width + height // 2)])
+        rows.append(bytes(row))
+
+    def chunk(kind, data):
+        return (struct.pack(">I", len(data)) + kind + data
+                + struct.pack(">I", zlib.crc32(kind + data)))
+
+    path.write_bytes(b"\x89PNG\r\n\x1a\n"
+                     + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+                     + chunk(b"IDAT", zlib.compress(b"".join(rows), 9))
+                     + chunk(b"IEND", b""))
+    return str(path)
+
+
+def fixture(now, map_path):
+    """A poll of Seaford VIC at NOW (UTC), shaped as poll.py prints it,
+    with the moment and the radar station to show it at."""
     midnight = datetime(now.year, now.month, now.day, 13, tzinfo=timezone.utc)
     if midnight > now:
         midnight -= timedelta(days=1)
@@ -97,11 +123,11 @@ def fixture(now):
             "rain": {"chance": [10, 20, 40, 60, 70, 30, 10, 0, 0, 0, 5, 0][slot],
                      "amount": {"min": 0, "max": 2}},
         })
-    return {
-        "now": iso(now),
+    poll = {
+        "ok": True,
+        "request": {"query": "Seaford VIC", "geohash": ""},
+        "geohash": "r1ppnx",
         "locationName": "Seaford, VIC",
-        "station": "IDR023",
-        "errorText": "",
         "observations": {
             "temp": 21.4, "temp_feels_like": 19.8, "humidity": 64, "rain_since_9am": 0.4,
             "wind": {"speed_kilometre": 22, "direction": "SSW"},
@@ -120,10 +146,10 @@ def fixture(now):
                     "</p><ul><li>Damaging winds</li><li>Heavy rainfall</li></ul>"
                     '<p>See <a href="https://www.bom.gov.au/vic/warnings/">current '
                     "warnings</a>.</p>",
-            # Stands in for a warning map, which poll.py saves as a file.
-            "images": [str(ROOT / "docs" / "screenshots" / "light-radar.png")],
+            "images": [map_path],
         }],
     }
+    return {"now": iso(now), "station": "IDR023", "poll": poll}
 
 
 def main():
@@ -182,7 +208,8 @@ def render(options, config_home):
     QQmlEngine.setObjectOwnership(i18n, QQmlEngine.ObjectOwnership.CppOwnership)
     engine.rootContext().setContextObject(i18n)
     now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
-    engine.rootContext().setContextProperty("fixtureJson", json.dumps(fixture(now)))
+    map_path = warning_map(pathlib.Path(config_home) / "warning-map.png")
+    engine.rootContext().setContextProperty("fixtureJson", json.dumps(fixture(now, map_path)))
     engine.rootContext().setContextProperty("liveRadar", not options.offline)
     engine.load(str(ROOT / "scripts" / "render.qml"))
     if not engine.rootObjects():
@@ -190,8 +217,6 @@ def render(options, config_home):
         return 1
     window = shiboken6.wrapInstance(shiboken6.getCppPointer(engine.rootObjects()[0])[0], QQuickWindow)
     view = window.findChild(QObject, "fullView")
-    tab_bar = next(item for item in view.findChildren(QObject)
-                   if item.metaObject().className().startswith("TabBar"))
 
     def settle(seconds):
         timer = QTimer()
@@ -216,8 +241,8 @@ def render(options, config_home):
 
     options.outdir.mkdir(parents=True, exist_ok=True)
     heights = {}
-    for index, name in enumerate(TABS):
-        tab_bar.setProperty("currentIndex", index)
+    for name in TABS:
+        view.setProperty("currentTab", view.property(name + "Tab"))
         settle(options.radar_wait if name == "radar" and not options.offline else 1.0)
         heights[name] = settled_height()
         window.setProperty("height", heights[name])
