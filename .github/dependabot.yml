@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 Mark Hellewell <aussieweather.sandlot200@passinbox.com>
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+# Workflow actions are pinned to commit SHAs; this proposes updates to them.
+# A release is proposed only once it is a week old.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7

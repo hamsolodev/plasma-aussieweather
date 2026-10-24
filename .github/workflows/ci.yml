@@ -9,11 +9,16 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   ci:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Install dependencies
         run: |
@@ -33,25 +38,23 @@ jobs:
           jq -e '.KPlugin.Version | test("^[0-9]+\\.[0-9]+")' metadata.json
           jq -e '.KPackageStructure == "Plasma/Applet"' metadata.json
 
-      - name: Version sync (metadata.json vs _widgetVersion)
-        run: bash scripts/check-version.sh
-
       # qmllint with KDE imports is not available on stock ubuntu runners;
       # tests cover the fetch scripts and the pure-JS helpers (no Plasma
       # runtime needed).
       - name: Run tests
         run: bash scripts/test.sh
 
-      - name: Compile translations
-        run: bash translate/build.sh
+      # template.pot must list every translatable string; source locations
+      # and the creation date are allowed to differ.
+      - name: Translation template is current
+        run: |
+          bash translate/merge.sh
+          git diff --exit-code -I '^#: ' -I '^"POT-Creation-Date: ' translate/template.pot
 
       - name: Build .plasmoid
-        run: |
-          version="$(jq -r '.KPlugin.Version' metadata.json)"
-          zip -qr "net.tropism.plasma.aussieweather-${version}.plasmoid" metadata.json contents/
-          unzip -l "net.tropism.plasma.aussieweather-${version}.plasmoid"
+        run: unzip -l "$(bash scripts/package.sh)"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: plasmoid
           path: net.tropism.plasma.aussieweather-*.plasmoid
