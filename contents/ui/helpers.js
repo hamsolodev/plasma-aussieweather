@@ -97,10 +97,16 @@ function pressureStr(hpa, tendency) {
     return Math.round(n) + " hPa" + (arrow[String(tendency || "").toLowerCase()] || "")
 }
 
-function shortDay(isoDate) {
-    if (!isoDate) return "—"
-    var d = new Date(isoDate)
-    return isNaN(d.getTime()) ? "—" : ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()]
+// The weekday (0 = Sunday) of a daily forecast, where it is forecast for.
+// BoM dates each day by the location's local midnight, given in UTC (VIC in
+// daylight time: 13:00Z the day before), so the system time zone's weekday
+// is wrong wherever it is behind the location's. Noon local time is that
+// instant plus 12 hours, which lands on the right UTC date for every offset
+// from +0 to +12 (Australia spans +6:30 to +12). -1 if unparseable.
+function forecastWeekday(isoDate) {
+    var ms = Date.parse(isoDate)
+    if (isNaN(ms)) return -1
+    return new Date(ms + 12 * 3600000).getUTCDay()
 }
 
 function titleCase(s) {

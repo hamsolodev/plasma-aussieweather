@@ -878,7 +878,11 @@ PlasmoidItem {
 
                         PlainLabel {
                             Layout.alignment: Qt.AlignHCenter
-                            text: index === 0 ? i18n("Today") : Helpers.shortDay(modelData.date)
+                            text: {
+                                if (index === 0) return i18n("Today")
+                                var day = Helpers.forecastWeekday(modelData.date)
+                                return day < 0 ? "—" : Qt.locale().dayName(day, Locale.ShortFormat)
+                            }
                             font.pointSize: Kirigami.Theme.defaultFont.pointSize
                             font.weight: index === 0 ? Font.Bold : Font.Normal
                             opacity: 0.65

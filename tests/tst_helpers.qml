@@ -109,12 +109,23 @@ TestCase {
         compare(Helpers.pressureStr(null, "rising"), "—")
     }
 
-    // ── shortDay / titleCase ──────────────────────────────────────────────
+    // ── forecastWeekday / titleCase ───────────────────────────────────────
 
-    function test_shortDay() {
-        compare(Helpers.shortDay("2026-06-13"), "Sat")
-        compare(Helpers.shortDay(null), "—")
-        compare(Helpers.shortDay("garbage"), "—")
+    // BoM dates a daily forecast by the location's local midnight, in UTC.
+    // Each of these is Saturday 24 October 2026 where it is forecast for.
+    function test_forecastWeekday_is_the_locations_day() {
+        compare(Helpers.forecastWeekday("2026-10-23T13:00:00Z"), 6)   // VIC, daylight time
+        compare(Helpers.forecastWeekday("2026-10-23T13:30:00Z"), 6)   // SA, daylight time
+        compare(Helpers.forecastWeekday("2026-10-23T14:00:00Z"), 6)   // QLD
+        compare(Helpers.forecastWeekday("2026-10-23T16:00:00Z"), 6)   // WA
+        compare(Helpers.forecastWeekday("2026-10-23T17:00:00Z"), 6)   // Christmas Island
+        compare(Helpers.forecastWeekday("2026-10-23T17:30:00Z"), 6)   // Cocos Islands
+        compare(Helpers.forecastWeekday("2026-10-23T12:00:00Z"), 6)   // Norfolk, daylight time
+    }
+
+    function test_forecastWeekday_invalid() {
+        compare(Helpers.forecastWeekday(null), -1)
+        compare(Helpers.forecastWeekday("garbage"), -1)
     }
 
     function test_titleCase() {

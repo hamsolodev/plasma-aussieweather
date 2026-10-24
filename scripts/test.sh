@@ -21,4 +21,10 @@ if [ -z "$runner" ]; then
     echo "FAIL: qmltestrunner not found" >&2
     exit 1
 fi
-QT_QPA_PLATFORM=offscreen "$runner" -input "$ROOT/tests"
+# BoM's times are UTC and its locations span +6:30 to +12, so date logic
+# that leans on the system time zone passes in one zone and fails in
+# another. Run the QML tests in several.
+for tz in UTC Australia/Adelaide Australia/Brisbane America/New_York; do
+    echo "== QML tests, TZ=$tz"
+    TZ="$tz" QT_QPA_PLATFORM=offscreen "$runner" -input "$ROOT/tests"
+done
