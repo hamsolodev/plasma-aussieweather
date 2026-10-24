@@ -19,6 +19,7 @@ import json
 import sys
 import urllib.parse
 import urllib.request
+from datetime import datetime, timezone
 
 API = "https://api.weather.bom.gov.au/v1"
 
@@ -61,10 +62,32 @@ def resolve(get, query):
             location.get("name", "") + ", " + location.get("state", ""))
 
 
-def warnings_for(get, geohash):
-    """The location's warnings, each merged with its detail where available."""
+def parse_time(value):
+    """An API timestamp as an aware datetime, or None if it isn't one."""
+    try:
+        return datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def is_current(warning, now):
+    """False once BoM has cancelled the warning or it has expired.
+
+    The API keeps listing a cancelled warning (phase "cancelled") until its
+    original expiry, so the phase has to be checked as well as the time.
+    """
+    if warning.get("phase") == "cancelled":
+        return False
+    expiry = parse_time(warning.get("expiry_time"))
+    return expiry is None or expiry > now
+
+
+def warnings_for(get, geohash, now):
+    """The location's current warnings, each merged with its detail."""
     warnings = []
     for warning in get("/locations/" + geohash + "/warnings").get("data", []):
+        if not is_current(warning, now):
+            continue
         wid = (warning.get("id") or "").strip()
         if wid:
             try:
@@ -76,7 +99,7 @@ def warnings_for(get, geohash):
     return warnings
 
 
-def collect(get, geohash, query):
+def collect(get, geohash, query, now):
     """Everything the widget shows, as one JSON-ready dict."""
     out = {"ok": True}
     if not geohash:
@@ -90,7 +113,7 @@ def collect(get, geohash, query):
     except Exception:
         out["hourly"] = []
     try:
-        out["warnings"] = warnings_for(get, geohash)
+        out["warnings"] = warnings_for(get, geohash, now)
     except Exception:
         out["warnings"] = []
     return out
@@ -99,7 +122,7 @@ def collect(get, geohash, query):
 def main(argv):
     version, geohash, query = argv[1:4]
     try:
-        result = collect(make_get(version), geohash, query)
+        result = collect(make_get(version), geohash, query, datetime.now(timezone.utc))
     except NotFound as e:
         result = {"ok": False, "permanent": True, "error": str(e)}
     except Exception as e:
