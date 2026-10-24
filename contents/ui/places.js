@@ -41,7 +41,7 @@ function _parse(entry) {
 // and a place saved twice is offered once.
 function fromConfig(entries, search, radar) {
     var places = []
-    var seen = {}
+    var seen = Object.create(null)  // no prototype: "constructor" is a place
     for (var i = 0; entries && i < entries.length; i++) {
         var place = _parse(entries[i])
         if (place && !(_key(place.search) in seen)) {
@@ -59,10 +59,17 @@ function fromConfig(entries, search, radar) {
     return places
 }
 
-// The config's `places` entries for `places`; blank ones are not saved.
+// The config's `places` entries for `places`; blank ones are not saved, and
+// a place listed twice is saved once, as it was first listed.
 function toConfig(places) {
-    return places.filter(function(p) { return p.search.trim() !== "" })
-                 .map(function(p) { return JSON.stringify({ search: p.search.trim(), radar: p.radar }) })
+    var seen = Object.create(null)
+    return places.filter(function(p) {
+        var key = _key(p.search)
+        if (key === "" || key in seen)
+            return false
+        seen[key] = true
+        return true
+    }).map(function(p) { return JSON.stringify({ search: p.search.trim(), radar: p.radar }) })
 }
 
 // The index in `places` of the place searched as `search`; -1 if none.

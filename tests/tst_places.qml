@@ -78,6 +78,20 @@ TestCase {
                 [entry("Seaford VIC", "IDR023")])
     }
 
+    function test_any_name_is_a_place() {
+        // Names an object has already: a plain object as the set of names
+        // seen would take them for seen.
+        var places = Places.fromConfig([entry("constructor", "IDR023"), entry("__proto__", "IDR023"),
+                                        entry("toString", "IDR023")], "", "")
+        compare(places.map(function(p) { return p.search }), ["constructor", "__proto__", "toString"])
+    }
+
+    function test_a_place_listed_twice_is_saved_once() {
+        compare(Places.toConfig([{ search: "Seaford VIC", radar: "IDR023" },
+                                 { search: "seaford  vic", radar: "IDR024" }]),
+                [entry("Seaford VIC", "IDR023")])
+    }
+
     function test_indexOf_ignores_case_and_spacing() {
         var places = [{ search: "Seaford VIC", radar: "IDR023" }, { search: "Perth WA", radar: "IDR703" }]
         compare(Places.indexOf(places, "Perth WA"), 1)
