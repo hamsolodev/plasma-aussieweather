@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2026 Mark Hellewell <aussieweather.sandlot200@passinbox.com>
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+# Build output of scripts/package.sh and translate/build.sh
+/*.plasmoid
+/contents/locale/
+__pycache__/

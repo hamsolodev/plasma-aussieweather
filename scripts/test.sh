@@ -10,7 +10,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-python3 -I -m unittest discover --start-directory "$ROOT/tests" --pattern 'test_*.py'
+# -B: importing the scripts must not leave bytecode inside contents/.
+python3 -I -B -m unittest discover --start-directory "$ROOT/tests" --pattern 'test_*.py'
 
 runner="$(command -v qmltestrunner || true)"
 for candidate in /usr/lib64/qt6/bin/qmltestrunner /usr/lib/qt6/bin/qmltestrunner; do
