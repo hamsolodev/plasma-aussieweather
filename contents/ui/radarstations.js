@@ -82,6 +82,10 @@ var stations = [
     { site: "96", name: "Yeoval", ranges: [512, 256, 128, 64] },
 ]
 
+// Used when no station is configured, or the configured one is not in the
+// table: Melbourne at 256 km. main.xml's default must match.
+var defaultId = "IDR022"
+
 var rangeSuffix = { 512: "1", 256: "2", 128: "3", 64: "4" }
 var suffixRange = { "1": 512, "2": 256, "3": 128, "4": 64 }
 
@@ -101,4 +105,13 @@ function indexOfSite(site) {
     for (var i = 0; i < stations.length; i++)
         if (stations[i].site === site) return i
     return -1
+}
+
+// True for a product ID this table offers: a known site, at a range that
+// site publishes.
+function isKnownId(id) {
+    var p = parseId(id)
+    if (!p) return false
+    var i = indexOfSite(p.site)
+    return i >= 0 && stations[i].ranges.indexOf(p.km) >= 0
 }

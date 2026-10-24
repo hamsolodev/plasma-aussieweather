@@ -16,7 +16,8 @@ SPDX-License-Identifier: GPL-2.0-or-later
         <entry name="locationSearch" type="String">
             <default>Seaford VIC</default>
         </entry>
-        <!-- BoM radar station ID, e.g. IDR022 = Melbourne 64 km. -->
+        <!-- BoM radar station ID, e.g. IDR022 = Melbourne 256 km. Must
+             match RadarStations.defaultId. -->
         <entry name="radarStation" type="String">
             <default>IDR022</default>
         </entry>

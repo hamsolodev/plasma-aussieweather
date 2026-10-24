@@ -29,12 +29,10 @@ Kirigami.FormLayout {
     }
 
     Component.onCompleted: {
-        var parsed = RadarStations.parseId(plasmoid.configuration.radarStation)
-        var stIdx = parsed ? RadarStations.indexOfSite(parsed.site) : -1
-        if (stIdx < 0) {                       // unknown/defunct ID: fall back to Melbourne 128 km
-            stIdx = RadarStations.indexOfSite("02")
-            parsed = { km: 128 }
-        }
+        var id = plasmoid.configuration.radarStation
+        var parsed = RadarStations.parseId(
+            RadarStations.isKnownId(id) ? id : RadarStations.defaultId)
+        var stIdx = RadarStations.indexOfSite(parsed.site)
         stationCombo.currentIndex = stIdx
         var rIdx = RadarStations.stations[stIdx].ranges.indexOf(parsed.km)
         rangeCombo.currentIndex = rIdx >= 0 ? rIdx : 0

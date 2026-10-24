@@ -252,9 +252,13 @@ PlasmoidItem {
 
     // Ephemeral station override from the radar tab's quick picker. Cleared
     // when the tab is left, reverting to the station configured in settings.
+    // A station not in RadarStations' table (a stale or hand-edited config)
+    // falls back to the default rather than reaching a URL.
     property string radarOverride: ""
-    readonly property string activeRadarStation:
-        radarOverride !== "" ? radarOverride : plasmoid.configuration.radarStation
+    readonly property string activeRadarStation: {
+        var id = radarOverride !== "" ? radarOverride : plasmoid.configuration.radarStation
+        return RadarStations.isKnownId(id) ? id : RadarStations.defaultId
+    }
 
     onActiveRadarStationChanged: {
         radarFrameUrls       = []
