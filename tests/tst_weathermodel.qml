@@ -98,8 +98,9 @@ TestCase {
 
     function test_stale_after_two_missed_polls() {
         var now = Date.parse("2026-10-24T00:30:00Z")
-        verify(!model({ lastSuccessMs: now - 15 * 60000 }).isStale)
-        verify(model({ lastSuccessMs: now - 25 * 60000 }).isStale)
+        var tenMinutes = 600000
+        verify(!model({ interval: tenMinutes, lastSuccessMs: now - 15 * 60000 }).isStale)
+        verify(model({ interval: tenMinutes, lastSuccessMs: now - 25 * 60000 }).isStale)
     }
 
     // Warnings kept through a failed fetch must still expire.
@@ -113,6 +114,46 @@ TestCase {
         verify(m.hasWarnings)
         m.now = new Date("2026-10-24T06:00:00Z")
         compare(m.currentWarnings.map(function(w) { return w.title }), ["No expiry"])
+    }
+
+    // ── apply: a successful poll ───────────────────────────────────────────
+
+    function test_apply_takes_in_a_poll() {
+        var m = model({ hasData: false })
+        m.apply({ ok: true, locationName: "Kimba, SA", observations: { temp: 30 },
+                  forecast: [day("2026-10-23", "sunny")], hourly: [], warnings: [] },
+                Date.parse("2026-10-24T00:30:00Z"))
+        verify(m.hasData)
+        compare(m.locationName, "Kimba, SA")
+        compare(m.temperatureText, "30°C")
+        compare(m.lastSuccessMs, Date.parse("2026-10-24T00:30:00Z"))
+    }
+
+    // poll.py reports a failed extra as null: keep what was shown rather
+    // than claim there are no warnings or no hourly forecast.
+    function test_apply_keeps_extras_that_failed() {
+        var m = model({ warnings: [{ title: "In force", expiry_time: "2026-10-24T05:00:00Z" }] })
+        m.apply({ ok: true, observations: { temp: 19 }, forecast: m.forecast,
+                  hourly: null, warnings: null }, Date.parse("2026-10-24T00:31:00Z"))
+        compare(m.currentWarnings.length, 1)
+        compare(m.hourlyForecast.length, 2)
+        compare(m.temperatureText, "19°C")
+    }
+
+    function test_apply_without_a_lookup_keeps_the_name() {
+        var m = model({ locationName: "Seaford, VIC" })
+        m.apply({ ok: true, observations: {}, forecast: [], hourly: [], warnings: [] }, 0)
+        compare(m.locationName, "Seaford, VIC")
+    }
+
+    // Without sunrise and sunset, night falls back to the slot's own flag.
+    function test_night_without_astronomical_times() {
+        var night = hour("2026-10-24T11:00:00Z", "sunny")
+        night.is_night = true
+        var m = model({ forecast: [{ date: "2026-10-23T13:00:00Z", icon_descriptor: "sunny" }],
+                        hourlyForecast: [night], now: new Date("2026-10-24T11:10:00Z") })
+        verify(m.isNight)
+        compare(m.currentIcon, "weather-clear-night")
     }
 
     function test_no_warnings() {

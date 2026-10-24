@@ -78,12 +78,12 @@ ColumnLayout {
 
     Kirigami.Separator {
         Layout.fillWidth: true
-        visible: tab.weather.hasData && (tab.weather.upcomingHourly.length > 0 || tab.weather.today !== null)
+        visible: (tab.weather.upcomingHourly.length > 0 || tab.weather.today !== null)
         Layout.topMargin: Kirigami.Units.smallSpacing / 2
     }
 
     HourlyStrip {
-        visible: tab.weather.hasData && tab.weather.upcomingHourly.length > 0
+        visible: tab.weather.upcomingHourly.length > 0
         Layout.fillWidth: true
         weather: tab.weather
         clock: tab.clock
@@ -91,11 +91,11 @@ ColumnLayout {
 
     Kirigami.Separator {
         Layout.fillWidth: true
-        visible: tab.weather.hasData && tab.weather.upcomingHourly.length > 0 && tab.weather.today !== null
+        visible: tab.weather.upcomingHourly.length > 0 && tab.weather.today !== null
     }
 
     DailyStrip {
-        visible: tab.weather.hasData && tab.weather.today !== null
+        visible: tab.weather.today !== null
         Layout.fillWidth: true
         weather: tab.weather
     }
@@ -113,13 +113,13 @@ ColumnLayout {
 
     Kirigami.Separator {
         Layout.fillWidth: true
-        visible: tab.weather.hasData && tab.weather.today !== null
+        visible: tab.weather.today !== null
         Layout.topMargin: Kirigami.Units.smallSpacing / 2
     }
 
     // Today's extended forecast
     PlainLabel {
-        visible: tab.weather.hasData && tab.weather.today !== null
+        visible: tab.weather.today !== null
                  && (tab.weather.today.extended_text || "") !== ""
         Layout.fillWidth: true
         Layout.preferredHeight: implicitHeight
@@ -133,7 +133,7 @@ ColumnLayout {
 
     // UV · sunrise and sunset · moon phase
     RowLayout {
-        visible: tab.weather.hasData && tab.weather.today !== null
+        visible: tab.weather.today !== null
         Layout.fillWidth: true
         Layout.leftMargin:  Kirigami.Units.smallSpacing
         Layout.rightMargin: Kirigami.Units.smallSpacing
@@ -243,7 +243,7 @@ ColumnLayout {
             text: {
                 var parts = [tab.weather.locationName]
                 var obs = tab.weather.observations
-                if (tab.weather.hasData && obs && obs.station) {
+                if (obs && obs.station) {
                     parts.push(obs.station.distance
                         ? i18nc("observation station and its distance", "%1 (%2 km)",
                                 obs.station.name, (obs.station.distance / 1000).toFixed(1))

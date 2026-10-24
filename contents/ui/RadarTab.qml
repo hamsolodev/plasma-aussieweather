@@ -112,10 +112,7 @@ ColumnLayout {
         }
         PlasmaComponents.Button {
             icon.name: "view-refresh-symbolic"
-            onClicked: {
-                tab.radar.reset()
-                tab.radar.refresh()
-            }
+            onClicked: tab.radar.reload()
         }
     }
 

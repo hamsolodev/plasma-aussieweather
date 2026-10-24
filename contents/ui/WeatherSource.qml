@@ -23,6 +23,14 @@ QtObject {
 
     readonly property string locationSearch: config.locationSearch
 
+    // A transient failure is retried after 5 s, doubling, six times (about
+    // 5 minutes in all); then the regular polls take over.
+    readonly property int retryBaseMs: 5000
+    readonly property int retryCapMs: 160000
+    readonly property int maxRetries: 6
+    // How often to check whether a poll is due (Helpers.isDue).
+    readonly property int dueCheckMs: 30000
+
     property string _geohash: ""
     property real _lastPollMs: 0
     property int _retryCount: 0
@@ -77,16 +85,13 @@ QtObject {
             return
 
         if (!d.ok) {
-            weather.errorText = failureText(d)
-            // Keep showing the last good data through a transient failure:
-            // a missed poll shouldn't blank a working widget.
-            if (!weather.observations) weather.hasData = false
+            // The last good data stays on show, with the error beside it.
             // Transient failures (e.g. DNS not yet up after a wake) are
-            // retried with exponential backoff: 5 s to 160 s, about 5
-            // minutes in all, then the regular polls take over. Definitive
-            // answers (permanent: location not found) are not retried.
-            if (!d.permanent && _retryCount < 6) {
-                _retry.interval = 5000 * Math.pow(2, _retryCount)
+            // retried; definitive answers (permanent: location not found)
+            // are not.
+            weather.errorText = failureText(d)
+            if (!d.permanent && _retryCount < maxRetries) {
+                _retry.interval = Helpers.backoffMs(_retryCount, retryBaseMs, retryCapMs)
                 _retryCount++
                 _retry.restart()
             }
@@ -98,25 +103,18 @@ QtObject {
 
         if (d.locationName) {
             _geohash = d.geohash
-            weather.locationName      = d.locationName
             config.lastGeohash        = d.geohash
             config.lastLocationName   = d.locationName
             config.lastLocationSearch = d.request.query
         }
-        weather.observations = d.observations || null
-        weather.forecast     = d.forecast     || []
-        // null: that fetch failed. Keep what was shown rather than claim
-        // there are no warnings; the error says why.
-        if (d.warnings !== null) weather.warnings       = d.warnings
-        if (d.hourly   !== null) weather.hourlyForecast = d.hourly
-        weather.lastSuccessMs = Date.now()
+        weather.apply(d, Date.now())
+        // An extra that failed keeps what was shown (apply); say why.
         var partial = []
         if (d.warningsError)
             partial.push(i18n("Warnings could not be updated: %1", d.warningsError))
         if (d.hourlyError)
             partial.push(i18n("The hourly forecast could not be updated: %1", d.hourlyError))
         weather.errorText = partial.join("\n")
-        weather.hasData = true
     }
 
     property ScriptRunner _poller: ScriptRunner {
@@ -133,7 +131,7 @@ QtObject {
     // that covers the regular interval and a wake from sleep, which Qt
     // timers do not count. The check at start polls at once.
     property Timer _due: Timer {
-        interval: 30000
+        interval: source.dueCheckMs
         repeat: true
         triggeredOnStart: true
         onTriggered: {

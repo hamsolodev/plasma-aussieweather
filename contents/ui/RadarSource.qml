@@ -33,6 +33,13 @@ QtObject {
         return RadarStations.isKnownId(id) ? id : RadarStations.defaultId
     }
 
+    // While the radar is on screen, a failure is retried after 30 s,
+    // doubling, at most every 5 minutes.
+    readonly property int retryBaseMs: 30000
+    readonly property int retryCapMs: 300000
+    // How often to check whether a refresh is due (Helpers.isDue).
+    readonly property int dueCheckMs: 30000
+
     property var frames: []
     property real lastRefreshMs: 0
     // Why the last refresh failed; "" when it did not.
@@ -66,6 +73,12 @@ QtObject {
         _lister.run([station])
     }
 
+    // Start over: forget the frames and any failure, and fetch afresh.
+    function reload() {
+        reset()
+        refresh()
+    }
+
     // A radar failure, as radar.py or scriptResult reports it, worded for
     // the user.
     function failureText(d) {
@@ -91,10 +104,9 @@ QtObject {
 
         if (!d.ok) {
             errorText = failureText(d)
-            // While the tab is open, retry with backoff: 30 s doubling to a
-            // 5-minute ceiling. Leaving the tab stops it.
-            if (!d.permanent && active) {
-                _retry.interval = Math.min(30000 * Math.pow(2, _retryCount), 300000)
+            // Retried while the radar stays on screen; leaving stops it.
+            if (!d.permanent) {
+                _retry.interval = Helpers.backoffMs(_retryCount, retryBaseMs, retryCapMs)
                 _retryCount++
                 _retry.restart()
             }
@@ -123,7 +135,7 @@ QtObject {
     // Becoming active checks at once; a recent fetch is not repeated, so
     // switching tabs back and forth does not refetch.
     property Timer _due: Timer {
-        interval: 30000
+        interval: radar.dueCheckMs
         running: radar.active
         repeat: true
         triggeredOnStart: true

@@ -42,7 +42,7 @@ ColumnLayout {
         PlainLabel {
             Layout.fillWidth: true
             Layout.alignment: Qt.AlignVCenter
-            visible: conditions.weather.hasData && conditions.obs !== null
+            visible: conditions.obs !== null
             opacity: 0.7
             wrapMode: Text.WordWrap
             text: {
@@ -56,7 +56,7 @@ ColumnLayout {
         }
 
         ColumnLayout {
-            visible: conditions.weather.hasData && conditions.weather.today !== null
+            visible: conditions.weather.today !== null
             spacing: 0
             Layout.alignment: Qt.AlignVCenter
             Layout.rightMargin: Kirigami.Units.smallSpacing
@@ -84,7 +84,7 @@ ColumnLayout {
     // wind (left) | humidity (right). BoM's observations carry no pressure,
     // dew point or cloud cover.
     RowLayout {
-        visible: conditions.weather.hasData && conditions.obs !== null
+        visible: conditions.obs !== null
         Layout.fillWidth: true
         Layout.leftMargin:  Kirigami.Units.smallSpacing
         Layout.rightMargin: Kirigami.Units.smallSpacing
@@ -111,7 +111,7 @@ ColumnLayout {
     }
 
     PlainLabel {
-        visible: conditions.weather.hasData && conditions.obs !== null
+        visible: conditions.obs !== null
                  && Helpers.hasValue(conditions.obs.rain_since_9am)
         Layout.leftMargin: Kirigami.Units.smallSpacing
         text: conditions.obs && Helpers.hasValue(conditions.obs.rain_since_9am)

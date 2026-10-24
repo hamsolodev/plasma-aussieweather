@@ -354,6 +354,16 @@ TestCase {
         compare(Helpers.msToNextMinute(minute), 60000 + 50)
     }
 
+    // ── backoffMs ─────────────────────────────────────────────────────────
+
+    function test_backoffMs_doubles_to_a_ceiling() {
+        compare(Helpers.backoffMs(0, 30000, 300000), 30000)
+        compare(Helpers.backoffMs(1, 30000, 300000), 60000)
+        compare(Helpers.backoffMs(3, 30000, 300000), 240000)
+        compare(Helpers.backoffMs(4, 30000, 300000), 300000)
+        compare(Helpers.backoffMs(20, 30000, 300000), 300000)
+    }
+
     // ── isStale / isSameDay ───────────────────────────────────────────────
 
     function test_isStale_after_two_missed_polls() {

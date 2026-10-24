@@ -279,6 +279,12 @@ function todayIndex(forecast, nowMs) {
     return today
 }
 
+// The wait before retry number count (0 first): baseMs, doubling each time,
+// no longer than capMs.
+function backoffMs(count, baseMs, capMs) {
+    return Math.min(baseMs * Math.pow(2, count), capMs)
+}
+
 // Whether a fetch last made at lastMs (0: never) is due again at nowMs.
 // Times are wall-clock (Date.now()), which keeps counting while the machine
 // sleeps, where Qt timers do not; so a periodic check of this also notices
