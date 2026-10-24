@@ -8,6 +8,7 @@ import io
 import json
 import time
 import unittest
+from unittest import mock
 from datetime import datetime, timezone
 
 from codeloader import load
@@ -59,15 +60,10 @@ def run_main(station, names):
             return names()
         return names
 
-    original = radar.list_names
-    radar.list_names = list_names
-    try:
-        out = io.StringIO()
-        with contextlib.redirect_stdout(out):
-            radar.main(["radar.py", station])
-        return json.loads(out.getvalue())
-    finally:
-        radar.list_names = original
+    out = io.StringIO()
+    with mock.patch.object(radar, "list_names", list_names), contextlib.redirect_stdout(out):
+        radar.main(["radar.py", station])
+    return json.loads(out.getvalue())
 
 
 class MainTest(unittest.TestCase):
@@ -95,13 +91,9 @@ class MainTest(unittest.TestCase):
         self.assertEqual((result["error"], result["detail"]), ("network", "FTP reply 530"))
 
     def test_listing_has_a_deadline(self):
-        original = radar.LISTING_DEADLINE
-        radar.LISTING_DEADLINE = 1
-        try:
-            started = time.monotonic()
+        started = time.monotonic()
+        with mock.patch.object(radar, "LISTING_DEADLINE", 1):
             result = run_main("IDR022", lambda: time.sleep(10))
-        finally:
-            radar.LISTING_DEADLINE = original
         self.assertLess(time.monotonic() - started, 5)
         self.assertEqual((result["error"], result["detail"]), ("network", "listing took too long"))
 

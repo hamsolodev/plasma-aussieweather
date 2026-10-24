@@ -10,13 +10,35 @@ import tempfile
 import io
 import json
 import unittest
+from unittest import mock
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
-from codeloader import FakeApi, load
+from codeloader import load
 
 poll = load("poll")
+
+class FakeApi:
+    """Stands in for poll.make_get: answers API paths from a dict.
+
+    A value that is an exception instance is raised instead of returned.
+    Every path asked for is recorded in .requested.
+    """
+
+    def __init__(self, responses):
+        self.responses = responses
+        self.requested = []
+
+    def __call__(self, path):
+        self.requested.append(path)
+        if path not in self.responses:
+            raise AssertionError("unexpected API request: " + path)
+        value = self.responses[path]
+        if isinstance(value, Exception):
+            raise value
+        return value
+
 
 # Minimal stand-ins shaped like the BoM v1 API's responses.
 SEAFORD_VIC = {"geohash": "r1ppnxx", "name": "Seaford", "state": "VIC"}
@@ -52,21 +74,12 @@ def http_error(code):
 
 def run_main(api, geohash, query):
     """poll.main's JSON output, with API calls answered by API."""
-    original = poll.make_get
-    poll.make_get = lambda version: api
-    cache = os.environ.get("XDG_CACHE_HOME")
-    os.environ["XDG_CACHE_HOME"] = _IMAGE_DIR.name
-    try:
-        out = io.StringIO()
-        with contextlib.redirect_stdout(out):
-            poll.main(["poll.py", "1.8.0", geohash, query])
-        return json.loads(out.getvalue())
-    finally:
-        poll.make_get = original
-        if cache is None:
-            del os.environ["XDG_CACHE_HOME"]
-        else:
-            os.environ["XDG_CACHE_HOME"] = cache
+    out = io.StringIO()
+    with (mock.patch.object(poll, "make_get", lambda version: api),
+          mock.patch.dict(os.environ, {"XDG_CACHE_HOME": _IMAGE_DIR.name}),
+          contextlib.redirect_stdout(out)):
+        poll.main(["poll.py", "1.8.0", geohash, query])
+    return json.loads(out.getvalue())
 
 
 class RedirectTest(unittest.TestCase):
