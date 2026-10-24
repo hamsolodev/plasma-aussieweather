@@ -23,8 +23,10 @@
    checks (the tests, the QML compiled and rendered against real Plasma,
    the translation template); then it builds the `.plasmoid` (with
    compiled translations) with `scripts/package.sh`, checks the tag
-   matches `metadata.json`, extracts the CHANGELOG section, and creates a
-   GitHub Release with the `.plasmoid` and `SHA256SUMS` attached.
+   matches `metadata.json` and extracts the CHANGELOG section, all with a
+   read-only token; a separate job, which runs no code from the
+   repository, creates the GitHub Release with the `.plasmoid` and
+   `SHA256SUMS` attached.
 4. Upload to the KDE Store manually (see below).
 5. Bump the submodule pointer in the `plasmoids` repo.
 
