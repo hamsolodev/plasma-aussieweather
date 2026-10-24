@@ -17,10 +17,16 @@ stdout carrying "ok"; the exit status is always 0.
 
 import base64
 import binascii
+import collections
+import hashlib
 import html
 import json
+import os
+import pathlib
 import re
 import sys
+import tempfile
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -56,6 +62,7 @@ def failure_from(error):
     if isinstance(error, Failure):
         return error
     if isinstance(error, urllib.error.HTTPError):
+        error.close()  # it holds the response
         # A client error will not change on retry; rate limiting will.
         permanent = 400 <= error.code < 500 and error.code != 429
         return Failure("http", "HTTP %d %s" % (error.code, error.reason), permanent)
@@ -154,24 +161,30 @@ def is_current(warning, now):
     return expiry is None or expiry > now
 
 
-# Warning bodies are shown as Qt RichText, which fetches <img> sources and
-# hands every image to whichever decoder sniffs it — so the HTML BoM sends is
-# rebuilt from this allowlist rather than passed through. Links survive only
-# as https; images only as PNG data: URIs that really are PNG.
+# Warning bodies are shown as Qt RichText, which fetches <img> sources, hands
+# every image to whichever decoder sniffs it, and lays nested tables out in
+# time that doubles with each level. So the HTML BoM sends is rebuilt from
+# this allowlist rather than passed through: links survive only as https,
+# nesting and text are capped, and images leave the markup (see ImageStore).
 ALLOWED_TAGS = {
     "a", "b", "br", "div", "em", "h1", "h2", "h3", "h4", "h5", "h6", "hr",
-    "i", "img", "li", "ol", "p", "pre", "span", "strong", "sub", "sup",
-    "table", "tbody", "td", "th", "thead", "tr", "u", "ul",
+    "i", "li", "ol", "p", "pre", "span", "strong", "sub", "sup", "u", "ul",
 }
-VOID_TAGS = {"br", "hr", "img"}
+VOID_TAGS = {"br", "hr"}
 DROPPED_WITH_CONTENT = {"script", "style"}
+MAX_DEPTH = 8
+MAX_TEXT = 20000
+
 PNG_URI_PREFIX = "data:image/png;base64,"
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 MAX_IMAGE_BYTES = 2 * 1024 * 1024
+MAX_IMAGES = 8
+
+Sanitised = collections.namedtuple("Sanitised", ["html", "images"])
 
 
-def png_data_uri(src):
-    """SRC normalised if it is a data: URI holding a PNG, else None."""
+def png_bytes(src):
+    """The bytes of a data: URI holding a PNG, else None."""
     if not src.lower().startswith(PNG_URI_PREFIX):
         return None
     payload = "".join(src[len(PNG_URI_PREFIX):].split())
@@ -181,21 +194,7 @@ def png_data_uri(src):
         return None
     if not data.startswith(PNG_SIGNATURE) or len(data) > MAX_IMAGE_BYTES:
         return None
-    return PNG_URI_PREFIX + payload
-
-
-def allowed_attributes(tag, attrs):
-    """The attributes TAG keeps, or None if the tag itself must go."""
-    attrs = dict(attrs)
-    if tag == "a":
-        href = attrs.get("href") or ""
-        return [("href", href)] if href.lower().startswith("https://") else None
-    if tag == "img":
-        src = png_data_uri(attrs.get("src") or "")
-        if src is None:
-            return None
-        return [("src", src)] + ([("alt", attrs["alt"])] if attrs.get("alt") else [])
-    return []
+    return data
 
 
 class _Sanitiser(HTMLParser):
@@ -203,22 +202,44 @@ class _Sanitiser(HTMLParser):
     def __init__(self):
         super().__init__(convert_charrefs=True)
         self.out = []
-        self.open = []
+        self.images = []
+        # Every allowed element still open, as (tag, emitted): one past
+        # MAX_DEPTH is tracked but not emitted, so its end tag closes it and
+        # not an outer element.
+        self.stack = []
         self.dropping = 0
+        self.text_left = MAX_TEXT
+
+    def depth(self):
+        return sum(emitted for _, emitted in self.stack)
 
     def handle_starttag(self, tag, attrs):
         if tag in DROPPED_WITH_CONTENT:
             self.dropping += 1
             return
-        if self.dropping or tag not in ALLOWED_TAGS:
+        if self.dropping or self.text_left <= 0:
             return
-        kept = allowed_attributes(tag, attrs)
-        if kept is None:
+        if tag == "img":
+            data = png_bytes(dict(attrs).get("src") or "")
+            if data is not None and len(self.images) < MAX_IMAGES:
+                self.images.append(data)
             return
-        self.out.append("<" + tag + "".join(
-            ' %s="%s"' % (name, html.escape(value, quote=True)) for name, value in kept) + ">")
-        if tag not in VOID_TAGS:
-            self.open.append(tag)
+        if tag not in ALLOWED_TAGS:
+            return
+        if tag == "a":
+            href = dict(attrs).get("href") or ""
+            if not href.lower().startswith("https://"):
+                return
+            start = '<a href="%s">' % html.escape(href, quote=True)
+        else:
+            start = "<" + tag + ">"
+        if tag in VOID_TAGS:
+            self.out.append(start)
+            return
+        emitted = self.depth() < MAX_DEPTH
+        if emitted:
+            self.out.append(start)
+        self.stack.append((tag, emitted))
 
     def handle_startendtag(self, tag, attrs):
         self.handle_starttag(tag, attrs)
@@ -229,28 +250,80 @@ class _Sanitiser(HTMLParser):
         if tag in DROPPED_WITH_CONTENT:
             self.dropping = max(0, self.dropping - 1)
             return
-        if tag not in self.open:
+        if self.text_left <= 0 or all(t != tag for t, _ in self.stack):
             return
-        while self.open:
-            closing = self.open.pop()
-            self.out.append("</" + closing + ">")
+        while self.stack:
+            closing, emitted = self.stack.pop()
+            if emitted:
+                self.out.append("</" + closing + ">")
             if closing == tag:
                 break
 
     def handle_data(self, data):
-        if not self.dropping:
-            self.out.append(html.escape(data, quote=False))
+        if self.dropping or self.text_left <= 0:
+            return
+        if len(data) > self.text_left:
+            data = data[:self.text_left] + "…"
+        self.text_left -= len(data)
+        self.out.append(html.escape(data, quote=False))
 
     def result(self):
         self.close()
-        return "".join(self.out) + "".join("</" + t + ">" for t in reversed(self.open))
+        closing = "".join("</" + t + ">" for t, emitted in reversed(self.stack) if emitted)
+        return Sanitised("".join(self.out) + closing, self.images)
 
 
-def sanitise_html(markup):
-    """MARKUP rebuilt from the allowlist, safe to show as RichText."""
+def sanitise(markup):
+    """MARKUP rebuilt from the allowlist, safe to show as RichText, and the
+    PNG images taken out of it."""
     sanitiser = _Sanitiser()
     sanitiser.feed(markup)
     return sanitiser.result()
+
+
+class ImageStore:
+    """Warning images, as PNG files the widget shows with a QML Image.
+
+    A data: image left in RichText is handed to every image plugin's
+    sniffer before the PNG decoder (LibRaw claims some PNG-signature data
+    by its size alone); a QML Image of a .png file goes to the PNG decoder.
+    Files are named by their content's hash, so a poll rewrites nothing.
+    """
+
+    # An unreferenced file younger than this may belong to a poll still
+    # running (the location changed mid-poll), so prune leaves it.
+    PRUNE_AFTER = 600
+
+    def __init__(self, directory):
+        self.directory = directory
+        self.kept = set()
+
+    def save(self, data):
+        """Store DATA; its file's path."""
+        path = self.directory / (hashlib.sha256(data).hexdigest() + ".png")
+        if not path.exists():
+            self.directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile(dir=self.directory, suffix=".tmp", delete=False) as f:
+                f.write(data)
+            os.replace(f.name, path)
+        self.kept.add(path.name)
+        return str(path)
+
+    def prune(self):
+        """Delete files no current warning shows."""
+        if not self.directory.is_dir():
+            return
+        cutoff = time.time() - self.PRUNE_AFTER
+        for path in self.directory.iterdir():
+            if path.name not in self.kept and path.stat().st_mtime < cutoff:
+                path.unlink(missing_ok=True)
+
+
+def image_store():
+    """The ImageStore under the user's cache directory."""
+    cache = os.environ.get("XDG_CACHE_HOME") or ""
+    base = pathlib.Path(cache) if os.path.isabs(cache) else pathlib.Path.home() / ".cache"
+    return ImageStore(base / "net.tropism.plasma.aussieweather" / "warnings")
 
 
 HTTPS_URL = re.compile(r'https://[^\s<>"]+')
@@ -278,20 +351,26 @@ def linkify(text):
     return "".join(out)
 
 
-def warning_view(warning):
-    """The fields of a warning the widget shows, its body as safe RichText."""
+def warning_view(warning, images):
+    """The fields of a warning the widget shows: its body as safe RichText,
+    and the paths of its images, saved in the ImageStore IMAGES."""
     body = warning.get("message") or warning.get("text") or warning.get("description") or ""
+    if LOOKS_LIKE_HTML.search(body):
+        body_html, pngs = sanitise(body)
+    else:
+        body_html, pngs = linkify(body), []
     return {
         "id": warning.get("id", ""),
         "title": warning.get("title") or warning.get("short_title") or "",
         "phase": warning.get("phase", ""),
         "issue_time": warning.get("issue_time", ""),
         "expiry_time": warning.get("expiry_time", ""),
-        "html": sanitise_html(body) if LOOKS_LIKE_HTML.search(body) else linkify(body),
+        "html": body_html,
+        "images": [images.save(png) for png in pngs],
     }
 
 
-def warnings_for(get, geohash, now):
+def warnings_for(get, geohash, now, images):
     """The location's current warnings, each merged with its detail."""
     warnings = []
     for warning in get("/locations/" + geohash + "/warnings").get("data", []):
@@ -304,7 +383,7 @@ def warnings_for(get, geohash, now):
                 warning = dict(warning, **detail.get("data", {}))
             except Exception:
                 pass
-        warnings.append(warning_view(warning))
+        warnings.append(warning_view(warning, images))
     return warnings
 
 
@@ -318,11 +397,12 @@ def hourly_for(get, geohash):
         return get("/locations/" + geohash + "/forecasts/hourly").get("data", [])
     except urllib.error.HTTPError as e:
         if e.code == 404:
+            e.close()
             return []
         raise
 
 
-def collect(get, geohash, query, now):
+def collect(get, geohash, query, now, images):
     """Everything the widget shows, as one JSON-ready dict."""
     if not query.strip():
         raise Failure("no_location", permanent=True)
@@ -348,7 +428,8 @@ def collect(get, geohash, query, now):
         out["hourly"] = None
         out["hourlyError"] = failure_from(e).detail
     try:
-        out["warnings"] = warnings_for(get, geohash, now)
+        out["warnings"] = warnings_for(get, geohash, now, images)
+        images.prune()
     except Exception as e:
         out["warnings"] = None
         out["warningsError"] = failure_from(e).detail
@@ -358,7 +439,8 @@ def collect(get, geohash, query, now):
 def main(argv):
     version, geohash, query = argv[1:4]
     try:
-        result = collect(make_get(version), geohash, query, datetime.now(timezone.utc))
+        result = collect(make_get(version), geohash, query, datetime.now(timezone.utc),
+                         image_store())
     except Exception as e:
         failure = failure_from(e)
         result = {"ok": False, "error": failure.kind, "detail": failure.detail,

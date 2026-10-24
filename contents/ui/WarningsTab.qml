@@ -55,8 +55,8 @@ QQC2.ScrollView {
                     wrapMode: Text.WordWrap
                     visible: modelData.html !== ""
                     // poll.py rebuilds the body from a tag allowlist
-                    // (sanitise_html): only https links and PNG data: images
-                    // survive, so nothing here fetches.
+                    // (sanitise): only https links survive and no images,
+                    // so nothing here fetches.
                     textFormat: Text.RichText
                     linkColor: Kirigami.Theme.linkColor
                     text: modelData.html
@@ -64,6 +64,21 @@ QQC2.ScrollView {
                     HoverHandler {
                         enabled: parent.hoveredLink !== ""
                         cursorShape: Qt.PointingHandCursor
+                    }
+                }
+                // The warning's images (BoM's heatwave maps), which poll.py
+                // saves as PNG files rather than leaving in the RichText.
+                Repeater {
+                    model: modelData.images || []
+                    Image {
+                        required property string modelData
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: implicitWidth > 0
+                            ? width * implicitHeight / implicitWidth : 0
+                        source: Helpers.fileUrl(modelData)
+                        sourceSize.width: 1024
+                        fillMode: Image.PreserveAspectFit
+                        asynchronous: true
                     }
                 }
                 PlainLabel {

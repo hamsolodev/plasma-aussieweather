@@ -403,6 +403,12 @@ TestCase {
         verify(!Helpers.isRadarFor({}, "IDR022"))
     }
 
+    function test_fileUrl_encodes_each_segment() {
+        compare(Helpers.fileUrl("/home/u/.cache/w/ab12.png"), "file:///home/u/.cache/w/ab12.png")
+        compare(Helpers.fileUrl("/home/u/my cache/#1?/x.png"),
+                "file:///home/u/my%20cache/%231%3F/x.png")
+    }
+
     // ── nextLoadedFrame (radar loop) ──────────────────────────────────────
 
     // Frames as the radar tab sees them: true where the Image has loaded.

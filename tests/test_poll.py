@@ -4,6 +4,9 @@
 
 import base64
 import contextlib
+import os
+import pathlib
+import tempfile
 import io
 import json
 import unittest
@@ -19,6 +22,13 @@ poll = load("poll")
 SEAFORD_VIC = {"geohash": "r1ppnxx", "name": "Seaford", "state": "VIC"}
 SEAFORD_SA = {"geohash": "r1f93cz", "name": "Seaford", "state": "SA"}
 NOW = datetime(2026, 10, 24, 1, 0, tzinfo=timezone.utc)
+# Where warning images go in tests that do not look at them.
+_IMAGE_DIR = tempfile.TemporaryDirectory()
+IMAGES = poll.ImageStore(pathlib.Path(_IMAGE_DIR.name))
+
+
+def tearDownModule():
+    _IMAGE_DIR.cleanup()
 
 
 def location_api(geohash, warnings=(), details=None, **overrides):
@@ -37,13 +47,15 @@ def location_api(geohash, warnings=(), details=None, **overrides):
 
 
 def http_error(code):
-    return urllib.error.HTTPError("https://api.example/x", code, "status %d" % code, {}, None)
+    return urllib.error.HTTPError("https://api.example/x", code, "status %d" % code, {}, io.BytesIO())
 
 
 def run_main(api, geohash, query):
     """poll.main's JSON output, with API calls answered by API."""
     original = poll.make_get
     poll.make_get = lambda version: api
+    cache = os.environ.get("XDG_CACHE_HOME")
+    os.environ["XDG_CACHE_HOME"] = _IMAGE_DIR.name
     try:
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
@@ -51,6 +63,10 @@ def run_main(api, geohash, query):
         return json.loads(out.getvalue())
     finally:
         poll.make_get = original
+        if cache is None:
+            del os.environ["XDG_CACHE_HOME"]
+        else:
+            os.environ["XDG_CACHE_HOME"] = cache
 
 
 class RedirectTest(unittest.TestCase):
@@ -66,8 +82,9 @@ class RedirectTest(unittest.TestCase):
 
     def test_redirect_off_https_is_refused(self):
         for target in ("http://api.weather.bom.gov.au/v1/y", "ftp://x/y", "file:///etc/passwd"):
-            with self.assertRaises(urllib.error.HTTPError, msg=target):
+            with self.assertRaises(urllib.error.HTTPError, msg=target) as caught:
                 self.handler.redirect_request(self.request, None, 302, "Found", {}, target)
+            caught.exception.close()
 
 
 class SplitStateTest(unittest.TestCase):
@@ -173,7 +190,7 @@ class CollectTest(unittest.TestCase):
 
     def test_cached_geohash_skips_the_lookup(self):
         api = location_api("r1ppnx")
-        out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW)
+        out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW, IMAGES)
         self.assertTrue(out["ok"])
         self.assertNotIn("locationName", out)
         self.assertFalse(any(p.startswith("/locations?") for p in api.requested))
@@ -186,25 +203,25 @@ class CollectTest(unittest.TestCase):
 
     def test_lookup_reports_the_resolved_location(self):
         api = location_api("r1ppnx", **{"/locations?search=Seaford": {"data": [SEAFORD_VIC]}})
-        out = poll.collect(api, "", "Seaford VIC", NOW)
+        out = poll.collect(api, "", "Seaford VIC", NOW, IMAGES)
         self.assertEqual(out["geohash"], "r1ppnx")
         self.assertEqual(out["locationName"], "Seaford, VIC")
 
     def test_failed_extras_are_unknown_not_empty(self):
         api = location_api("r1ppnx", **{"/locations/r1ppnx/forecasts/hourly": http_error(503),
                                         "/locations/r1ppnx/warnings": http_error(503)})
-        out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW)
+        out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW, IMAGES)
         self.assertIsNone(out["hourly"])
         self.assertIsNone(out["warnings"])
         self.assertIn("503", out["warningsError"])
 
     def test_hourly_not_offered_is_empty(self):
         api = location_api("rd3het", **{"/locations/rd3het/forecasts/hourly": http_error(404)})
-        out = poll.collect(api, "rd3het", "Lord Howe Island NSW", NOW)
+        out = poll.collect(api, "rd3het", "Lord Howe Island NSW", NOW, IMAGES)
         self.assertEqual(out["hourly"], [])
 
     def test_forecasts_are_trimmed(self):
-        out = poll.collect(location_api("r1ppnx"), "r1ppnx", "Seaford VIC", NOW)
+        out = poll.collect(location_api("r1ppnx"), "r1ppnx", "Seaford VIC", NOW, IMAGES)
         self.assertEqual(len(out["forecast"]), 8)
         # More hours than are shown: the widget drops slots that have passed.
         self.assertEqual(len(out["hourly"]), 12)
@@ -213,7 +230,7 @@ class CollectTest(unittest.TestCase):
         summary = {"id": "VIC_X_1", "title": "Flood Warning"}
         api = location_api("r1ppnx", warnings=[summary],
                            details={"VIC_X_1": {"message": "<p>Detail</p>"}})
-        out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW)
+        out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW, IMAGES)
         self.assertEqual(out["warnings"][0]["html"], "<p>Detail</p>")
         self.assertEqual(out["warnings"][0]["title"], "Flood Warning")
 
@@ -225,7 +242,7 @@ class CurrentWarningsTest(unittest.TestCase):
         cancelled = {"id": "B", "phase": "cancelled", "expiry_time": "2026-10-24T04:16:30Z"}
         expired = {"id": "C", "phase": "update", "expiry_time": "2026-10-24T00:59:59Z"}
         api = location_api("r1ppnx", warnings=[live, cancelled, expired], details={"A": {}})
-        out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW)
+        out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW, IMAGES)
         self.assertEqual([w["id"] for w in out["warnings"]], ["A"])
         self.assertNotIn("/warnings/B", api.requested)
         self.assertNotIn("/warnings/C", api.requested)
@@ -234,7 +251,7 @@ class CurrentWarningsTest(unittest.TestCase):
         missing = {"id": "A", "phase": "new"}
         garbled = {"id": "B", "phase": "new", "expiry_time": "soon"}
         api = location_api("r1ppnx", warnings=[missing, garbled], details={"A": {}, "B": {}})
-        out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW)
+        out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW, IMAGES)
         self.assertEqual([w["id"] for w in out["warnings"]], ["A", "B"])
 
 
@@ -251,44 +268,98 @@ class SanitiseHtmlTest(unittest.TestCase):
     def test_bom_markup_survives_without_attributes(self):
         html = ('<div class="product"><h2>Heatwave</h2><p style="x">Hot <b>days</b>.</p>'
                 '<ul class="l"><li>one</li></ul><br/></div>')
-        self.assertEqual(poll.sanitise_html(html),
+        self.assertEqual(poll.sanitise(html).html,
                          "<div><h2>Heatwave</h2><p>Hot <b>days</b>.</p><ul><li>one</li></ul><br></div>")
 
     def test_scripts_styles_and_unknown_tags_are_dropped(self):
         html = '<p>a<script>alert(1)</script><style>p{}</style><iframe src="x">b</iframe>c</p>'
-        self.assertEqual(poll.sanitise_html(html), "<p>abc</p>")
+        self.assertEqual(poll.sanitise(html).html, "<p>abc</p>")
 
     def test_event_handlers_are_dropped(self):
-        self.assertEqual(poll.sanitise_html('<p onclick="x()">t</p>'), "<p>t</p>")
+        self.assertEqual(poll.sanitise('<p onclick="x()">t</p>').html, "<p>t</p>")
 
     def test_only_https_links_survive(self):
         html = ('<a href="https://nt.gov.au/h?a=1&amp;b=2">ok</a>'
                 '<a href="javascript:alert(1)">js</a><a href="file:///etc/passwd">f</a>'
                 '<a href="http://bom.gov.au">plain</a>')
-        self.assertEqual(poll.sanitise_html(html),
+        self.assertEqual(poll.sanitise(html).html,
                          '<a href="https://nt.gov.au/h?a=1&amp;b=2">ok</a>jsfplain')
 
-    def test_only_real_png_data_images_survive(self):
-        png = data_uri("image/png", PNG)
-        html = ('<img alt="map" src="%s">' % png
+    def test_images_leave_the_markup(self):
+        # Qt RichText hands a data: image to every image plugin's sniffer
+        # (LibRaw claims some PNG-signature data by size alone), so no
+        # image stays in the markup; real PNGs are kept aside instead.
+        html = ('<p>a<img alt="map" src="%s">b</p>' % data_uri("image/png", PNG)
                 + '<img src="https://tracker.example/p.png">'
                 + '<img src="%s">' % data_uri("image/png", EPS)
                 + '<img src="%s">' % data_uri("image/svg+xml", b"<svg/>")
                 + '<img src="data:image/png;base64,!!!">')
-        self.assertEqual(poll.sanitise_html(html), '<img src="%s" alt="map">' % png)
+        result = poll.sanitise(html)
+        self.assertEqual(result.html, "<p>ab</p>")
+        self.assertEqual(result.images, [PNG])
+
+    def test_images_are_capped(self):
+        html = "".join('<img src="%s">' % data_uri("image/png", PNG + bytes([i]))
+                       for i in range(poll.MAX_IMAGES + 3))
+        self.assertEqual(len(poll.sanitise(html).images), poll.MAX_IMAGES)
+
+    def test_tables_are_dropped(self):
+        # Qt's RichText table layout time doubles with each level of
+        # nesting: 20 levels froze the shell for minutes.
+        html = "<table><tr><td>" * 20 + "x" + "</td></tr></table>" * 20
+        self.assertEqual(poll.sanitise(html).html, "x")
+
+    def test_nesting_is_capped(self):
+        html = "<div>" * 50 + "x" + "</div>" * 50
+        out = poll.sanitise(html).html
+        self.assertEqual(out.count("<div>"), poll.MAX_DEPTH)
+        self.assertEqual(out.count("</div>"), poll.MAX_DEPTH)
+        self.assertIn("x", out)
+
+    def test_text_is_capped(self):
+        out = poll.sanitise("<p>" + "a" * (poll.MAX_TEXT + 500) + "</p><p>tail</p>").html
+        self.assertLessEqual(out.count("a"), poll.MAX_TEXT)
+        self.assertNotIn("tail", out)
+        self.assertTrue(out.endswith("…</p>"))
 
     def test_text_stays_escaped(self):
-        self.assertEqual(poll.sanitise_html("<p>a &lt;b&gt; &amp; c</p>"),
+        self.assertEqual(poll.sanitise("<p>a &lt;b&gt; &amp; c</p>").html,
                          "<p>a &lt;b&gt; &amp; c</p>")
 
     def test_attribute_quotes_cannot_break_out(self):
         html = '<a href=\'https://x.au/"onmouseover="y\'>t</a>'
-        self.assertEqual(poll.sanitise_html(html),
+        self.assertEqual(poll.sanitise(html).html,
                          '<a href="https://x.au/&quot;onmouseover=&quot;y">t</a>')
 
     def test_unclosed_and_stray_tags_are_balanced(self):
-        self.assertEqual(poll.sanitise_html("<ul><li>x</b></ul></p><p>y"),
+        self.assertEqual(poll.sanitise("<ul><li>x</b></ul></p><p>y").html,
                          "<ul><li>x</li></ul><p>y</p>")
+
+
+class ImageStoreTest(unittest.TestCase):
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.store = poll.ImageStore(pathlib.Path(self.directory.name) / "warnings")
+
+    def tearDown(self):
+        self.directory.cleanup()
+
+    def test_same_image_same_file(self):
+        self.assertEqual(self.store.save(PNG), self.store.save(PNG))
+        self.assertEqual(len(list(self.store.directory.iterdir())), 1)
+
+    def test_prune_keeps_what_this_poll_saved_and_recent_files(self):
+        kept = pathlib.Path(self.store.save(PNG))
+        old = self.store.directory / ("0" * 64 + ".png")
+        recent = self.store.directory / ("1" * 64 + ".png")
+        for path in (old, recent):
+            path.write_bytes(PNG)
+        os.utime(old, (0, 0))
+        self.store.prune()
+        self.assertTrue(kept.exists())
+        self.assertTrue(recent.exists(), "another poll may have just saved it")
+        self.assertFalse(old.exists())
 
 
 class LinkifyTest(unittest.TestCase):
@@ -308,23 +379,39 @@ class LinkifyTest(unittest.TestCase):
 
 class WarningViewTest(unittest.TestCase):
 
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.store = poll.ImageStore(pathlib.Path(self.directory.name) / "warnings")
+
+    def tearDown(self):
+        self.directory.cleanup()
+
+    def test_images_are_saved_as_png_files(self):
+        view = poll.warning_view({"id": "A", "message": '<p>Map:</p><img src="%s">'
+                                  % data_uri("image/png", PNG)}, self.store)
+        self.assertEqual(view["html"], "<p>Map:</p>")
+        [path] = view["images"]
+        self.assertTrue(path.endswith(".png"))
+        self.assertEqual(pathlib.Path(path).read_bytes(), PNG)
+        self.assertEqual(pathlib.Path(path).parent, self.store.directory)
+
     def test_html_message_is_sanitised(self):
         view = poll.warning_view({"id": "A", "title": "Flood Warning", "phase": "new",
                                   "issue_time": "2026-10-24T00:00:00Z",
                                   "expiry_time": "2026-10-25T00:00:00Z",
-                                  "message": "<p>Rising<script>x</script></p>"})
+                                  "message": "<p>Rising<script>x</script></p>"}, self.store)
         self.assertEqual(view, {"id": "A", "title": "Flood Warning", "phase": "new",
                                 "issue_time": "2026-10-24T00:00:00Z",
                                 "expiry_time": "2026-10-25T00:00:00Z",
-                                "html": "<p>Rising</p>"})
+                                "html": "<p>Rising</p>", "images": []})
 
     def test_summary_without_detail_falls_back(self):
-        view = poll.warning_view({"id": "A", "short_title": "Sheep Graziers Warning"})
+        view = poll.warning_view({"id": "A", "short_title": "Sheep Graziers Warning"}, self.store)
         self.assertEqual(view["title"], "Sheep Graziers Warning")
         self.assertEqual(view["html"], "")
 
     def test_plain_text_body_is_linkified(self):
-        view = poll.warning_view({"id": "A", "text": "See https://bom.gov.au now"})
+        view = poll.warning_view({"id": "A", "text": "See https://bom.gov.au now"}, self.store)
         self.assertEqual(view["html"],
                          'See <a href="https://bom.gov.au">https://bom.gov.au</a> now')
 

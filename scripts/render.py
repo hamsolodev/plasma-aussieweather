@@ -114,6 +114,8 @@ def fixture(now):
                     "</p><ul><li>Damaging winds</li><li>Heavy rainfall</li></ul>"
                     '<p>See <a href="https://www.bom.gov.au/vic/warnings/">current '
                     "warnings</a>.</p>",
+            # Stands in for a warning map, which poll.py saves as a file.
+            "images": [str(ROOT / "docs" / "screenshots" / "light-radar.png")],
         }],
     }
 

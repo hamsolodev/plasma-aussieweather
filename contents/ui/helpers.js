@@ -112,6 +112,12 @@ function localPath(url) {
     return decodeURIComponent(String(url).replace(/^file:\/\//, ""))
 }
 
+// A file: URL for an absolute path, each segment percent-encoded so a
+// space, # or ? in a directory name stays part of the path.
+function fileUrl(path) {
+    return "file://" + String(path).split("/").map(encodeURIComponent).join("/")
+}
+
 // Only https links are ever opened externally. Warning bodies can only carry
 // https links (poll.py's allowlist); this gate on Qt.openUrlExternally keeps
 // a file:, javascript: or other scheme from being launched regardless.
