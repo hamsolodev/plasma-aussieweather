@@ -3,8 +3,10 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 import contextlib
+import ftplib
 import io
 import json
+import time
 import unittest
 from datetime import datetime, timezone
 
@@ -53,6 +55,8 @@ def run_main(station, names):
     def list_names():
         if isinstance(names, Exception):
             raise names
+        if callable(names):
+            return names()
         return names
 
     original = radar.list_names
@@ -84,11 +88,46 @@ class MainTest(unittest.TestCase):
         self.assertEqual((result["ok"], result["error"], result["permanent"]),
                          (False, "no_frames", False))
 
+    def test_server_text_is_not_shown(self):
+        # The listing is plain FTP: whoever is on the path writes the reply.
+        refusal = ftplib.error_perm("530 BoM radar access suspended. Call 1800-000-000")
+        result = run_main("IDR022", refusal)
+        self.assertEqual((result["error"], result["detail"]), ("network", "FTP reply 530"))
+
+    def test_listing_has_a_deadline(self):
+        original = radar.LISTING_DEADLINE
+        radar.LISTING_DEADLINE = 1
+        try:
+            started = time.monotonic()
+            result = run_main("IDR022", lambda: time.sleep(10))
+        finally:
+            radar.LISTING_DEADLINE = original
+        self.assertLess(time.monotonic() - started, 5)
+        self.assertEqual((result["error"], result["detail"]), ("network", "listing took too long"))
+
     def test_listing_failure_is_a_network_failure(self):
         result = run_main("IDR022", ConnectionRefusedError(111, "Connection refused"))
         self.assertEqual((result["ok"], result["error"], result["permanent"]),
                          (False, "network", False))
         self.assertIn("Connection refused", result["detail"])
+
+
+class NameCollectorTest(unittest.TestCase):
+
+    def test_collects_names(self):
+        collect = radar.NameCollector()
+        collect("IDR022.T.202610240000.png")
+        self.assertEqual(collect.names, ["IDR022.T.202610240000.png"])
+
+    def test_endless_listing_is_cut_off(self):
+        collect = radar.NameCollector()
+        with self.assertRaises(radar.ListingTooLarge):
+            for _ in range(radar.MAX_NAMES + 1):
+                collect("x")
+        collect = radar.NameCollector()
+        with self.assertRaises(radar.ListingTooLarge):
+            for _ in range(radar.MAX_BYTES // 100 + 1):
+                collect("x" * 100)
 
 
 class StationTest(unittest.TestCase):
@@ -98,7 +137,7 @@ class StationTest(unittest.TestCase):
             self.assertTrue(radar.is_station(station), station)
 
     def test_invalid_station_ids(self):
-        for station in ("", "IDR02", "IDR025", "IDR02.T", "IDR022 ", "../IDR022", "idr022"):
+        for station in ("", "IDR02", "IDR025", "IDR02.T", "IDR022 ", "../IDR022", "idr022", "IDR٠٢2"):
             self.assertFalse(radar.is_station(station), station)
 
 
