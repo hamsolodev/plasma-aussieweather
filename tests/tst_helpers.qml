@@ -326,6 +326,25 @@ TestCase {
         compare(Helpers.clockFormat(true), "HH:mm")
     }
 
+    // ── isDue / msToNextMinute ────────────────────────────────────────────
+
+    function test_isDue() {
+        var interval = 600000
+        var last = Date.UTC(2026, 9, 24, 0, 0)
+        verify(Helpers.isDue(0, last, interval))
+        verify(!Helpers.isDue(last, last + interval - 1, interval))
+        verify(Helpers.isDue(last, last + interval, interval))
+        // After a sleep, wall-clock time has moved on even if timers have not.
+        verify(Helpers.isDue(last, last + 8 * 3600000, interval))
+    }
+
+    function test_msToNextMinute_lands_just_past_the_boundary() {
+        var minute = Date.UTC(2026, 9, 24, 0, 1)
+        compare(Helpers.msToNextMinute(minute - 15000), 15000 + 50)
+        compare(Helpers.msToNextMinute(minute - 1), 1 + 50)
+        compare(Helpers.msToNextMinute(minute), 60000 + 50)
+    }
+
     // ── isStale / isSameDay ───────────────────────────────────────────────
 
     function test_isStale_after_two_missed_polls() {

@@ -262,6 +262,20 @@ function todayIndex(forecast, nowMs) {
     return today
 }
 
+// Whether a fetch last made at lastMs (0: never) is due again at nowMs.
+// Times are wall-clock (Date.now()), which keeps counting while the machine
+// sleeps, where Qt timers do not; so a periodic check of this also notices
+// a wake.
+function isDue(lastMs, nowMs, intervalMs) {
+    return lastMs <= 0 || nowMs - lastMs >= intervalMs
+}
+
+// Milliseconds from nowMs to just past the next minute boundary, for a
+// clock that ticks on the minute.
+function msToNextMinute(nowMs) {
+    return 60000 - nowMs % 60000 + 50
+}
+
 // Whether data last fetched at lastMs is out of date at nowMs: two polls in
 // a row have been missed. False before the first fetch (lastMs 0).
 function isStale(lastMs, nowMs, intervalMs) {

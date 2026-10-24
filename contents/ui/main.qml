@@ -266,26 +266,16 @@ PlasmoidItem {
         poller.connectSource(buildPollCommand())
     }
 
-    Timer {
-        interval: root.effectivePollInterval
-        running: true
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: root.refresh()
-    }
-
-    // Qt timers don't advance during system sleep. This watchdog uses
-    // wall-clock time (Date.now() = CLOCK_REALTIME, which does advance
-    // during sleep) to detect that data is stale after a wake and
-    // triggers an immediate refresh rather than waiting out the
-    // remaining timer interval.
+    // Polls when due by wall-clock time (Helpers.isDue), checked every 30 s:
+    // that covers the regular interval and a wake from sleep, which Qt
+    // timers do not count. The check at start polls at once.
     Timer {
         interval: 30000
         running: true
         repeat: true
+        triggeredOnStart: true
         onTriggered: {
-            if (root._lastPollMs > 0
-                    && (Date.now() - root._lastPollMs) > root.effectivePollInterval)
+            if (Helpers.isDue(root._lastPollMs, Date.now(), root.effectivePollInterval))
                 root.refresh()
         }
     }
@@ -370,31 +360,19 @@ PlasmoidItem {
         radarRetry.stop()
     }
 
-    // Minute-resolution clock snapped to wall-clock minute boundaries.
-    // currentIcon and any is_night bindings reference this so they re-evaluate on the hour.
+    // Minute-resolution clock, ticking just past each wall-clock minute.
+    // Everything that depends on the time of day reads this, so it updates
+    // within a minute: the day/night switch, "Now", staleness.
     property var currentTime: new Date()
 
     Timer {
-        id: clockSync
-        running: false
-        repeat: false
+        interval: Helpers.msToNextMinute(Date.now())
+        running: true
         onTriggered: {
             root.currentTime = new Date()
-            clockTick.start()
-        }
-        Component.onCompleted: {
-            var now = new Date()
-            var ms = (60 - now.getSeconds()) * 1000 - now.getMilliseconds()
-            interval = ms > 100 ? ms : ms + 60000
+            interval = Helpers.msToNextMinute(Date.now())
             start()
         }
-    }
-    Timer {
-        id: clockTick
-        interval: 60000
-        repeat: true
-        running: false
-        onTriggered: root.currentTime = new Date()
     }
 
     P5Support.DataSource {
@@ -457,18 +435,16 @@ PlasmoidItem {
         radarPoller.connectSource(scriptCommand("radar.py", [activeRadarStation]))
     }
 
-    // Refresh only while the Radar tab is being viewed, no sooner than the
-    // configured update interval — triggeredOnStart re-checks on every
-    // tab-enter, but a recent fetch (per _radarLastRefreshMs) is skipped so
-    // switching tabs back and forth doesn't refetch on every switch.
+    // Refreshes when due, like the weather poll, but only while the Radar tab
+    // is on screen. Entering the tab checks at once; a recent fetch is not
+    // repeated, so switching tabs back and forth does not refetch.
     Timer {
-        interval: root.effectivePollInterval
+        interval: 30000
         running: root.radarActive
         repeat: true
         triggeredOnStart: true
         onTriggered: {
-            if (!root._radarLastRefreshMs
-                    || (Date.now() - root._radarLastRefreshMs) >= root.effectivePollInterval)
+            if (Helpers.isDue(root._radarLastRefreshMs, Date.now(), root.effectivePollInterval))
                 root.refreshRadarFrames()
         }
     }
