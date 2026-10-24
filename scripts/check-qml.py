@@ -4,7 +4,7 @@
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
 
-"""Compile every QML file in contents/ui against the installed Plasma.
+"""Compile every QML file in contents/ against the installed Plasma.
 
     scripts/check-qml.py
 
@@ -17,6 +17,7 @@ real Plasma 6 QML modules, which CI's Fedora container provides.
 Prints how many files it examined, and fails if that is none.
 """
 
+import json
 import os
 import pathlib
 import shutil
@@ -46,9 +47,9 @@ TestCase {
 
 
 def main():
-    files = sorted((ROOT / "contents" / "ui").glob("*.qml"))
+    files = sorted((ROOT / "contents").rglob("*.qml"))
     if not files:
-        print("FAIL: no QML files found in contents/ui", file=sys.stderr)
+        print("FAIL: no QML files found in contents/", file=sys.stderr)
         return 1
     runner = next((r for r in RUNNERS if shutil.which(r)), None)
     if runner is None:
@@ -58,7 +59,7 @@ def main():
     rows = [{"tag": f.name, "file": f.as_uri()} for f in files]
     with tempfile.TemporaryDirectory() as tmp:
         test = pathlib.Path(tmp) / "tst_compile.qml"
-        test.write_text(TEST % repr(rows).replace("'", '"'))
+        test.write_text(TEST % json.dumps(rows))
         # A private config directory: KDE modules write config as they load,
         # and an unwritable one makes KConfig pop up a dialog.
         env = dict(os.environ, QT_QPA_PLATFORM="offscreen",

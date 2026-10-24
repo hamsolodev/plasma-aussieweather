@@ -244,8 +244,10 @@ ColumnLayout {
                 var parts = [tab.weather.locationName]
                 var obs = tab.weather.observations
                 if (tab.weather.hasData && obs && obs.station) {
-                    var km = obs.station.distance ? (obs.station.distance / 1000).toFixed(1) : null
-                    parts.push(obs.station.name + (km ? " (" + km + " km)" : ""))
+                    parts.push(obs.station.distance
+                        ? i18nc("observation station and its distance", "%1 (%2 km)",
+                                obs.station.name, (obs.station.distance / 1000).toFixed(1))
+                        : obs.station.name)
                 }
                 var updated = tab.clock.whenText(tab.weather.lastSuccessMs)
                 if (updated) parts.push(updated)

@@ -137,12 +137,16 @@ def main():
 
     # The KDE platform theme reads its colours from kdeglobals; a private
     # config home with the chosen Breeze scheme's colours sets light or dark.
-    config_home = pathlib.Path(tempfile.mkdtemp(prefix="aussieweather-render-"))
-    shutil.copy(f"/usr/share/color-schemes/{SCHEMES[options.scheme]}.colors",
-                config_home / "kdeglobals")
+    with tempfile.TemporaryDirectory(prefix="aussieweather-render-") as config_home:
+        shutil.copy(f"/usr/share/color-schemes/{SCHEMES[options.scheme]}.colors",
+                    pathlib.Path(config_home) / "kdeglobals")
+        return render(options, config_home)
+
+
+def render(options, config_home):
     # The software renderer: the same pixels with or without a GPU (CI's
     # container has none, and Qt would warn as it fell back to it).
-    os.environ.update({"XDG_CONFIG_HOME": str(config_home), "QT_QPA_PLATFORM": "offscreen",
+    os.environ.update({"XDG_CONFIG_HOME": config_home, "QT_QPA_PLATFORM": "offscreen",
                        "QT_QPA_PLATFORMTHEME": "kde", "QT_QUICK_BACKEND": "software",
                        "TZ": "Australia/Melbourne"})
 
@@ -222,7 +226,6 @@ def main():
         window.grabWindow().save(str(path))
         print(f"{path}: popup height {heights[name]:.0f}")
 
-    shutil.rmtree(config_home, ignore_errors=True)
     if network:
         print(f"note: {len(network)} radar image(s) failed to load from BoM", file=sys.stderr)
     if problems:
