@@ -7,7 +7,8 @@ UV index, severe weather warnings, and an animated rain radar loop.
 > **Unofficial client.** This widget is not affiliated with or endorsed by
 > the Australian Bureau of Meteorology. Weather data © Australian Bureau of
 > Meteorology. The widget identifies itself to BoM services with a versioned
-> User-Agent and polls no faster than every 10 minutes.
+> User-Agent and polls every 10 minutes at most often; a failed poll is
+> retried after 5 seconds, doubling, at most six times.
 
 ## Screenshots
 
@@ -54,9 +55,11 @@ kpackagetool6 --type Plasma/Applet --upgrade net.tropism.plasma.aussieweather-<v
 ```sh
 git clone https://github.com/hamsolodev/plasma-aussieweather.git
 cd plasma-aussieweather
-zip -qr aussieweather.plasmoid metadata.json contents/
-kpackagetool6 --type Plasma/Applet --install aussieweather.plasmoid
+kpackagetool6 --type Plasma/Applet --install "$(scripts/package.sh)"
 ```
+
+`scripts/package.sh` needs `zip`, and `msgfmt` (gettext) once translations
+exist; it prints the path of the `.plasmoid` it builds.
 
 ### Runtime requirement
 
@@ -78,24 +81,33 @@ only; no third-party Python packages needed).
 
 ## Troubleshooting
 
-- **"Cannot reach BoM" / no data** — check that `python3` runs from a
-  terminal and that api.weather.bom.gov.au is reachable. BoM occasionally
-  blocks unusual User-Agents; the widget sends
+- **"Cannot reach BoM"** — api.weather.bom.gov.au is unreachable from this
+  machine; the widget keeps showing the last data it had, dimmed in the
+  panel once it is out of date, and retries.
+- **"BoM returned an error"** — BoM answered but refused the request. BoM
+  occasionally blocks unusual User-Agents; the widget sends
   `net.tropism.plasma.aussieweather/<version>`.
-- **Radar shows the base map but no rain frames** — the station may be
-  offline for maintenance (BoM rotates outages;
-  [check here](http://www.bom.gov.au/australia/radar/about/radar_outages.shtml)).
-  Switch to a neighbouring station from the Radar tab's quick picker.
+- **"The weather script failed"** — check that `python3` runs from a
+  terminal; the message carries its error.
+- **"No recent radar images"** — the station has published nothing in the
+  last hour, usually because it is offline for maintenance. Switch to a
+  neighbouring station from the Radar tab's quick picker.
 - **Location resolves to the wrong place** — include the state suffix
-  (`Springfield QLD` vs `Springfield SA`); the widget filters search results
-  by state when one is given.
+  (`Springfield QLD` vs `Springfield SA`, in any case); only places in that
+  state then match, and if none does the widget says the location was not
+  found.
 
 ## Development
 
 ```sh
+./scripts/test.sh      # Python tests of contents/code, QML tests of the helpers
+./scripts/package.sh   # build net.tropism.plasma.aussieweather-<version>.plasmoid
 ./translate/merge.sh   # regenerate translate/template.pot after string changes
-./translate/build.sh   # compile .po → contents/locale (run before packaging)
 ```
+
+The tests need `python3` and Qt 6's `qmltestrunner` (Fedora:
+`qt6-qtdeclarative-devel`; Debian/Ubuntu: `qt6-declarative-dev-tools` and
+`qml6-module-qttest`). CI fails if `template.pot` is out of date.
 
 This repo is also consumed as a git submodule by a private multi-widget
 repo; the widget package itself is `metadata.json` + `contents/` at the repo

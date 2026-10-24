@@ -42,6 +42,12 @@
   `implicitHeight: 0` so the popup sizes from Weather/Radar content instead,
   and the Warnings tab scrolls within that height as intended
 
+## 1.7.1 — 2026-06-17
+
+- Fix popup expanding to full screen height on first open; caused by
+  `Layout.fillHeight` on the StackLayout creating an unconstrained height
+  cycle before content implicit heights were computed
+
 ## 1.7.0 — 2026-06-17
 
 - Warning text rendered as HTML instead of escaped plain text, preserving
