@@ -9,7 +9,7 @@ msgstr ""
 "Project-Id-Version: plasma_applet_net.tropism.plasma.aussieweather\n"
 "Report-Msgid-Bugs-To: https://github.com/hamsolodev/plasma-aussieweather/"
 "issues\n"
-"POT-Creation-Date: 2026-10-24 03:28+0000\n"
+"POT-Creation-Date: 2026-10-24 03:32+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -35,7 +35,7 @@ msgstr ""
 msgid "Radar range:"
 msgstr ""
 
-#: contents/ui/ConfigPage.qml:63 contents/ui/RadarTab.qml:76
+#: contents/ui/ConfigPage.qml:63 contents/ui/RadarTab.qml:77
 msgid "%1 km"
 msgstr ""
 
@@ -55,7 +55,7 @@ msgid ""
 "detail."
 msgstr ""
 
-#: contents/ui/CurrentConditions.qml:52 contents/ui/HourlyStrip.qml:73
+#: contents/ui/CurrentConditions.qml:52 contents/ui/HourlyStrip.qml:65
 msgid "Feels like %1"
 msgstr ""
 
@@ -73,13 +73,13 @@ msgstr ""
 msgid "%1 mm since 9 am"
 msgstr ""
 
-#: contents/ui/DailyStrip.qml:24
+#: contents/ui/DailyStrip.qml:23
 msgid "1-Day Forecast"
 msgid_plural "%1-Day Forecast"
 msgstr[0] ""
 msgstr[1] ""
 
-#: contents/ui/DailyStrip.qml:49
+#: contents/ui/DailyStrip.qml:48
 msgid "Today"
 msgstr ""
 
@@ -95,39 +95,39 @@ msgstr ""
 msgid "⚠ Warnings (%1)"
 msgstr ""
 
-#: contents/ui/HourlyStrip.qml:25
+#: contents/ui/HourlyStrip.qml:24
 msgid "Next Hour"
 msgid_plural "Next %1 Hours"
 msgstr[0] ""
 msgstr[1] ""
 
-#: contents/ui/HourlyStrip.qml:54
+#: contents/ui/HourlyStrip.qml:53
 msgid "Now"
 msgstr ""
 
-#: contents/ui/HourlyStrip.qml:78
+#: contents/ui/HourlyStrip.qml:70
 msgid "Wind %1 (gusts %2)"
 msgstr ""
 
-#: contents/ui/HourlyStrip.qml:79
+#: contents/ui/HourlyStrip.qml:71
 msgid "Wind %1"
 msgstr ""
 
-#: contents/ui/HourlyStrip.qml:83
+#: contents/ui/HourlyStrip.qml:75
 #, javascript-format
 msgid "Humidity %1%"
 msgstr ""
 
-#: contents/ui/HourlyStrip.qml:85
+#: contents/ui/HourlyStrip.qml:77
 msgctxt "abbreviated dew point"
 msgid "Dew pt %1"
 msgstr ""
 
-#: contents/ui/HourlyStrip.qml:89
+#: contents/ui/HourlyStrip.qml:81
 msgid "UV %1"
 msgstr ""
 
-#: contents/ui/HourlyStrip.qml:92
+#: contents/ui/HourlyStrip.qml:84
 msgid "Rain %1–%2 mm"
 msgstr ""
 
@@ -152,47 +152,98 @@ msgstr ""
 msgid "Radar update failed: %1"
 msgstr ""
 
-#: contents/ui/RadarTab.qml:55
+#: contents/ui/RadarTab.qml:56
 msgid "Update failed"
 msgstr ""
 
-#: contents/ui/RadarTab.qml:56
+#: contents/ui/RadarTab.qml:57
 msgid "Fetching…"
 msgstr ""
 
-#: contents/ui/RadarTab.qml:58
+#: contents/ui/RadarTab.qml:59
 msgid "Updated just now"
 msgstr ""
 
-#: contents/ui/RadarTab.qml:59
+#: contents/ui/RadarTab.qml:60
 msgid "Updated a minute ago"
 msgid_plural "Updated %1 minutes ago"
 msgstr[0] ""
 msgstr[1] ""
 
-#: contents/ui/RadarTab.qml:107
-msgid "Radar: %2  ·  %1 frame"
-msgid_plural "Radar: %2  ·  %1 frames"
-msgstr[0] ""
-msgstr[1] ""
-
-#: contents/ui/RadarTab.qml:110
-msgid "Radar: %1"
-msgstr ""
-
-#: contents/ui/RadarTab.qml:111
-msgid "Radar: %1  ·  Loading…"
-msgstr ""
-
-#: contents/ui/RadarTab.qml:131
+#: contents/ui/RadarTab.qml:115
 msgid "Full radar loop"
 msgstr ""
 
-#: contents/ui/RadarTab.qml:138
+#: contents/ui/RadarTab.qml:122
 msgid "Weather maps"
 msgstr ""
 
-#: contents/ui/WarningsTab.qml:51 contents/ui/WeatherTab.qml:56
+#: contents/ui/SunMoonRow.qml:42
+msgctxt "UV index category"
+msgid "Low"
+msgstr ""
+
+#: contents/ui/SunMoonRow.qml:43
+msgctxt "UV index category"
+msgid "Moderate"
+msgstr ""
+
+#: contents/ui/SunMoonRow.qml:44
+msgctxt "UV index category"
+msgid "High"
+msgstr ""
+
+#: contents/ui/SunMoonRow.qml:45
+msgctxt "UV index category"
+msgid "Very High"
+msgstr ""
+
+#: contents/ui/SunMoonRow.qml:46
+msgctxt "UV index category"
+msgid "Extreme"
+msgstr ""
+
+#: contents/ui/SunMoonRow.qml:72
+msgctxt "moon phase"
+msgid "New Moon"
+msgstr ""
+
+#: contents/ui/SunMoonRow.qml:73
+msgctxt "moon phase"
+msgid "Waxing Crescent"
+msgstr ""
+
+#: contents/ui/SunMoonRow.qml:74
+msgctxt "moon phase"
+msgid "First Quarter"
+msgstr ""
+
+#: contents/ui/SunMoonRow.qml:75
+msgctxt "moon phase"
+msgid "Waxing Gibbous"
+msgstr ""
+
+#: contents/ui/SunMoonRow.qml:76
+msgctxt "moon phase"
+msgid "Full Moon"
+msgstr ""
+
+#: contents/ui/SunMoonRow.qml:77
+msgctxt "moon phase"
+msgid "Waning Gibbous"
+msgstr ""
+
+#: contents/ui/SunMoonRow.qml:78
+msgctxt "moon phase"
+msgid "Last Quarter"
+msgstr ""
+
+#: contents/ui/SunMoonRow.qml:79
+msgctxt "moon phase"
+msgid "Waning Crescent"
+msgstr ""
+
+#: contents/ui/WarningBanner.qml:43 contents/ui/WarningsTab.qml:51
 msgid "Warning"
 msgstr ""
 
@@ -244,81 +295,16 @@ msgstr ""
 msgid "The hourly forecast could not be updated: %1"
 msgstr ""
 
-#: contents/ui/WeatherTab.qml:111
+#: contents/ui/WeatherTab.qml:69
 msgid "Waiting for data…"
 msgstr ""
 
-#: contents/ui/WeatherTab.qml:162
-msgctxt "UV index category"
-msgid "Low"
-msgstr ""
-
-#: contents/ui/WeatherTab.qml:163
-msgctxt "UV index category"
-msgid "Moderate"
-msgstr ""
-
-#: contents/ui/WeatherTab.qml:164
-msgctxt "UV index category"
-msgid "High"
-msgstr ""
-
-#: contents/ui/WeatherTab.qml:165
-msgctxt "UV index category"
-msgid "Very High"
-msgstr ""
-
-#: contents/ui/WeatherTab.qml:166
-msgctxt "UV index category"
-msgid "Extreme"
-msgstr ""
-
-#: contents/ui/WeatherTab.qml:201
-msgctxt "moon phase"
-msgid "New Moon"
-msgstr ""
-
-#: contents/ui/WeatherTab.qml:202
-msgctxt "moon phase"
-msgid "Waxing Crescent"
-msgstr ""
-
-#: contents/ui/WeatherTab.qml:203
-msgctxt "moon phase"
-msgid "First Quarter"
-msgstr ""
-
-#: contents/ui/WeatherTab.qml:204
-msgctxt "moon phase"
-msgid "Waxing Gibbous"
-msgstr ""
-
-#: contents/ui/WeatherTab.qml:205
-msgctxt "moon phase"
-msgid "Full Moon"
-msgstr ""
-
-#: contents/ui/WeatherTab.qml:206
-msgctxt "moon phase"
-msgid "Waning Gibbous"
-msgstr ""
-
-#: contents/ui/WeatherTab.qml:207
-msgctxt "moon phase"
-msgid "Last Quarter"
-msgstr ""
-
-#: contents/ui/WeatherTab.qml:208
-msgctxt "moon phase"
-msgid "Waning Crescent"
-msgstr ""
-
-#: contents/ui/WeatherTab.qml:248
+#: contents/ui/WeatherTab.qml:134
 msgctxt "observation station and its distance"
 msgid "%1 (%2 km)"
 msgstr ""
 
-#: contents/ui/WeatherTab.qml:263
+#: contents/ui/WeatherTab.qml:149
 msgctxt "abbreviation of Bureau of Meteorology"
 msgid "BoM"
 msgstr ""

@@ -10,8 +10,9 @@ import org.kde.kirigami as Kirigami
 
 import "radarstations.js" as RadarStations
 
-// The Radar tab: how fresh the loop is, a quick station and range picker,
-// the radar itself, and links to BoM's own loop and maps.
+// The Radar tab: one line saying how fresh the loop is, a quick station and
+// range picker and a refresh button, the radar itself (with any failure
+// below it), and links to BoM's own loop and maps.
 ColumnLayout {
     id: tab
 
@@ -78,6 +79,10 @@ ColumnLayout {
             onActivated: tab.radar.pickedStation = RadarStations.idAt(
                 stationPicker.currentIndex, currentIndex)
         }
+        PlasmaComponents.Button {
+            icon.name: "view-refresh-symbolic"
+            onClicked: tab.radar.reload()
+        }
     }
 
     RadarView {
@@ -93,27 +98,6 @@ ColumnLayout {
         wrapMode: Text.WordWrap
         color: Kirigami.Theme.neutralTextColor
         text: "⚠  " + tab.radar.errorText
-    }
-
-    RowLayout {
-        Layout.fillWidth: true
-        Layout.leftMargin:  Kirigami.Units.smallSpacing
-        Layout.rightMargin: Kirigami.Units.smallSpacing
-
-        PlainLabel {
-            Layout.fillWidth: true
-            opacity: 0.55
-            text: tab.radar.frames.length > 0
-                ? i18np("Radar: %2  ·  %1 frame", "Radar: %2  ·  %1 frames",
-                        tab.radar.frames.length, tab.radar.station)
-                : tab.radar.errorText
-                    ? i18n("Radar: %1", tab.radar.station)
-                    : i18n("Radar: %1  ·  Loading…", tab.radar.station)
-        }
-        PlasmaComponents.Button {
-            icon.name: "view-refresh-symbolic"
-            onClicked: tab.radar.reload()
-        }
     }
 
     Item { Layout.fillHeight: true }
