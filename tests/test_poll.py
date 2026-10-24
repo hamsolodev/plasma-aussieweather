@@ -163,7 +163,7 @@ class CollectTest(unittest.TestCase):
 
     def test_forecasts_are_trimmed(self):
         out = poll.collect(location_api("r1ppnx"), "r1ppnx", "Seaford VIC", NOW)
-        self.assertEqual(len(out["forecast"]), 7)
+        self.assertEqual(len(out["forecast"]), 8)
         # More hours than are shown: the widget drops slots that have passed.
         self.assertEqual(len(out["hourly"]), 12)
 

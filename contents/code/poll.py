@@ -305,7 +305,9 @@ def collect(get, geohash, query, now):
     out["geohash"] = geohash
     base = "/locations/" + geohash
     out["observations"] = get(base + "/observations").get("data", {})
-    out["forecast"] = get(base + "/forecasts/daily").get("data", [])[:7]
+    # One more day than the widget shows: just after local midnight BoM
+    # can still list the day that ended, which the widget skips.
+    out["forecast"] = get(base + "/forecasts/daily").get("data", [])[:8]
     # The hourly forecast and warnings are extras: if one fails, the rest is
     # still worth showing. None means unknown, so the widget keeps what it
     # had; an empty list would mean there are none.

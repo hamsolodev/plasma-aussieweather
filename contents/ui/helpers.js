@@ -238,6 +238,17 @@ function slotTimeFormat(date, use24Hour) {
     return date.getMinutes() === 0 ? "hap" : "h:mmap"
 }
 
+// The index of today's entry in the daily forecast. Each entry is dated by
+// the location's local midnight (in UTC), so today is the latest one that
+// has begun — whatever the system time zone, and even when BoM still lists
+// the day that just ended. 0 if none has begun.
+function todayIndex(forecast, nowMs) {
+    var today = 0
+    for (var i = 0; i < (forecast || []).length; i++)
+        if (Date.parse(forecast[i].date) <= nowMs) today = i
+    return today
+}
+
 // Whether data last fetched at lastMs is out of date at nowMs: two polls in
 // a row have been missed. False before the first fetch (lastMs 0).
 function isStale(lastMs, nowMs, intervalMs) {

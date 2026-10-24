@@ -88,11 +88,18 @@ PlasmoidItem {
     // currentTime). The hourly is_night flag describes the slot's timestamp
     // instant, so using it for "now" quantises the day/night flip to the
     // hour mark — up to ~59 min after actual sunset.
-    readonly property bool hasAstro: pollOk && forecast.length > 0 && !!forecast[0].astronomical
+    // The daily forecast from today on (Helpers.todayIndex), at most 7 days,
+    // and today's entry, null before the first poll. todayIdx changes once a
+    // day, so the strip is not rebuilt every minute.
+    readonly property int todayIdx: Helpers.todayIndex(forecast, currentTime.getTime())
+    readonly property var days: forecast.slice(todayIdx, todayIdx + 7)
+    readonly property var today: days.length > 0 ? days[0] : null
+
+    readonly property bool hasAstro: pollOk && today !== null && !!today.astronomical
     readonly property bool isNight: {
         if (!hasAstro) return false
-        var sunrise = new Date(forecast[0].astronomical.sunrise_time)
-        var sunset  = new Date(forecast[0].astronomical.sunset_time)
+        var sunrise = new Date(today.astronomical.sunrise_time)
+        var sunset  = new Date(today.astronomical.sunset_time)
         return currentTime < sunrise || currentTime >= sunset
     }
 
@@ -102,11 +109,11 @@ PlasmoidItem {
     readonly property bool slotIsNight: hasAstro ? isNight : (!!nowSlot && !!nowSlot.is_night)
 
     readonly property string currentIcon: {
-        if (!pollOk || !forecast || forecast.length === 0)
+        if (!pollOk || !today)
             return "weather-none-available"
         if (nowSlot)
             return Helpers.bomIcon(Helpers.iconDescriptor(nowSlot), slotIsNight)
-        return Helpers.bomIcon(Helpers.iconDescriptor(forecast[0]), isNight)
+        return Helpers.bomIcon(Helpers.iconDescriptor(today), isNight)
     }
 
     // What it is like now, for the popup and the panel tooltip: the current
@@ -116,8 +123,8 @@ PlasmoidItem {
         var descriptor = nowSlot ? Helpers.iconDescriptor(nowSlot) : ""
         if (descriptor)
             return Helpers.titleCase(Helpers.conditionKey(descriptor, slotIsNight))
-        if (forecast.length > 0)
-            return Helpers.titleCase(forecast[0].short_text || "").replace(/\.$/, "")
+        if (today !== null)
+            return Helpers.titleCase(today.short_text || "").replace(/\.$/, "")
         return ""
     }
 
@@ -134,7 +141,7 @@ PlasmoidItem {
 
     // Today's UV category (Helpers.uvKey), "" when BoM gave none.
     readonly property string todayUvKey:
-        forecast.length > 0 && forecast[0].uv ? Helpers.uvKey(forecast[0].uv.category) : ""
+        today && today.uv ? Helpers.uvKey(today.uv.category) : ""
 
     Plasmoid.icon: currentIcon
     toolTipTextFormat: Text.PlainText
@@ -629,18 +636,18 @@ PlasmoidItem {
 
                 // Today's high / low from forecast
                 ColumnLayout {
-                    visible: root.pollOk && root.forecast.length > 0
+                    visible: root.pollOk && root.today !== null
                     spacing: 0
                     Layout.alignment: Qt.AlignVCenter
                     Layout.rightMargin: Kirigami.Units.smallSpacing
 
                     PlainLabel {
                         Layout.alignment: Qt.AlignRight
-                        text: Helpers.formatTemp(root.forecast.length > 0 ? root.forecast[0].temp_max : null)
+                        text: Helpers.formatTemp(root.today ? root.today.temp_max : null)
                         font.pointSize: Kirigami.Theme.defaultFont.pointSize + 1
                         font.weight: Font.Bold
                         color: {
-                            var key = Helpers.tempColorKey(root.forecast.length > 0 ? root.forecast[0].temp_max : null)
+                            var key = Helpers.tempColorKey(root.today ? root.today.temp_max : null)
                             if (key === "hot")  return Kirigami.Theme.negativeTextColor
                             if (key === "warm") return Kirigami.Theme.neutralTextColor
                             return Kirigami.Theme.textColor
@@ -648,21 +655,21 @@ PlasmoidItem {
                     }
                     PlainLabel {
                         Layout.alignment: Qt.AlignRight
-                        text: Helpers.formatTemp(root.forecast.length > 0 ? root.forecast[0].temp_min : null)
+                        text: Helpers.formatTemp(root.today ? root.today.temp_min : null)
                         font.pointSize: Kirigami.Theme.defaultFont.pointSize
                         opacity: 0.55
                     }
                     PlainLabel {
                         Layout.alignment: Qt.AlignRight
-                        visible: root.forecast.length > 0 && !!root.forecast[0].rain
-                                 && Helpers.hasValue(root.forecast[0].rain.chance)
-                        text: root.forecast.length > 0 && !!root.forecast[0].rain
-                              && Helpers.hasValue(root.forecast[0].rain.chance)
-                            ? root.forecast[0].rain.chance + "%" : ""
+                        visible: root.today !== null && !!root.today.rain
+                                 && Helpers.hasValue(root.today.rain.chance)
+                        text: root.today !== null && !!root.today.rain
+                              && Helpers.hasValue(root.today.rain.chance)
+                            ? root.today.rain.chance + "%" : ""
                         font.pointSize: Kirigami.Theme.defaultFont.pointSize
                         color: {
-                            var key = root.forecast.length > 0 && root.forecast[0].rain
-                                ? Helpers.rainColorKey(root.forecast[0].rain.chance || 0) : "none"
+                            var key = root.today && root.today.rain
+                                ? Helpers.rainColorKey(root.today.rain.chance || 0) : "none"
                             if (key === "heavy")    return Kirigami.Theme.negativeTextColor
                             if (key === "moderate") return Kirigami.Theme.neutralTextColor
                             return Kirigami.Theme.disabledTextColor
@@ -716,7 +723,7 @@ PlasmoidItem {
 
             Kirigami.Separator {
                 Layout.fillWidth: true
-                visible: root.pollOk && (root.upcomingHourly.length > 0 || root.forecast.length > 0)
+                visible: root.pollOk && (root.upcomingHourly.length > 0 || root.today !== null)
                 Layout.topMargin: Kirigami.Units.smallSpacing / 2
             }
 
@@ -822,14 +829,14 @@ PlasmoidItem {
 
             Kirigami.Separator {
                 Layout.fillWidth: true
-                visible: root.pollOk && root.upcomingHourly.length > 0 && root.forecast.length > 0
+                visible: root.pollOk && root.upcomingHourly.length > 0 && root.today !== null
             }
 
             // 7-day forecast
             PlainLabel {
-                visible: root.pollOk && root.forecast.length > 0
+                visible: root.pollOk && root.today !== null
                 Layout.leftMargin: Kirigami.Units.smallSpacing
-                text: i18n("7-Day Forecast")
+                text: i18np("1-Day Forecast", "%1-Day Forecast", root.days.length)
                 font.pointSize: Kirigami.Theme.defaultFont.pointSize
                 font.weight: Font.Bold
                 opacity: 0.55
@@ -840,17 +847,17 @@ PlasmoidItem {
             // populates after initial layout; Row with explicit widths is not.
             Row {
                 id: forecastRow
-                visible: root.pollOk && root.forecast.length > 0
+                visible: root.pollOk && root.today !== null
                 Layout.fillWidth: true
                 Layout.leftMargin:  Kirigami.Units.smallSpacing
                 Layout.rightMargin: Kirigami.Units.smallSpacing
 
                 Repeater {
-                    model: root.forecast
+                    model: root.days
                     delegate: ColumnLayout {
                         required property var modelData
                         required property int index
-                        width: forecastRow.width / Math.max(root.forecast.length, 1)
+                        width: forecastRow.width / Math.max(root.days.length, 1)
                         spacing: 1
 
                         PlainLabel {
@@ -932,14 +939,14 @@ PlasmoidItem {
 
             Kirigami.Separator {
                 Layout.fillWidth: true
-                visible: root.pollOk && root.forecast.length > 0
+                visible: root.pollOk && root.today !== null
                 Layout.topMargin: Kirigami.Units.smallSpacing / 2
             }
 
             // Extended forecast text
             PlainLabel {
-                visible: root.pollOk && root.forecast.length > 0
-                             && (root.forecast[0].extended_text || "") !== ""
+                visible: root.pollOk && root.today !== null
+                             && (root.today.extended_text || "") !== ""
                 Layout.fillWidth: true
                 Layout.preferredHeight: implicitHeight
                 Layout.leftMargin:  Kirigami.Units.smallSpacing
@@ -948,12 +955,12 @@ PlasmoidItem {
                 wrapMode: Text.WordWrap
                 font.pointSize: Kirigami.Theme.defaultFont.pointSize
                 opacity: 0.75
-                text: root.forecast.length > 0 ? (root.forecast[0].extended_text || "") : ""
+                text: root.today !== null ? (root.today.extended_text || "") : ""
             }
 
             // UV · Sunrise/Sunset · Moon phase (merged row)
             RowLayout {
-                visible: root.pollOk && root.forecast.length > 0
+                visible: root.pollOk && root.today !== null
                 Layout.fillWidth: true
                 Layout.leftMargin:  Kirigami.Units.smallSpacing
                 Layout.rightMargin: Kirigami.Units.smallSpacing
@@ -980,6 +987,7 @@ PlasmoidItem {
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     font.weight: Font.DemiBold
                     text: {
+                        if (root.todayUvKey === "") return ""
                         var label = {
                             low:      i18nc("UV index category", "Low"),
                             moderate: i18nc("UV index category", "Moderate"),
@@ -987,7 +995,7 @@ PlasmoidItem {
                             veryhigh: i18nc("UV index category", "Very High"),
                             extreme:  i18nc("UV index category", "Extreme")
                         }[root.todayUvKey] || ""
-                        var idx = root.forecast[0].uv.max_index
+                        var idx = root.today.uv.max_index
                         return label + (idx !== null && idx !== undefined ? "  " + idx : "")
                     }
                     color: {
@@ -1004,12 +1012,12 @@ PlasmoidItem {
                 Item { Layout.fillWidth: true }
 
                 PlainLabel {
-                    visible: root.forecast.length > 0 && !!root.forecast[0].astronomical
+                    visible: root.today !== null && !!root.today.astronomical
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     opacity: 0.65
                     text: {
-                        if (!root.forecast.length || !root.forecast[0].astronomical) return ""
-                        var a = root.forecast[0].astronomical
+                        if (!root.today || !root.today.astronomical) return ""
+                        var a = root.today.astronomical
                         return "🌅 " + Qt.formatTime(new Date(a.sunrise_time), "h:mm ap").replace(" ", "")
                                + "  ·  🌇 " + Qt.formatTime(new Date(a.sunset_time), "h:mm ap").replace(" ", "")
                     }

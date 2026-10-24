@@ -289,6 +289,27 @@ TestCase {
         compare(Helpers.slotTimeFormat(new Date(2026, 9, 24, 14, 30), true), "HH:mm")
     }
 
+    // ── todayIndex ────────────────────────────────────────────────────────
+
+    // Daily entries are dated by the location's local midnight, in UTC (VIC
+    // in daylight time: 13:00Z the day before).
+    function days() {
+        return [{ date: "2026-10-22T13:00:00Z" }, { date: "2026-10-23T13:00:00Z" },
+                { date: "2026-10-24T13:00:00Z" }]
+    }
+
+    function test_todayIndex_is_the_day_now_falls_in() {
+        compare(Helpers.todayIndex(days(), Date.parse("2026-10-22T20:00:00Z")), 0)
+        // Just after local midnight, before BoM drops the day that ended.
+        compare(Helpers.todayIndex(days(), Date.parse("2026-10-23T13:05:00Z")), 1)
+        compare(Helpers.todayIndex(days(), Date.parse("2026-10-25T01:00:00Z")), 2)
+    }
+
+    function test_todayIndex_defaults_to_the_first_entry() {
+        compare(Helpers.todayIndex(days(), Date.parse("2026-10-20T00:00:00Z")), 0)
+        compare(Helpers.todayIndex([], Date.parse("2026-10-24T00:00:00Z")), 0)
+    }
+
     // ── isStale / isSameDay ───────────────────────────────────────────────
 
     function test_isStale_after_two_missed_polls() {
