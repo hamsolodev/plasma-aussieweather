@@ -108,6 +108,7 @@ PlasmoidItem {
     readonly property bool hasWarnings: Array.isArray(warnings) && warnings.length > 0
 
     Plasmoid.icon: currentIcon
+    toolTipTextFormat: Text.PlainText
     toolTipMainText: i18nc("BoM is the Bureau of Meteorology; %1 is the location",
                            "BoM — %1", locationName)
     toolTipSubText: pollOk
@@ -339,13 +340,14 @@ PlasmoidItem {
             Text {
                 id: warningBadgeText
                 anchors.centerIn: parent
+                textFormat: Text.PlainText
                 text: root.warnings.length
                 font.pixelSize: Math.round(parent.height * 0.7)
                 font.bold: true
                 color: "#ffffff"
             }
         }
-        PlasmaComponents.Label {
+        PlainLabel {
             anchors.left:         compactIco.right
             anchors.leftMargin:   Kirigami.Units.smallSpacing
             anchors.right:        parent.right
@@ -436,7 +438,7 @@ PlasmoidItem {
                         rightMargin: Kirigami.Units.smallSpacing
                     }
                     spacing: Kirigami.Units.smallSpacing
-                    PlasmaComponents.Label {
+                    PlainLabel {
                         Layout.fillWidth: true
                         wrapMode: Text.WordWrap
                         color: Kirigami.Theme.neutralTextColor
@@ -476,14 +478,14 @@ PlasmoidItem {
                     visible: root.pollOk
                 }
 
-                PlasmaComponents.Label {
+                PlainLabel {
                     visible: root.pollOk
                     text: root.observations ? Helpers.formatTemp(root.observations.temp) : "—"
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize * 3
                     font.weight: Font.Bold
                 }
 
-                PlasmaComponents.Label {
+                PlainLabel {
                     Layout.fillWidth: true
                     Layout.alignment: Qt.AlignVCenter
                     visible: root.pollOk && root.observations !== null
@@ -513,7 +515,7 @@ PlasmoidItem {
                     Layout.alignment: Qt.AlignVCenter
                     Layout.rightMargin: Kirigami.Units.smallSpacing
 
-                    PlasmaComponents.Label {
+                    PlainLabel {
                         Layout.alignment: Qt.AlignRight
                         text: Helpers.formatTemp(root.forecast.length > 0 ? root.forecast[0].temp_max : null)
                         font.pointSize: Kirigami.Theme.defaultFont.pointSize + 1
@@ -525,13 +527,13 @@ PlasmoidItem {
                             return Kirigami.Theme.textColor
                         }
                     }
-                    PlasmaComponents.Label {
+                    PlainLabel {
                         Layout.alignment: Qt.AlignRight
                         text: Helpers.formatTemp(root.forecast.length > 0 ? root.forecast[0].temp_min : null)
                         font.pointSize: Kirigami.Theme.defaultFont.pointSize
                         opacity: 0.55
                     }
-                    PlasmaComponents.Label {
+                    PlainLabel {
                         Layout.alignment: Qt.AlignRight
                         visible: root.forecast.length > 0 && root.forecast[0].rain
                         text: (root.forecast.length > 0 && root.forecast[0].rain)
@@ -557,7 +559,7 @@ PlasmoidItem {
                 Layout.rightMargin: Kirigami.Units.smallSpacing
                 spacing: Kirigami.Units.smallSpacing
 
-                PlasmaComponents.Label {
+                PlainLabel {
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     text: {
                         if (!root.observations) return ""
@@ -570,7 +572,7 @@ PlasmoidItem {
                     }
                 }
                 Item { Layout.fillWidth: true }
-                PlasmaComponents.Label {
+                PlainLabel {
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     visible: root.observations && root.observations.humidity !== undefined
                     text: root.observations
@@ -578,7 +580,7 @@ PlasmoidItem {
                                          Math.round(root.observations.humidity || 0))
                         : ""
                 }
-                PlasmaComponents.Label {
+                PlainLabel {
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     visible: root.observations && root.observations.pressure !== undefined
                     text: root.observations
@@ -599,7 +601,7 @@ PlasmoidItem {
                 Layout.rightMargin: Kirigami.Units.smallSpacing
                 spacing: Kirigami.Units.smallSpacing
 
-                PlasmaComponents.Label {
+                PlainLabel {
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     visible: !!root.observations && root.observations.rain_since_9am !== undefined
                     text: root.observations
@@ -607,7 +609,7 @@ PlasmoidItem {
                         : ""
                 }
                 Item { Layout.fillWidth: true }
-                PlasmaComponents.Label {
+                PlainLabel {
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     opacity: 0.65
                     visible: !!root.observations
@@ -631,7 +633,7 @@ PlasmoidItem {
             }
 
             // Hourly forecast
-            PlasmaComponents.Label {
+            PlainLabel {
                 visible: root.pollOk && root.hourlyForecast.length > 0
                 Layout.leftMargin: Kirigami.Units.smallSpacing
                 text: i18n("Next 8 Hours")
@@ -655,7 +657,7 @@ PlasmoidItem {
                         width: hourlyRow.width / Math.max(root.hourlyForecast.length, 1)
                         spacing: 1
 
-                        PlasmaComponents.Label {
+                        PlainLabel {
                             Layout.alignment: Qt.AlignHCenter
                             font.pointSize: Kirigami.Theme.defaultFont.pointSize
                             font.weight: index === 0 ? Font.Bold : Font.Normal
@@ -677,6 +679,7 @@ PlasmoidItem {
                             HoverHandler { id: hourHover }
                             PlasmaComponents.ToolTip {
                                 visible: hourHover.hovered && text !== ""
+                                textFormat: Text.PlainText
                                 delay: Kirigami.Units.toolTipDelay
                                 text: {
                                     var lines = []
@@ -705,13 +708,13 @@ PlasmoidItem {
                                 }
                             }
                         }
-                        PlasmaComponents.Label {
+                        PlainLabel {
                             Layout.alignment: Qt.AlignHCenter
                             text: Helpers.formatTemp(modelData.temp)
                             font.pointSize: Kirigami.Theme.defaultFont.pointSize
                             font.weight: Font.DemiBold
                         }
-                        PlasmaComponents.Label {
+                        PlainLabel {
                             Layout.alignment: Qt.AlignHCenter
                             visible: modelData.rain && (modelData.rain.chance || 0) > 0
                             font.pointSize: Kirigami.Theme.defaultFont.pointSize
@@ -735,7 +738,7 @@ PlasmoidItem {
             }
 
             // 7-day forecast
-            PlasmaComponents.Label {
+            PlainLabel {
                 visible: root.pollOk && root.forecast.length > 0
                 Layout.leftMargin: Kirigami.Units.smallSpacing
                 text: i18n("7-Day Forecast")
@@ -762,7 +765,7 @@ PlasmoidItem {
                         width: forecastRow.width / Math.max(root.forecast.length, 1)
                         spacing: 1
 
-                        PlasmaComponents.Label {
+                        PlainLabel {
                             Layout.alignment: Qt.AlignHCenter
                             text: index === 0 ? i18n("Today") : Helpers.shortDay(modelData.date)
                             font.pointSize: Kirigami.Theme.defaultFont.pointSize
@@ -778,11 +781,12 @@ PlasmoidItem {
                             HoverHandler { id: dayHover }
                             PlasmaComponents.ToolTip {
                                 visible: dayHover.hovered && text !== ""
+                                textFormat: Text.PlainText
                                 delay: Kirigami.Units.toolTipDelay
                                 text: modelData.extended_text || modelData.short_text || ""
                             }
                         }
-                        PlasmaComponents.Label {
+                        PlainLabel {
                             Layout.alignment: Qt.AlignHCenter
                             text: Helpers.formatTemp(modelData.temp_max)
                             font.pointSize: Kirigami.Theme.defaultFont.pointSize
@@ -794,13 +798,13 @@ PlasmoidItem {
                                 return Kirigami.Theme.textColor
                             }
                         }
-                        PlasmaComponents.Label {
+                        PlainLabel {
                             Layout.alignment: Qt.AlignHCenter
                             text: Helpers.formatTemp(modelData.temp_min)
                             font.pointSize: Kirigami.Theme.defaultFont.pointSize
                             opacity: 0.5
                         }
-                        PlasmaComponents.Label {
+                        PlainLabel {
                             Layout.alignment: Qt.AlignHCenter
                             visible: modelData.rain !== undefined && modelData.rain !== null
                             text: {
@@ -824,7 +828,7 @@ PlasmoidItem {
             }
 
             // Error / loading state
-            PlasmaComponents.Label {
+            PlainLabel {
                 visible: !root.pollOk
                 Layout.fillWidth: true
                 Layout.margins: Kirigami.Units.largeSpacing
@@ -843,7 +847,7 @@ PlasmoidItem {
             }
 
             // Extended forecast text
-            PlasmaComponents.Label {
+            PlainLabel {
                 visible: root.pollOk && root.forecast.length > 0
                              && (root.forecast[0].extended_text || "") !== ""
                 Layout.fillWidth: true
@@ -868,7 +872,7 @@ PlasmoidItem {
                 // At night UV is always 0 — show a happy moon instead; the
                 // sun icon + UV reading return at sunrise (isNight is
                 // minute-reactive via currentTime).
-                PlasmaComponents.Label {
+                PlainLabel {
                     visible: root.isNight
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     text: "🌛"
@@ -879,7 +883,7 @@ PlasmoidItem {
                     Layout.preferredHeight: Kirigami.Units.iconSizes.small
                     source: "weather-clear-symbolic"
                 }
-                PlasmaComponents.Label {
+                PlainLabel {
                     visible: !root.isNight && root.forecast.length > 0 && !!root.forecast[0].uv
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     font.weight: Font.DemiBold
@@ -904,7 +908,7 @@ PlasmoidItem {
 
                 Item { Layout.fillWidth: true }
 
-                PlasmaComponents.Label {
+                PlainLabel {
                     visible: root.forecast.length > 0 && !!root.forecast[0].astronomical
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     opacity: 0.65
@@ -918,7 +922,7 @@ PlasmoidItem {
 
                 Item { Layout.fillWidth: true }
 
-                PlasmaComponents.Label {
+                PlainLabel {
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     text: {
                         var mp = Helpers.moonPhase(root.currentTime)
@@ -938,7 +942,7 @@ PlasmoidItem {
                 Layout.rightMargin:  Kirigami.Units.smallSpacing
                 Layout.bottomMargin: Kirigami.Units.smallSpacing
 
-                PlasmaComponents.Label {
+                PlainLabel {
                     Layout.fillWidth: true
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     opacity: 0.5
@@ -1022,7 +1026,7 @@ PlasmoidItem {
                 Layout.rightMargin: Kirigami.Units.smallSpacing
                 spacing: Kirigami.Units.smallSpacing
 
-                PlasmaComponents.Label {
+                PlainLabel {
                     Layout.fillWidth: true
                     elide: Text.ElideRight
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
@@ -1158,7 +1162,7 @@ PlasmoidItem {
 
                 // Frame counter — shows where the loop starts. Black to match
                 // BoM's own overlay text; the base map is always light.
-                PlasmaComponents.Label {
+                PlainLabel {
                     anchors {
                         left: parent.left
                         bottom: parent.bottom
@@ -1177,7 +1181,7 @@ PlasmoidItem {
                 Layout.leftMargin:  Kirigami.Units.smallSpacing
                 Layout.rightMargin: Kirigami.Units.smallSpacing
 
-                PlasmaComponents.Label {
+                PlainLabel {
                     Layout.fillWidth: true
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
                     opacity: 0.55
@@ -1254,7 +1258,7 @@ PlasmoidItem {
                         Layout.rightMargin: Kirigami.Units.smallSpacing
                         spacing: 2
 
-                        PlasmaComponents.Label {
+                        PlainLabel {
                             Layout.fillWidth: true
                             Layout.topMargin: Kirigami.Units.smallSpacing
                             wrapMode: Text.WordWrap
@@ -1280,7 +1284,7 @@ PlasmoidItem {
                                 cursorShape: Qt.PointingHandCursor
                             }
                         }
-                        PlasmaComponents.Label {
+                        PlainLabel {
                             Layout.fillWidth: true
                             wrapMode: Text.WordWrap
                             font.pointSize: Kirigami.Theme.defaultFont.pointSize
