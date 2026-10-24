@@ -4,7 +4,6 @@
 
 import QtQuick
 import QtQuick.Layouts
-import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
 
 import "helpers.js" as Helpers
@@ -53,19 +52,11 @@ ColumnLayout {
                     font.weight: index === 0 ? Font.Bold : Font.Normal
                     opacity: 0.65
                 }
-                Kirigami.Icon {
-                    Layout.alignment: Qt.AlignHCenter
+                ForecastIcon {
                     Layout.preferredWidth:  Kirigami.Units.iconSizes.large
                     Layout.preferredHeight: Kirigami.Units.iconSizes.large
                     source: Helpers.bomIcon(Helpers.iconDescriptor(modelData), false)
-
-                    HoverHandler { id: hover }
-                    PlasmaComponents.ToolTip {
-                        visible: hover.hovered && text !== ""
-                        textFormat: Text.PlainText
-                        delay: Kirigami.Units.toolTipDelay
-                        text: modelData.extended_text || modelData.short_text || ""
-                    }
+                    details: modelData.extended_text || modelData.short_text || ""
                 }
                 ToneLabel {
                     Layout.alignment: Qt.AlignHCenter

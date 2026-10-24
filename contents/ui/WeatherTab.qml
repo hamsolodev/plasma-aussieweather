@@ -7,8 +7,6 @@ import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
 
-import "helpers.js" as Helpers
-
 // The Weather tab: a warning banner, the conditions now, the hourly and
 // daily forecasts, today's extended forecast, UV, sun and moon, and a
 // footer naming the location and station with refresh and BoM buttons.
@@ -25,50 +23,10 @@ ColumnLayout {
 
     spacing: Kirigami.Units.smallSpacing
 
-    // Severe weather warning banner: click to open the Warnings tab.
-    Item {
-        visible: tab.weather.hasWarnings
+    WarningBanner {
         Layout.fillWidth: true
-        implicitHeight: bannerRow.implicitHeight + Kirigami.Units.smallSpacing * 2
-
-        Rectangle {
-            anchors.fill: parent
-            color: Kirigami.Theme.neutralTextColor
-            opacity: 0.18
-            radius: 3
-        }
-        RowLayout {
-            id: bannerRow
-            anchors {
-                left: parent.left; right: parent.right
-                verticalCenter: parent.verticalCenter
-                leftMargin:  Kirigami.Units.smallSpacing
-                rightMargin: Kirigami.Units.smallSpacing
-            }
-            spacing: Kirigami.Units.smallSpacing
-            PlainLabel {
-                Layout.fillWidth: true
-                wrapMode: Text.WordWrap
-                color: Kirigami.Theme.neutralTextColor
-                text: {
-                    if (!tab.weather.hasWarnings) return ""
-                    return "⚠  " + tab.weather.currentWarnings.map(function(w) {
-                        return w.title || i18n("Warning")
-                    }).join("  ·  ")
-                }
-            }
-            Kirigami.Icon {
-                Layout.preferredWidth:  Kirigami.Units.iconSizes.small
-                Layout.preferredHeight: Kirigami.Units.iconSizes.small
-                color: Kirigami.Theme.neutralTextColor
-                source: "go-next-symbolic"
-            }
-        }
-        MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.PointingHandCursor
-            onClicked: tab.warningsRequested()
-        }
+        weather: tab.weather
+        onClicked: tab.warningsRequested()
     }
 
     CurrentConditions {
@@ -131,77 +89,13 @@ ColumnLayout {
         text: tab.weather.today !== null ? (tab.weather.today.extended_text || "") : ""
     }
 
-    // UV · sunrise and sunset · moon phase
-    RowLayout {
+    SunMoonRow {
         visible: tab.weather.today !== null
         Layout.fillWidth: true
         Layout.leftMargin:  Kirigami.Units.smallSpacing
         Layout.rightMargin: Kirigami.Units.smallSpacing
-        spacing: Kirigami.Units.smallSpacing
-
-        // At night UV is always 0, so a moon shows instead; the sun icon and
-        // UV reading return at sunrise (isNight follows the clock).
-        PlainLabel {
-            visible: tab.weather.isNight
-            text: "🌛"
-        }
-        // Shown only for a category BoM actually gave: later days carry a uv
-        // object whose fields are all null.
-        Kirigami.Icon {
-            visible: !tab.weather.isNight && tab.weather.todayUvKey !== ""
-            Layout.preferredWidth:  Kirigami.Units.iconSizes.small
-            Layout.preferredHeight: Kirigami.Units.iconSizes.small
-            source: "weather-clear-symbolic"
-        }
-        ToneLabel {
-            visible: !tab.weather.isNight && tab.weather.todayUvKey !== ""
-            font.weight: Font.DemiBold
-            tone: Helpers.uvTone(tab.weather.todayUvKey)
-            text: {
-                if (tab.weather.todayUvKey === "") return ""
-                var label = {
-                    low:      i18nc("UV index category", "Low"),
-                    moderate: i18nc("UV index category", "Moderate"),
-                    high:     i18nc("UV index category", "High"),
-                    veryhigh: i18nc("UV index category", "Very High"),
-                    extreme:  i18nc("UV index category", "Extreme")
-                }[tab.weather.todayUvKey] || ""
-                var idx = tab.weather.today.uv.max_index
-                return label + (Helpers.hasValue(idx) ? "  " + idx : "")
-            }
-        }
-
-        Item { Layout.fillWidth: true }
-
-        PlainLabel {
-            visible: tab.weather.today !== null && !!tab.weather.today.astronomical
-            opacity: 0.65
-            text: {
-                if (!tab.weather.today || !tab.weather.today.astronomical) return ""
-                var a = tab.weather.today.astronomical
-                return "🌅 " + tab.clock.timeText(new Date(a.sunrise_time))
-                       + "  ·  🌇 " + tab.clock.timeText(new Date(a.sunset_time))
-            }
-        }
-
-        Item { Layout.fillWidth: true }
-
-        PlainLabel {
-            text: {
-                var mp = Helpers.moonPhase(tab.clock.now)
-                var name = {
-                    new:             i18nc("moon phase", "New Moon"),
-                    waxing_crescent: i18nc("moon phase", "Waxing Crescent"),
-                    first_quarter:   i18nc("moon phase", "First Quarter"),
-                    waxing_gibbous:  i18nc("moon phase", "Waxing Gibbous"),
-                    full:            i18nc("moon phase", "Full Moon"),
-                    waning_gibbous:  i18nc("moon phase", "Waning Gibbous"),
-                    last_quarter:    i18nc("moon phase", "Last Quarter"),
-                    waning_crescent: i18nc("moon phase", "Waning Crescent")
-                }[mp.key]
-                return mp.emoji + "  " + name
-            }
-        }
+        weather: tab.weather
+        clock: tab.clock
     }
 
     // Pins the footer to the bottom.
