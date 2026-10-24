@@ -1,7 +1,7 @@
 version = 1
 
 [[annotations]]
-path = ["metadata.json", "translate/template.pot", "translate/*.po"]
+path = ["metadata.json", "translate/template.pot", "translate/*.po", "branding/**", "contents/screenshot.png"]
 SPDX-FileCopyrightText = "2026 Mark Hellewell <aussieweather.sandlot200@passinbox.com>"
 SPDX-License-Identifier = "GPL-2.0-or-later"
 

@@ -2,6 +2,10 @@
 
 ## 1.8.0 — 2026-10-24
 
+New
+- An icon of its own, Australia under the sun, in Plasma's widget
+  explorer and on the website
+
 Fixes
 - Cancelled and expired warnings no longer show as active in the badge,
   banner and Warnings tab

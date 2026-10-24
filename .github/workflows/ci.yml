@@ -45,6 +45,10 @@ jobs:
       - name: Run tests
         run: bash scripts/test.sh
 
+      # The icon's copies must be made from today's branding/ sources.
+      - name: Icons are current
+        run: python3 -I scripts/make-icons.py --check
+
       # template.pot must list exactly the translatable strings in the code.
       # Order and source locations change whenever code moves between
       # files, so the strings are compared, not the text.

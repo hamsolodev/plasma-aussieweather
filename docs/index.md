@@ -1,5 +1,7 @@
 # Aussie Weather — Plasma 6 widget
 
+<img src="icon.png" alt="" width="96" align="right">
+
 Australian weather in your KDE panel: current conditions, hourly and 7-day
 forecasts, UV, severe weather warnings, and an animated rain radar — data
 from the Bureau of Meteorology's public API.

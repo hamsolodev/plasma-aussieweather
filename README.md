@@ -1,5 +1,7 @@
 # Aussie Weather
 
+<img src="docs/icon.png" alt="" width="96" align="right">
+
 A KDE Plasma 6 panel widget for Australian weather, sourced from the Bureau
 of Meteorology's public API: current conditions, hourly and 7-day forecasts,
 UV index, severe weather warnings, and an animated rain radar loop.
@@ -113,6 +115,7 @@ made so, the maps are not shown and the widget says why.
 ./scripts/check-qml.py       # compile every QML file against the installed Plasma
 ./scripts/render.py OUTDIR   # screenshot each tab offscreen; fails on any QML warning
 ./scripts/package.sh         # build net.tropism.plasma.aussieweather-<version>.plasmoid
+./scripts/make-icons.py      # remake the icon's copies after editing branding/
 ./translate/merge.sh         # regenerate translate/template.pot after string changes
 ```
 
@@ -121,7 +124,9 @@ The tests need `python3` and Qt 6's `qmltestrunner` (Fedora:
 `qml6-module-qttest`). `check-qml.py` and `render.py` also need KDE
 Plasma 6's QML modules, and `render.py` PySide6 built against the same Qt
 (Fedora: `python3-pyside6`); CI runs both in a Fedora container. CI fails
-if `template.pot` is out of date.
+if `template.pot` is out of date, or if the icon's copies were not made
+from today's `branding/` sources (`make-icons.py` needs ImageMagick with
+librsvg, and Pillow; its `--check` only Python).
 
 This repo is also consumed as a git submodule by a private multi-widget
 repo; the widget package itself is `metadata.json` + `contents/` at the repo
