@@ -15,11 +15,16 @@ GEOHASH is the cached result of an earlier lookup; when it is empty, QUERY
 stdout carrying "ok"; the exit status is always 0.
 """
 
+import base64
+import binascii
+import html
 import json
+import re
 import sys
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
+from html.parser import HTMLParser
 
 API = "https://api.weather.bom.gov.au/v1"
 
@@ -82,6 +87,143 @@ def is_current(warning, now):
     return expiry is None or expiry > now
 
 
+# Warning bodies are shown as Qt RichText, which fetches <img> sources and
+# hands every image to whichever decoder sniffs it — so the HTML BoM sends is
+# rebuilt from this allowlist rather than passed through. Links survive only
+# as https; images only as PNG data: URIs that really are PNG.
+ALLOWED_TAGS = {
+    "a", "b", "br", "div", "em", "h1", "h2", "h3", "h4", "h5", "h6", "hr",
+    "i", "img", "li", "ol", "p", "pre", "span", "strong", "sub", "sup",
+    "table", "tbody", "td", "th", "thead", "tr", "u", "ul",
+}
+VOID_TAGS = {"br", "hr", "img"}
+DROPPED_WITH_CONTENT = {"script", "style"}
+PNG_URI_PREFIX = "data:image/png;base64,"
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+MAX_IMAGE_BYTES = 2 * 1024 * 1024
+
+
+def png_data_uri(src):
+    """SRC normalised if it is a data: URI holding a PNG, else None."""
+    if not src.lower().startswith(PNG_URI_PREFIX):
+        return None
+    payload = "".join(src[len(PNG_URI_PREFIX):].split())
+    try:
+        data = base64.b64decode(payload, validate=True)
+    except (binascii.Error, ValueError):
+        return None
+    if not data.startswith(PNG_SIGNATURE) or len(data) > MAX_IMAGE_BYTES:
+        return None
+    return PNG_URI_PREFIX + payload
+
+
+def allowed_attributes(tag, attrs):
+    """The attributes TAG keeps, or None if the tag itself must go."""
+    attrs = dict(attrs)
+    if tag == "a":
+        href = attrs.get("href") or ""
+        return [("href", href)] if href.lower().startswith("https://") else None
+    if tag == "img":
+        src = png_data_uri(attrs.get("src") or "")
+        if src is None:
+            return None
+        return [("src", src)] + ([("alt", attrs["alt"])] if attrs.get("alt") else [])
+    return []
+
+
+class _Sanitiser(HTMLParser):
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.out = []
+        self.open = []
+        self.dropping = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in DROPPED_WITH_CONTENT:
+            self.dropping += 1
+            return
+        if self.dropping or tag not in ALLOWED_TAGS:
+            return
+        kept = allowed_attributes(tag, attrs)
+        if kept is None:
+            return
+        self.out.append("<" + tag + "".join(
+            ' %s="%s"' % (name, html.escape(value, quote=True)) for name, value in kept) + ">")
+        if tag not in VOID_TAGS:
+            self.open.append(tag)
+
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+        if tag not in VOID_TAGS:
+            self.handle_endtag(tag)
+
+    def handle_endtag(self, tag):
+        if tag in DROPPED_WITH_CONTENT:
+            self.dropping = max(0, self.dropping - 1)
+            return
+        if tag not in self.open:
+            return
+        while self.open:
+            closing = self.open.pop()
+            self.out.append("</" + closing + ">")
+            if closing == tag:
+                break
+
+    def handle_data(self, data):
+        if not self.dropping:
+            self.out.append(html.escape(data, quote=False))
+
+    def result(self):
+        self.close()
+        return "".join(self.out) + "".join("</" + t + ">" for t in reversed(self.open))
+
+
+def sanitise_html(markup):
+    """MARKUP rebuilt from the allowlist, safe to show as RichText."""
+    sanitiser = _Sanitiser()
+    sanitiser.feed(markup)
+    return sanitiser.result()
+
+
+HTTPS_URL = re.compile(r'https://[^\s<>"]+')
+TRAILING_PUNCTUATION = re.compile(r"[.,;:!?)\]}'\"]+$")
+LOOKS_LIKE_HTML = re.compile(r"<[a-z!/]", re.IGNORECASE)
+
+
+def linkify(text):
+    """Plain TEXT as RichText: escaped, with bare https URLs made links.
+
+    Trailing sentence punctuation stays outside the link, so a sentence
+    ending in a URL works.
+    """
+    out = []
+    last = 0
+    for match in HTTPS_URL.finditer(text):
+        url = match.group(0)
+        trail = TRAILING_PUNCTUATION.search(url)
+        if trail:
+            url = url[:trail.start()]
+        out.append(html.escape(text[last:match.start()], quote=False))
+        out.append('<a href="%s">%s</a>' % (html.escape(url), html.escape(url, quote=False)))
+        last = match.start() + len(url)
+    out.append(html.escape(text[last:], quote=False))
+    return "".join(out)
+
+
+def warning_view(warning):
+    """The fields of a warning the widget shows, its body as safe RichText."""
+    body = warning.get("message") or warning.get("text") or warning.get("description") or ""
+    return {
+        "id": warning.get("id", ""),
+        "title": warning.get("title") or warning.get("short_title") or "",
+        "phase": warning.get("phase", ""),
+        "issue_time": warning.get("issue_time", ""),
+        "expiry_time": warning.get("expiry_time", ""),
+        "html": sanitise_html(body) if LOOKS_LIKE_HTML.search(body) else linkify(body),
+    }
+
+
 def warnings_for(get, geohash, now):
     """The location's current warnings, each merged with its detail."""
     warnings = []
@@ -95,7 +237,7 @@ def warnings_for(get, geohash, now):
                 warning = dict(warning, **detail.get("data", {}))
             except Exception:
                 pass
-        warnings.append(warning)
+        warnings.append(warning_view(warning))
     return warnings
 
 

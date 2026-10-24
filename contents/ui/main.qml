@@ -444,7 +444,7 @@ PlasmoidItem {
                         text: {
                             if (!root.hasWarnings) return ""
                             return "⚠  " + root.warnings.map(function(w) {
-                                return w.title || w.type || "Warning"
+                                return w.title || i18n("Warning")
                             }).join("  ·  ")
                         }
                     }
@@ -1261,19 +1261,19 @@ PlasmoidItem {
                             color: Kirigami.Theme.neutralTextColor
                             font.pointSize: Kirigami.Theme.defaultFont.pointSize
                             font.weight: Font.Bold
-                            text: modelData.title || modelData.type || "Warning"
+                            text: modelData.title || i18n("Warning")
                         }
                         PlasmaComponents.Label {
                             Layout.fillWidth: true
                             wrapMode: Text.WordWrap
                             font.pointSize: Kirigami.Theme.defaultFont.pointSize
-                            visible: (modelData.text || modelData.description || modelData.message || "").length > 0
-                            // BoM detail is an HTML product (rendered as-is);
-                            // plain-text fallbacks are escaped + linkified.
-                            // Only http/https links are ever opened.
+                            visible: modelData.html !== ""
+                            // poll.py rebuilds the body from a tag allowlist
+                            // (sanitise_html): only https links and PNG data:
+                            // images survive, so nothing here fetches.
                             textFormat: Text.RichText
                             linkColor: Kirigami.Theme.linkColor
-                            text: Helpers.warningHtml(modelData.text || modelData.description || modelData.message || "")
+                            text: modelData.html
                             onLinkActivated: (link) => { if (Helpers.isSafeUrl(link)) Qt.openUrlExternally(link) }
                             HoverHandler {
                                 enabled: parent.hoveredLink !== ""
