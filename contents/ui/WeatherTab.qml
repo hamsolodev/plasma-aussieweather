@@ -124,7 +124,7 @@ ColumnLayout {
 
     Kirigami.Separator { Layout.fillWidth: true }
 
-    // Footer: place ▾ | station (distance) · last update | refresh | BoM
+    // Footer: place ▾ | last update · station (distance) | refresh | BoM
     RowLayout {
         Layout.fillWidth: true
         Layout.leftMargin:   Kirigami.Units.smallSpacing
@@ -192,8 +192,12 @@ ColumnLayout {
             Layout.fillWidth: true
             opacity: 0.5
             elide: Text.ElideRight
+            // The update time first: it says how old the data is, and a long
+            // station name is what eliding should cut.
             text: {
                 var parts = []
+                var updated = tab.clock.whenText(tab.weather.lastSuccessMs)
+                if (updated) parts.push(updated)
                 var obs = tab.weather.observations
                 if (obs && obs.station) {
                     parts.push(obs.station.distance
@@ -201,8 +205,6 @@ ColumnLayout {
                                 obs.station.name, (obs.station.distance / 1000).toFixed(1))
                         : obs.station.name)
                 }
-                var updated = tab.clock.whenText(tab.weather.lastSuccessMs)
-                if (updated) parts.push(updated)
                 return parts.join("  ·  ")
             }
         }
