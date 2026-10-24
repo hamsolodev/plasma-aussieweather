@@ -105,5 +105,15 @@ QtObject {
         return ""
     }
 
-    readonly property bool hasWarnings: Array.isArray(warnings) && warnings.length > 0
+    // The warnings still in force (Helpers.unexpired). The list is replaced
+    // when new warnings arrive or one expires, not every minute, so the
+    // Warnings tab is not rebuilt as the clock ticks.
+    property var currentWarnings: []
+    onWarningsChanged: currentWarnings = Helpers.unexpired(warnings, nowMs)
+    onNowMsChanged: {
+        var inForce = Helpers.unexpired(warnings, nowMs)
+        if (inForce.length !== currentWarnings.length) currentWarnings = inForce
+    }
+
+    readonly property bool hasWarnings: currentWarnings.length > 0
 }

@@ -52,7 +52,7 @@ ColumnLayout {
         PlasmaComponents.TabButton {
             visible: full.weather.hasWarnings
             width: full.weather.hasWarnings ? undefined : 0
-            text: i18n("⚠ Warnings (%1)", full.weather.warnings.length)
+            text: i18n("⚠ Warnings (%1)", full.weather.currentWarnings.length)
         }
     }
 

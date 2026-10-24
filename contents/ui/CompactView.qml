@@ -40,7 +40,7 @@ Item {
             id: badgeText
             anchors.centerIn: parent
             textFormat: Text.PlainText
-            text: compact.weather.warnings.length
+            text: compact.weather.currentWarnings.length
             font.pixelSize: Math.round(parent.height * 0.7)
             font.bold: true
             color: "#ffffff"

@@ -284,9 +284,18 @@ TestCase {
     function test_currentSlot_is_the_slot_now_falls_in() {
         compare(Helpers.currentSlot(slots(), Date.parse("2026-10-24T01:45:00Z")).time,
                 "2026-10-24T01:00:00Z")
-        compare(Helpers.currentSlot(slots(), Date.parse("2026-10-24T09:00:00Z")).time,
-                "2026-10-24T03:00:00Z")
+        // Hours past the last slot (polls failing): no slot is now.
+        compare(Helpers.currentSlot(slots(), Date.parse("2026-10-24T09:00:00Z")), null)
         compare(Helpers.currentSlot(slots(), Date.parse("2026-10-23T23:59:00Z")), null)
+    }
+
+    function test_unexpired() {
+        var warnings = [{ id: "a", expiry_time: "2026-10-24T01:00:00Z" },
+                        { id: "b", expiry_time: "2026-10-24T03:00:00Z" },
+                        { id: "c" }]
+        compare(Helpers.unexpired(warnings, Date.parse("2026-10-24T02:00:00Z"))
+                    .map(function(w) { return w.id }), ["b", "c"])
+        compare(Helpers.unexpired(null, 0), [])
     }
 
     // A UTC-hour slot starts at half past locally in SA, the NT, Broken Hill

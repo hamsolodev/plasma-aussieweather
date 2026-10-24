@@ -239,14 +239,25 @@ function upcomingSlots(hourly, nowMs) {
     })
 }
 
-// The hourly entry now falls in: the latest that starts at or before it.
-// null if every entry is in the future.
+// The hourly entry for the hour now falls in, or null. Only that hour's
+// slot describes now: while polls fail the list ages, and the last slot
+// left may be hours old.
 function currentSlot(hourly, nowMs) {
     var now = hourBucket(nowMs)
-    var best = null
-    for (var i = 0; i < (hourly || []).length; i++)
-        if (hourBucket(Date.parse(hourly[i].time)) <= now) best = hourly[i]
-    return best
+    var list = hourly || []
+    for (var i = 0; i < list.length; i++)
+        if (hourBucket(Date.parse(list[i].time)) === now) return list[i]
+    return null
+}
+
+// The warnings not yet expired at nowMs. One with no readable expiry time
+// is kept. poll.py drops expired warnings, but the widget keeps showing the
+// last list through a failed fetch, so time has to be checked here too.
+function unexpired(warnings, nowMs) {
+    return (warnings || []).filter(function(w) {
+        var expiry = Date.parse(w.expiry_time)
+        return isNaN(expiry) || expiry > nowMs
+    })
 }
 
 // Qt time format for an hourly slot's label: the hour alone when the slot

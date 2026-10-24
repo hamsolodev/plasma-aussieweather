@@ -33,7 +33,7 @@ QQC2.ScrollView {
         spacing: Kirigami.Units.smallSpacing
 
         Repeater {
-            model: tab.weather.warnings
+            model: tab.weather.currentWarnings
             delegate: ColumnLayout {
                 required property var modelData
                 required property int index
@@ -102,7 +102,7 @@ QQC2.ScrollView {
                 Kirigami.Separator {
                     Layout.fillWidth: true
                     Layout.topMargin: Kirigami.Units.smallSpacing
-                    visible: index < tab.weather.warnings.length - 1
+                    visible: index < tab.weather.currentWarnings.length - 1
                 }
             }
         }

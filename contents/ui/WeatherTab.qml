@@ -52,7 +52,7 @@ ColumnLayout {
                 color: Kirigami.Theme.neutralTextColor
                 text: {
                     if (!tab.weather.hasWarnings) return ""
-                    return "⚠  " + tab.weather.warnings.map(function(w) {
+                    return "⚠  " + tab.weather.currentWarnings.map(function(w) {
                         return w.title || i18n("Warning")
                     }).join("  ·  ")
                 }
