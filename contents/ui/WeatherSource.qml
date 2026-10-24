@@ -29,11 +29,11 @@ QtObject {
 
     // Start from the last successful lookup so the widget works across
     // restarts without waiting for a fresh one, but only if that lookup was
-    // for the location still configured (it may have been edited since).
-    // Then poll.
+    // for the location still configured (it may have been edited since;
+    // an empty one matches the cache's empty default). Then poll.
     Component.onCompleted: {
         weather.locationName = locationSearch
-        if (config.lastLocationSearch === locationSearch) {
+        if (locationSearch !== "" && config.lastLocationSearch === locationSearch) {
             if (config.lastGeohash) _geohash = config.lastGeohash
             if (config.lastLocationName) weather.locationName = config.lastLocationName
         }
@@ -110,10 +110,12 @@ QtObject {
         if (d.warnings !== null) weather.warnings       = d.warnings
         if (d.hourly   !== null) weather.hourlyForecast = d.hourly
         weather.lastSuccessMs = Date.now()
-        weather.errorText =
-              d.warningsError ? i18n("Warnings could not be updated: %1", d.warningsError)
-            : d.hourlyError   ? i18n("The hourly forecast could not be updated: %1", d.hourlyError)
-            : ""
+        var partial = []
+        if (d.warningsError)
+            partial.push(i18n("Warnings could not be updated: %1", d.warningsError))
+        if (d.hourlyError)
+            partial.push(i18n("The hourly forecast could not be updated: %1", d.hourlyError))
+        weather.errorText = partial.join("\n")
         weather.hasData = true
     }
 

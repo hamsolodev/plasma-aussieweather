@@ -79,6 +79,11 @@ QtObject {
     }
 
     function _handle(d) {
+        // Drop a listing that arrives once the radar is off screen: its
+        // frames would load with nothing showing them. The next visit
+        // fetches afresh.
+        if (!active)
+            return
         // Drop a listing for a station no longer shown. Output that names no
         // station (it did not parse) can only be taken as this one's.
         if (d.station !== undefined && !Helpers.isRadarFor(d, station))
