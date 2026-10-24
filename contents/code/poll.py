@@ -25,6 +25,7 @@ import json
 import os
 import pathlib
 import re
+import struct
 import sys
 import tempfile
 import time
@@ -183,12 +184,24 @@ PNG_URI_PREFIX = "data:image/png;base64,"
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 MAX_IMAGE_BYTES = 2 * 1024 * 1024
 MAX_IMAGES = 8
+# Qt can scale an image up to fill its box: a tiny 1×1024 PNG became a
+# raster of gigabytes. Images must be modest, and not extreme in shape.
+MAX_IMAGE_SIDE = 2048
+MAX_IMAGE_ASPECT = 8
 
 Sanitised = collections.namedtuple("Sanitised", ["html", "images"])
 
 
+def png_dimensions(data):
+    """(width, height) from a PNG's header chunk, or None if it has none."""
+    if len(data) < 24 or data[12:16] != b"IHDR":
+        return None
+    return struct.unpack(">II", data[16:24])
+
+
 def png_bytes(src):
-    """The bytes of a data: URI holding a PNG, else None."""
+    """The bytes of a data: URI holding a PNG of sane dimensions, else
+    None."""
     if not src.lower().startswith(PNG_URI_PREFIX):
         return None
     payload = "".join(src[len(PNG_URI_PREFIX):].split())
@@ -197,6 +210,14 @@ def png_bytes(src):
     except (binascii.Error, ValueError):
         return None
     if not data.startswith(PNG_SIGNATURE) or len(data) > MAX_IMAGE_BYTES:
+        return None
+    size = png_dimensions(data)
+    if size is None:
+        return None
+    width, height = size
+    if not (0 < width <= MAX_IMAGE_SIDE and 0 < height <= MAX_IMAGE_SIDE):
+        return None
+    if max(width, height) > MAX_IMAGE_ASPECT * min(width, height):
         return None
     return data
 

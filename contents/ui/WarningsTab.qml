@@ -76,8 +76,10 @@ QQC2.ScrollView {
                         Layout.preferredHeight: implicitWidth > 0
                             ? width * implicitHeight / implicitWidth : 0
                         source: Helpers.fileUrl(modelData)
+                        // Only ever scales down. No fillMode: with
+                        // PreserveAspectFit, Qt scales the source up to
+                        // fill the box at load time.
                         sourceSize.width: 1024
-                        fillMode: Image.PreserveAspectFit
                         asynchronous: true
                     }
                 }

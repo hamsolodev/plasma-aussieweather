@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 import base64
+import struct
+import zlib
 import contextlib
 import os
 import pathlib
@@ -292,7 +294,15 @@ class CurrentWarningsTest(unittest.TestCase):
         self.assertEqual([w["id"] for w in out["warnings"]], ["A", "B"])
 
 
-PNG = b"\x89PNG\r\n\x1a\n" + b"\0" * 16
+def png(width, height):
+    """The start of a PNG: its signature and IHDR chunk, enough for the
+    checks poll.py makes."""
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    return (b"\x89PNG\r\n\x1a\n" + struct.pack(">I", len(ihdr)) + b"IHDR" + ihdr
+            + struct.pack(">I", zlib.crc32(b"IHDR" + ihdr)))
+
+
+PNG = png(580, 820)
 EPS = b"%!PS-Adobe-3.0 EPSF-3.0\n"
 
 
@@ -334,6 +344,18 @@ class SanitiseHtmlTest(unittest.TestCase):
         result = poll.sanitise(html)
         self.assertEqual(result.html, "<p>ab</p>")
         self.assertEqual(result.images, [PNG])
+
+    def test_images_must_have_sane_dimensions(self):
+        # Qt scales an image to fill its box: a 1×1024 PNG of 89 bytes
+        # became a raster of gigabytes inside plasmashell.
+        for width, height in ((1, 1024), (1024, 1), (4096, 4096), (0, 10), (2049, 300)):
+            html = '<img src="%s">' % data_uri("image/png", png(width, height))
+            self.assertEqual(poll.sanitise(html).images, [], (width, height))
+        self.assertEqual(len(poll.sanitise('<img src="%s">' % data_uri("image/png", png(580, 820))).images), 1)
+
+    def test_png_needs_its_header(self):
+        bare_signature = b"\x89PNG\r\n\x1a\n" + b"\0" * 16
+        self.assertEqual(poll.sanitise('<img src="%s">' % data_uri("image/png", bare_signature)).images, [])
 
     def test_images_are_capped(self):
         html = "".join('<img src="%s">' % data_uri("image/png", PNG + bytes([i]))
