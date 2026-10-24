@@ -28,7 +28,9 @@ from datetime import datetime, timezone
 from html.parser import HTMLParser
 
 API = "https://api.weather.bom.gov.au/v1"
-STATES = {"ACT", "NSW", "NT", "QLD", "SA", "TAS", "VIC", "WA"}
+# The states and territories as BoM names them; OT is the other
+# territories (Norfolk, Christmas and the Cocos Islands).
+STATES = {"ACT", "NSW", "NT", "OT", "QLD", "SA", "TAS", "VIC", "WA"}
 GEOHASH = re.compile(r"[0-9b-hjkmnp-z]{6}")
 
 
@@ -88,23 +90,34 @@ def split_state(query):
     return " ".join(words), None
 
 
+def search(get, place):
+    """BoM's locations matching PLACE."""
+    return get("/locations?search=" + urllib.parse.quote(place)).get("data", [])
+
+
 def resolve(get, query):
     """Look QUERY up and return (geohash, display name).
 
     When QUERY names a state, only places in that state match: "Seaford
-    NSW" is not found rather than quietly becoming Seaford, VIC.
+    NSW" is not found rather than quietly becoming Seaford, VIC. A last
+    word that is not a state and leaves nothing found ("Sydney CBD") is
+    dropped and the place searched again.
     """
     place, state = split_state(query)
     if not place:
         raise Failure("no_location", permanent=True)
-    locations = get("/locations?search=" + urllib.parse.quote(place)).get("data", [])
+    locations = search(get, place)
     if state:
         locations = [l for l in locations if (l.get("state") or "").upper() == state]
+    elif not locations and len(place.split()) > 1:
+        locations = search(get, place.rsplit(None, 1)[0])
     if not locations:
         raise Failure("not_found", query.strip(), permanent=True)
     location = locations[0]
-    return (location.get("geohash", "")[:6],
-            location.get("name", "") + ", " + location.get("state", ""))
+    geohash = (location.get("geohash") or "")[:6]
+    if not GEOHASH.fullmatch(geohash):
+        raise Failure("bad_response", "location without a geohash")
+    return geohash, location.get("name", "") + ", " + location.get("state", "")
 
 
 def parse_time(value):
@@ -297,6 +310,8 @@ def hourly_for(get, geohash):
 
 def collect(get, geohash, query, now):
     """Everything the widget shows, as one JSON-ready dict."""
+    if not query.strip():
+        raise Failure("no_location", permanent=True)
     out = {"ok": True}
     if not GEOHASH.fullmatch(geohash):
         geohash = ""

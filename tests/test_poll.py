@@ -59,6 +59,10 @@ class SplitStateTest(unittest.TestCase):
         self.assertEqual(poll.split_state("seaford vic"), ("seaford", "VIC"))
         self.assertEqual(poll.split_state("  Port  Lincoln   Sa "), ("Port Lincoln", "SA"))
 
+    def test_other_territories(self):
+        # BoM files Norfolk, Christmas and the Cocos Islands under "OT".
+        self.assertEqual(poll.split_state("Norfolk Island OT"), ("Norfolk Island", "OT"))
+
     def test_last_word_that_is_not_a_state(self):
         self.assertEqual(poll.split_state("Port Lincoln"), ("Port Lincoln", None))
         self.assertEqual(poll.split_state("Mount Isa"), ("Mount Isa", None))
@@ -80,6 +84,22 @@ class ResolveTest(unittest.TestCase):
         with self.assertRaises(poll.Failure) as caught:
             poll.resolve(api, "Seaford NSW")
         self.assertEqual(caught.exception.kind, "not_found")
+
+    def test_unknown_suffix_falls_back_to_the_place(self):
+        # "Sydney CBD" finds nothing as written; without its last word it
+        # does, as it did when any short capitalised suffix was taken for a
+        # state.
+        sydney = {"geohash": "r3gx2fz", "name": "Sydney", "state": "NSW"}
+        api = FakeApi({"/locations?search=Sydney%20CBD": {"data": []},
+                       "/locations?search=Sydney": {"data": [sydney]}})
+        self.assertEqual(poll.resolve(api, "Sydney CBD"), ("r3gx2f", "Sydney, NSW"))
+
+    def test_api_geohash_is_checked(self):
+        bogus = {"geohash": "../../x", "name": "Seaford", "state": "VIC"}
+        api = FakeApi({"/locations?search=Seaford": {"data": [bogus]}})
+        with self.assertRaises(poll.Failure) as caught:
+            poll.resolve(api, "Seaford VIC")
+        self.assertEqual(caught.exception.kind, "bad_response")
 
     def test_no_match_is_not_found(self):
         api = FakeApi({"/locations?search=Nowhere": {"data": []}})
@@ -119,6 +139,10 @@ class ErrorKindTest(unittest.TestCase):
                                         urllib.error.URLError("Name or service not known")})
         result = run_main(api, "r1ppnx", "Seaford VIC")
         self.assertEqual((result["error"], result["permanent"]), ("network", False))
+
+    def test_empty_location_ignores_a_cached_geohash(self):
+        result = run_main(FakeApi({}), "r1ppnx", "")
+        self.assertEqual((result["ok"], result["error"]), (False, "no_location"))
 
     def test_malformed_cached_geohash_is_looked_up_again(self):
         api = location_api("r1ppnx", **{"/locations?search=Seaford": {"data": [SEAFORD_VIC]}})
