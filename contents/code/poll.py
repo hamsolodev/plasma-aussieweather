@@ -64,7 +64,8 @@ GEOHASH = re.compile(r"[0-9b-hjkmnp-z]{6}")
 
 # A whole poll's limit. Each read has a 15 s timeout, but a server dripping
 # a byte at a time never trips it, and while a poll runs the widget cannot
-# start another.
+# start another. A DNS lookup cannot be interrupted, so one can overrun it
+# by the resolver's own timeout.
 POLL_DEADLINE = 120
 
 
@@ -153,15 +154,20 @@ def split_state(query):
     return " ".join(words), None
 
 
-# BoM spells abbreviations out: "Mt Buller" is listed as Mount Buller.
-SPELLED_OUT = {"mt": "mount", "st": "saint", "pt": "port"}
+# BoM spells abbreviations out: "Mt Buller" is listed as Mount Buller, and
+# "Pt Cook" as Point Cook ("Pt" is Port elsewhere).
+SPELLED_OUT = {"mt": {"mount"}, "st": {"saint"}, "pt": {"port", "point"}}
+
+
+def same_word(a, b):
+    """Whether two lower-case words are the same, abbreviations aside."""
+    return a == b or b in SPELLED_OUT.get(a, ()) or a in SPELLED_OUT.get(b, ())
 
 
 def same_place(a, b):
     """Whether two place names are the same, abbreviations aside."""
-    def words(name):
-        return [SPELLED_OUT.get(word, word) for word in name.lower().split()]
-    return words(a) == words(b)
+    a, b = a.lower().split(), b.lower().split()
+    return len(a) == len(b) and all(map(same_word, a, b))
 
 
 def search(get, place):
@@ -257,10 +263,10 @@ Sanitised = collections.namedtuple("Sanitised", ["html", "images"])
 
 def clip_escaped(escaped, room):
     """Escaped text cut to at most ROOM characters, without splitting an
-    entity."""
+    entity, named or numeric."""
     if len(escaped) <= room:
         return escaped
-    return re.sub(r"&[a-z]*$", "", escaped[:room])
+    return re.sub(r"&#?\w*$", "", escaped[:room])
 
 
 def png_dimensions(data):
@@ -347,14 +353,16 @@ class _Sanitiser(HTMLParser):
             start = '<a href="%s">' % html.escape(href, quote=True)
         else:
             start = "<" + tag + ">"
+        # A tag that does not fit what is left of the output is left out.
+        fits = len(start) <= self.output_left
         if tag in VOID_TAGS:
-            if self.elements_left > 0:
+            if self.elements_left > 0 and fits:
                 self.elements_left -= 1
                 self.emit(start)
             return
         if len(self.stack) >= MAX_STACK:
             return
-        emitted = self.depth < MAX_DEPTH and self.elements_left > 0
+        emitted = self.depth < MAX_DEPTH and self.elements_left > 0 and fits
         if emitted:
             self.elements_left -= 1
             self.depth += 1
@@ -429,14 +437,19 @@ def user_cache():
 def group_is_private(gid):
     """Whether group GID is the user's alone: the user-private group
     Debian, Ubuntu and Fedora give each user, with no other members. Their
-    sessions' umask (002) leaves directories group-writable."""
+    sessions' umask (002) leaves directories group-writable.
+
+    Members are those the group lists and the accounts whose primary group
+    it is. Accounts from a directory service that does not enumerate them
+    (sssd's default) cannot be listed, so are not seen.
+    """
     try:
         group = grp.getgrgid(gid)
         user = pwd.getpwuid(os.getuid())
     except KeyError:
         return False
-    return (gid == user.pw_gid and group.gr_name == user.pw_name
-            and not set(group.gr_mem) - {user.pw_name})
+    others = set(group.gr_mem) | {a.pw_name for a in pwd.getpwall() if a.pw_gid == gid}
+    return gid == user.pw_gid and group.gr_name == user.pw_name and others <= {user.pw_name}
 
 
 def private_cache(path, create):
@@ -503,11 +516,20 @@ class ImageStore:
         self.saved_bytes = 0
         self.problem = ""
 
-    def _private(self, create):
-        """Whether the cache and the widget's directories are private (made
-        so if CREATE); raises OSError if not."""
-        return private_cache(self.cache, create) and all(
-            private_directory(path, create) for path in self._own)
+    def _make_private(self):
+        """Make the directories that are missing, and check all are
+        private; OSError if one is not."""
+        private_cache(self.cache, create=True)
+        for path in self._own:
+            private_directory(path, create=True)
+
+    def is_private(self):
+        """Whether the directories all exist and are private."""
+        try:
+            return private_cache(self.cache, create=False) and all(
+                private_directory(path, create=False) for path in self._own)
+        except OSError:
+            return False
 
     def save(self, data):
         """Store DATA; its file's path, or None once this poll has saved
@@ -519,7 +541,7 @@ class ImageStore:
         name = hashlib.sha256(data).hexdigest() + ".png"
         path = self.directory / name
         try:
-            self._private(create=True)
+            self._make_private()
             if self._holds(path, data):
                 os.utime(path)  # still shown: not one for prune
             else:
@@ -536,24 +558,27 @@ class ImageStore:
 
     @staticmethod
     def _holds(path, data):
-        """Whether PATH is a regular file holding DATA. Its type is checked
-        first: reading a FIFO would block."""
+        """Whether PATH is a regular file of the user's, with no other link,
+        holding DATA. A file planted while an older build left the directory
+        open, or one linked from elsewhere, could be changed later by
+        whoever planted it, so is replaced instead. Its type is checked
+        before it is read: reading a FIFO would block."""
         try:
-            return stat.S_ISREG(path.lstat().st_mode) and path.read_bytes() == data
+            info = path.lstat()
         except FileNotFoundError:
             return False
+        return (stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid()
+                and info.st_nlink == 1 and path.read_bytes() == data)
 
     def prune(self, older_than=PRUNE_AFTER):
         """Delete the images and leftover temporary files no current
         warning shows, once OLDER_THAN seconds old. Anything else in the
         directory is not ours and is left; a file another poll removes
         meanwhile is skipped. A directory that is missing or not private is
-        skipped quietly: housekeeping, not worth an error."""
-        try:
-            if not self._private(create=False):
-                return
-        except OSError:
-            return
+        skipped quietly: housekeeping, not worth an error. Whether it was
+        pruned."""
+        if not self.is_private():
+            return False
         cutoff = time.time() - older_than
         for path in self.directory.iterdir():
             if path.name in self.kept:
@@ -566,6 +591,7 @@ class ImageStore:
                     path.unlink()
             except FileNotFoundError:
                 pass
+        return True
 
 
 # Another widget may still show a place this one has left, and refreshes
@@ -575,18 +601,21 @@ FORMER_PLACE_AFTER = 24 * 3600
 
 def prune_former_places(cache, geohash):
     """Tidy the image directories of places other than GEOHASH's, removing
-    each once empty."""
+    each once empty. Nothing is touched unless the directories above them
+    are private."""
+    if not ImageStore(cache, CACHE_NAME, "warnings").is_private():
+        return
     try:
         places = [p for p in (cache / CACHE_NAME / "warnings").iterdir()
                   if p.name != geohash and GEOHASH.fullmatch(p.name)]
     except OSError:
         return
     for place in places:
-        ImageStore(cache, CACHE_NAME, "warnings", place.name).prune(FORMER_PLACE_AFTER)
-        try:
-            place.rmdir()
-        except OSError:
-            pass
+        if ImageStore(cache, CACHE_NAME, "warnings", place.name).prune(FORMER_PLACE_AFTER):
+            try:
+                place.rmdir()
+            except OSError:
+                pass
 
 
 HTTPS_URL = re.compile(r'https://[^\s<>"]+')
@@ -601,9 +630,9 @@ def linkify(text):
     ending in a URL works. It keeps to the budgets of sanitised HTML: at
     most MAX_TEXT of text, MAX_ELEMENTS links and MAX_OUTPUT of markup.
     """
-    if len(text) > MAX_TEXT:
-        text = text[:MAX_TEXT] + "…"
-    pieces = []
+    cut = len(text) > MAX_TEXT
+    text = text[:MAX_TEXT]
+    pieces = []  # (markup, whether it is a link)
     last = 0
     for links, match in enumerate(HTTPS_URL.finditer(text)):
         if links >= MAX_ELEMENTS:
@@ -612,38 +641,56 @@ def linkify(text):
         trail = TRAILING_PUNCTUATION.search(url)
         if trail:
             url = url[:trail.start()]
-        pieces.append(html.escape(text[last:match.start()], quote=False))
+        pieces.append((html.escape(text[last:match.start()], quote=False), False))
         if len(url) <= MAX_HREF:
-            pieces.append('<a href="%s">%s</a>' % (html.escape(url), html.escape(url, quote=False)))
+            pieces.append(('<a href="%s">%s</a>' % (html.escape(url), html.escape(url, quote=False)),
+                           True))
         else:
-            pieces.append(html.escape(url, quote=False))
+            pieces.append((html.escape(url, quote=False), False))
         last = match.start() + len(url)
-    pieces.append(html.escape(text[last:], quote=False))
+    pieces.append((html.escape(text[last:], quote=False), False))
     out = []
     room = MAX_OUTPUT
-    for piece in pieces:
-        if len(piece) > room:
-            out.append("…" if piece.startswith("<a ") else clip_escaped(piece, room) + "…")
+    for markup, is_link in pieces:
+        if len(markup) > room:
+            if not is_link:
+                out.append(clip_escaped(markup, room))
+            cut = True
             break
-        out.append(piece)
-        room -= len(piece)
+        out.append(markup)
+        room -= len(markup)
+    if cut:
+        out.append("…")
     return "".join(out)
 
 
-def warning_view(warning, images):
-    """The fields of a warning the widget shows: its body as safe RichText,
-    and the paths of its images, saved in the ImageStore IMAGES."""
-    body = warning.get("message") or warning.get("text") or warning.get("description") or ""
+def text_field(records, *names):
+    """The first non-empty string held by one of NAMES, in order, in any of
+    RECORDS, in order; else "". A field of another type is treated as
+    missing."""
+    for name in names:
+        for record in records:
+            value = record.get(name)
+            if isinstance(value, str) and value:
+                return value
+    return ""
+
+
+def warning_view(records, images):
+    """The fields of a warning the widget shows, from RECORDS (its detail,
+    then its summary): its body as safe RichText, and the paths of its
+    images, saved in the ImageStore IMAGES."""
+    body = text_field(records, "message", "text", "description")
     if LOOKS_LIKE_HTML.search(body):
         body_html, pngs = sanitise(body)
     else:
         body_html, pngs = linkify(body), []
     return {
-        "id": warning.get("id", ""),
-        "title": warning.get("title") or warning.get("short_title") or "",
-        "phase": warning.get("phase", ""),
-        "issue_time": warning.get("issue_time", ""),
-        "expiry_time": warning.get("expiry_time", ""),
+        "id": text_field(records, "id"),
+        "title": text_field(records, "title", "short_title"),
+        "phase": text_field(records, "phase"),
+        "issue_time": text_field(records, "issue_time"),
+        "expiry_time": text_field(records, "expiry_time"),
         "html": body_html,
         "images": [path for path in map(images.save, pngs) if path],
     }
@@ -653,21 +700,22 @@ def warnings_for(get, geohash, now, images):
     """The location's current warnings, each merged with its detail."""
     warnings = []
     for warning in get("/locations/" + geohash + "/warnings").get("data", []):
-        if not is_current(warning, now):
+        if not isinstance(warning, dict) or not is_current(warning, now):
             continue
         if len(warnings) >= MAX_WARNINGS:
             break
-        wid = (warning.get("id") or "").strip()
+        wid = text_field([warning], "id").strip()
+        detail = {}
         if wid:
             # Without its detail a warning still shows, by its summary's
             # title, so a detail that fails to load or makes no sense is
             # skipped rather than failing every warning.
             try:
-                detail = get("/warnings/" + urllib.parse.quote(wid, safe=""))
-                warning = dict(warning, **detail.get("data", {}))
+                data = get("/warnings/" + urllib.parse.quote(wid, safe="")).get("data", {})
+                detail = data if isinstance(data, dict) else {}
             except Exception as e:
                 failure_from(e)  # closes an HTTP error's response
-        warnings.append(warning_view(warning, images))
+        warnings.append(warning_view([detail, warning], images))
     return warnings
 
 
