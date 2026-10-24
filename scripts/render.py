@@ -11,7 +11,10 @@
 The views are the real ones from contents/ui, fed a synthetic forecast,
 inside a plain window (scripts/render.qml) instead of plasmashell. Prints
 each tab's popup height, and exits non-zero if QML logged any warning, so
-it doubles as a smoke test of the QML that plasmashell would swallow.
+it doubles as a smoke test of the QML that plasmashell would swallow. It
+also renders the panel, and runs the real poll.py through WeatherSource
+for a widget with no location (which needs no network), failing unless it
+says "No location set".
 
 The Radar tab is live: it lists frames through radar.py and loads BoM's
 images, so it needs the network and differs from run to run. With
@@ -177,7 +180,7 @@ def render(options, config_home):
                        "TZ": "Australia/Melbourne"})
 
     from PySide6.QtCore import QObject, QTimer, QUrl, qInstallMessageHandler, QtMsgType
-    from PySide6.QtGui import QGuiApplication
+    from PySide6.QtGui import QGuiApplication, QWindow
     from PySide6.QtQml import QQmlApplicationEngine, QQmlComponent, QQmlEngine
     from PySide6.QtQuick import QQuickWindow
     import shiboken6
@@ -251,10 +254,30 @@ def render(options, config_home):
         window.grabWindow().save(str(path))
         print(f"{path}: popup height {heights[name]:.0f}")
 
+    panel = shiboken6.wrapInstance(
+        shiboken6.getCppPointer(window.findChild(QWindow, "panelWindow"))[0], QQuickWindow)
+    path = options.outdir / f"{options.scheme}-panel.png"
+    panel.grabWindow().save(str(path))
+    print(f"{path}: panel")
+
+    unconfigured = window.findChild(QObject, "unconfiguredWeather")
+    expected = "No location set. Choose one in the widget's settings."
+    for _ in range(100):
+        if unconfigured.property("errorText"):
+            break
+        settle(0.1)
+    said = unconfigured.property("errorText")
+    if said == expected:
+        print("WeatherSource ran poll.py: " + said)
+    else:
+        problems.append("WeatherSource with no location said %r, not %r" % (said, expected))
+
     if network:
         print(f"note: {len(network)} radar image(s) failed to load from BoM", file=sys.stderr)
     if problems:
-        print(f"FAIL: QML logged {len(problems)} warning(s)", file=sys.stderr)
+        for problem in problems:
+            print("problem: " + problem, file=sys.stderr)
+        print(f"FAIL: {len(problems)} problem(s): QML warnings or wrong behaviour", file=sys.stderr)
         return 1
     print(f"OK: {len(TABS)} tabs rendered, no QML warnings")
     return 0

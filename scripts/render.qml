@@ -46,6 +46,35 @@ Window {
         interval: 600000
     }
 
+    // The panel, beside the popup, as wide as main.qml makes it.
+    Window {
+        objectName: "panelWindow"
+        visible: true
+        width: Kirigami.Units.gridUnit * 4
+        height: Kirigami.Units.iconSizes.smallMedium + Kirigami.Units.smallSpacing * 2
+        color: Kirigami.Theme.backgroundColor
+
+        CompactView {
+            anchors.fill: parent
+            anchors.leftMargin: Kirigami.Units.smallSpacing
+            weather: weather
+        }
+    }
+
+    // The production wiring, end to end: WeatherSource runs the real
+    // poll.py through ScriptRunner. With no location configured, poll.py
+    // answers at once, without the network, and the widget should say so.
+    WeatherModel {
+        id: unconfigured
+        objectName: "unconfiguredWeather"
+    }
+    WeatherSource {
+        config: ({ locationSearch: "", lastLocationSearch: "", lastGeohash: "", lastLocationName: "" })
+        version: "render"
+        interval: 600000
+        weather: unconfigured
+    }
+
     FullView {
         id: view
         objectName: "fullView"
