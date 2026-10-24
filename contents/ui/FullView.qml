@@ -40,7 +40,10 @@ ColumnLayout {
     Layout.maximumHeight: inPanelPopup ? implicitHeight : Number.POSITIVE_INFINITY
 
     // The Warnings tab exists only while warnings are in force. TabBar does
-    // not collapse an invisible button, so its width is zeroed too.
+    // not collapse an invisible button, so its width is zeroed too; while
+    // shown, its width is reset so TabBar shares the space equally. (Sizing
+    // it from tabBar.width made a binding loop: TabBar's implicit width is
+    // its buttons'.)
     PlasmaComponents.TabBar {
         id: tabBar
         Layout.fillWidth: true
@@ -48,7 +51,7 @@ ColumnLayout {
         PlasmaComponents.TabButton { text: i18n("Radar") }
         PlasmaComponents.TabButton {
             visible: full.weather.hasWarnings
-            width: full.weather.hasWarnings ? tabBar.width / 3 : 0
+            width: full.weather.hasWarnings ? undefined : 0
             text: i18n("⚠ Warnings (%1)", full.weather.warnings.length)
         }
     }
