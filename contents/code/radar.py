@@ -18,12 +18,24 @@ https by the widget. Every outcome is one JSON object on stdout carrying
 
 import ftplib
 import json
+import re
 import sys
+from datetime import datetime, timedelta, timezone
 
 FTP_HOST = "ftp.bom.gov.au"
 FTP_DIR = "/anon/gen/radar"
 FRAME_URL = "https://www.bom.gov.au/radar/"
 FRAME_COUNT = 6
+# Older frames mean the station is down; showing them would pass off old
+# rain as current. Frames from the future are allowed only clock skew.
+MAX_FRAME_AGE = timedelta(hours=1)
+MAX_CLOCK_SKEW = timedelta(minutes=10)
+STATION = re.compile(r"IDR\d{2,3}[1-4]")
+
+
+def is_station(station):
+    """True for a BoM radar product ID such as IDR022."""
+    return STATION.fullmatch(station) is not None
 
 
 def list_names():
@@ -37,16 +49,35 @@ def list_names():
     return names
 
 
-def frame_names(names, station):
-    """The station's latest frame file names, oldest first."""
-    prefix = station + ".T."
-    return sorted(n for n in names if n.startswith(prefix) and n.endswith(".png"))[-FRAME_COUNT:]
+def frame_names(names, station, now):
+    """The station's latest frame file names, oldest first.
+
+    The listing arrives over unencrypted FTP, so names must match BoM's
+    pattern exactly (STATION.T.yyyymmddhhmm.png, UTC) to be used.
+    """
+    pattern = re.compile(re.escape(station) + r"\.T\.(\d{12})\.png")
+    frames = []
+    for name in names:
+        match = pattern.fullmatch(name)
+        if not match:
+            continue
+        try:
+            taken = datetime.strptime(match.group(1), "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+        if -MAX_CLOCK_SKEW <= now - taken <= MAX_FRAME_AGE:
+            frames.append(name)
+    return sorted(frames)[-FRAME_COUNT:]
 
 
 def main(argv):
     station = argv[1]
+    if not is_station(station):
+        print(json.dumps({"ok": False, "error": "Not a radar station: " + station}))
+        return
     try:
-        frames = [FRAME_URL + n for n in frame_names(list_names(), station)]
+        now = datetime.now(timezone.utc)
+        frames = [FRAME_URL + n for n in frame_names(list_names(), station, now)]
         result = {"ok": True, "frames": frames}
     except Exception as e:
         result = {"ok": False, "error": str(e)}
