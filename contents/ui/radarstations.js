@@ -93,9 +93,9 @@ function stationId(site, km) {
     return "IDR" + site + rangeSuffix[km]
 }
 
-// "IDR023" -> { site: "02", km: 128 } (null if unparseable)
+// "IDR023" -> { site: "02", km: 128 } (null if unparseable, or not a string)
 function parseId(id) {
-    if (!id || id.length < 5 || id.substr(0, 3) !== "IDR") return null
+    if (typeof id !== "string" || id.length < 5 || id.substr(0, 3) !== "IDR") return null
     var suffix = id.charAt(id.length - 1)
     if (!(suffix in suffixRange)) return null
     return { site: id.substring(3, id.length - 1), km: suffixRange[suffix] }

@@ -15,6 +15,9 @@ TestCase {
         compare(RadarStations.parseId("XYZ022"), null)
         compare(RadarStations.parseId(""), null)
         compare(RadarStations.parseId(null), null)
+        compare(RadarStations.parseId(7), null)
+        compare(RadarStations.parseId({}), null)
+        compare(RadarStations.isKnownId(7), false)
     }
 
     function test_stationId_round_trips() {
