@@ -8,6 +8,9 @@
    workflow fails without one.
 3. If strings changed: `./translate/merge.sh`, and commit the updated
    `template.pot`. CI fails while it is out of date.
+4. If the popup looks different: retake the README's screenshots with
+   `scripts/docs-screenshots.sh` (live BoM data; needs the network,
+   PySide6 and ImageMagick), and commit `docs/screenshots/`.
 
 ## Release
 
