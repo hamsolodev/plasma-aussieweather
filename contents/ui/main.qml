@@ -646,10 +646,11 @@ PlasmoidItem {
                     }
                     PlainLabel {
                         Layout.alignment: Qt.AlignRight
-                        visible: root.forecast.length > 0 && root.forecast[0].rain
-                        text: (root.forecast.length > 0 && root.forecast[0].rain)
-                            ? (root.forecast[0].rain.chance || 0) + "%"
-                            : ""
+                        visible: root.forecast.length > 0 && !!root.forecast[0].rain
+                                 && Helpers.hasValue(root.forecast[0].rain.chance)
+                        text: root.forecast.length > 0 && !!root.forecast[0].rain
+                              && Helpers.hasValue(root.forecast[0].rain.chance)
+                            ? root.forecast[0].rain.chance + "%" : ""
                         font.pointSize: Kirigami.Theme.defaultFont.pointSize
                         color: {
                             var key = root.forecast.length > 0 && root.forecast[0].rain
@@ -686,10 +687,10 @@ PlasmoidItem {
                 Item { Layout.fillWidth: true }
                 PlainLabel {
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize
-                    visible: root.observations && root.observations.humidity !== undefined
-                    text: root.observations
+                    visible: !!root.observations && Helpers.hasValue(root.observations.humidity)
+                    text: root.observations && Helpers.hasValue(root.observations.humidity)
                         ? "💧  " + i18nc("relative humidity", "%1% RH",
-                                         Math.round(root.observations.humidity || 0))
+                                         Math.round(root.observations.humidity))
                         : ""
                 }
             }
@@ -697,11 +698,11 @@ PlasmoidItem {
             // Detail stats — row 2: rain since 9 am
             PlainLabel {
                 visible: root.pollOk && root.observations !== null
-                         && root.observations.rain_since_9am !== undefined
+                         && Helpers.hasValue(root.observations.rain_since_9am)
                 Layout.leftMargin: Kirigami.Units.smallSpacing
                 font.pointSize: Kirigami.Theme.defaultFont.pointSize
-                text: root.observations
-                    ? "🌧  " + i18n("%1 mm since 9 am", root.observations.rain_since_9am || 0)
+                text: root.observations && Helpers.hasValue(root.observations.rain_since_9am)
+                    ? "🌧  " + i18n("%1 mm since 9 am", root.observations.rain_since_9am)
                     : ""
             }
 
@@ -765,7 +766,7 @@ PlasmoidItem {
                                     if (modelData.temp_feels_like !== null && modelData.temp_feels_like !== undefined)
                                         lines.push(i18n("Feels like %1", Helpers.formatTemp(modelData.temp_feels_like)))
                                     var w = modelData.wind || {}
-                                    if (w.speed_kilometre !== undefined) {
+                                    if (Helpers.hasValue(w.speed_kilometre)) {
                                         var ws = Helpers.windStr(w.speed_kilometre, w.direction)
                                         lines.push(w.gust_speed_kilometre
                                             ? i18n("Wind %1 (gusts %2)", ws, Math.round(w.gust_speed_kilometre))

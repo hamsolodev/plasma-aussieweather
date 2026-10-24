@@ -77,6 +77,12 @@ function isSafeUrl(url) {
     return /^https:\/\//i.test(String(url == null ? "" : url))
 }
 
+// Whether an API field holds a reading. BoM sends null for one a station
+// did not take, and that must not show as 0.
+function hasValue(v) {
+    return v !== null && v !== undefined
+}
+
 function formatTemp(t) {
     var n = Number(t)
     if (t === null || t === undefined || isNaN(n)) return "—"

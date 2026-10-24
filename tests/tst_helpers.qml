@@ -8,6 +8,17 @@ import "../contents/ui/helpers.js" as Helpers
 TestCase {
     name: "AussieWeatherHelpers"
 
+    // ── hasValue ──────────────────────────────────────────────────────────
+
+    // BoM sends null for a reading a station did not take; 0 is a reading.
+    function test_hasValue() {
+        verify(Helpers.hasValue(0))
+        verify(Helpers.hasValue(98))
+        verify(Helpers.hasValue(""))
+        verify(!Helpers.hasValue(null))
+        verify(!Helpers.hasValue(undefined))
+    }
+
     // ── formatTemp ────────────────────────────────────────────────────────
 
     function test_formatTemp_rounds() {
