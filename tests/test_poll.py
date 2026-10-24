@@ -85,6 +85,19 @@ def run_main(api, geohash, query):
     return json.loads(out.getvalue())
 
 
+class ResponseSizeTest(unittest.TestCase):
+
+    def test_oversized_response_is_refused(self):
+        class Opener:
+            def open(self, request, timeout):
+                return io.BytesIO(b" " * (poll.MAX_RESPONSE + 1))
+        with mock.patch.object(poll.urllib.request, "build_opener", lambda *handlers: Opener()):
+            get = poll.make_get("1.8.0")
+            with self.assertRaises(poll.Failure) as caught:
+                get("/locations/r1ppnx/observations")
+        self.assertEqual(caught.exception.kind, "bad_response")
+
+
 class RedirectTest(unittest.TestCase):
 
     def setUp(self):
@@ -287,6 +300,14 @@ class CurrentWarningsTest(unittest.TestCase):
         self.assertNotIn("/warnings/B", api.requested)
         self.assertNotIn("/warnings/C", api.requested)
 
+    def test_warnings_are_capped(self):
+        many = [{"id": "W%d" % i, "phase": "new"} for i in range(poll.MAX_WARNINGS + 10)]
+        details = {"W%d" % i: {} for i in range(poll.MAX_WARNINGS + 10)}
+        api = location_api("r1ppnx", warnings=many, details=details)
+        out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW, IMAGE_DIR)
+        self.assertEqual(len(out["warnings"]), poll.MAX_WARNINGS)
+        self.assertEqual(sum(p.startswith("/warnings/") for p in api.requested), poll.MAX_WARNINGS)
+
     def test_warning_without_a_readable_expiry_is_kept(self):
         missing = {"id": "A", "phase": "new"}
         garbled = {"id": "B", "phase": "new", "expiry_time": "soon"}
@@ -423,6 +444,17 @@ class ImageStoreTest(unittest.TestCase):
 
     def tearDown(self):
         self.directory.cleanup()
+
+    def test_images_per_poll_are_capped(self):
+        saved = [self.store.save(PNG + i.to_bytes(4, "big")) for i in range(poll.MAX_POLL_IMAGES + 5)]
+        self.assertEqual(sum(path is not None for path in saved), poll.MAX_POLL_IMAGES)
+
+    def test_image_bytes_per_poll_are_capped(self):
+        size = poll.MAX_IMAGE_BYTES
+        saved = [self.store.save(PNG + i.to_bytes(8, "big") + b"\0" * (size - len(PNG) - 8))
+                 for i in range(12)]
+        kept = sum(path is not None for path in saved)
+        self.assertEqual(kept, poll.MAX_POLL_IMAGE_BYTES // size)
 
     def test_same_image_same_file(self):
         self.assertEqual(self.store.save(PNG), self.store.save(PNG))

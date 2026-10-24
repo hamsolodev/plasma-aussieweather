@@ -37,6 +37,9 @@ from datetime import datetime, timezone
 from html.parser import HTMLParser
 
 API = "https://api.weather.bom.gov.au/v1"
+# The largest real response, a heatwave warning with its maps, is 478 KB.
+MAX_RESPONSE = 4 * 1024 * 1024
+MAX_WARNINGS = 20
 
 # A backstop for anything else a hostile reply could make grow: the script
 # runs out of memory, not the machine. It needs under 30 MB.
@@ -109,7 +112,10 @@ def make_get(version):
     def get(path):
         request = urllib.request.Request(API + path, headers=headers)
         with opener.open(request, timeout=15) as response:
-            return json.load(response)
+            body = response.read(MAX_RESPONSE + 1)
+        if len(body) > MAX_RESPONSE:
+            raise Failure("bad_response", "a response over %d bytes" % MAX_RESPONSE)
+        return json.loads(body)
 
     return get
 
@@ -204,6 +210,9 @@ PNG_URI_PREFIX = "data:image/png;base64,"
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 MAX_IMAGE_BYTES = 2 * 1024 * 1024
 MAX_IMAGES = 8
+# And per poll, across all its warnings.
+MAX_POLL_IMAGES = 24
+MAX_POLL_IMAGE_BYTES = 16 * 1024 * 1024
 # Qt can scale an image up to fill its box: a tiny 1×1024 PNG became a
 # raster of gigabytes. Images must be modest, and not extreme in shape.
 MAX_IMAGE_SIDE = 2048
@@ -374,9 +383,15 @@ class ImageStore:
     def __init__(self, directory):
         self.directory = directory
         self.kept = set()
+        self.saved_bytes = 0
 
     def save(self, data):
-        """Store DATA; its file's path."""
+        """Store DATA; its file's path, or None once this poll has saved
+        MAX_POLL_IMAGES images or MAX_POLL_IMAGE_BYTES."""
+        if (len(self.kept) >= MAX_POLL_IMAGES
+                or self.saved_bytes + len(data) > MAX_POLL_IMAGE_BYTES):
+            return None
+        self.saved_bytes += len(data)
         path = self.directory / (hashlib.sha256(data).hexdigest() + ".png")
         if not path.exists():
             self.directory.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -449,7 +464,7 @@ def warning_view(warning, images):
         "issue_time": warning.get("issue_time", ""),
         "expiry_time": warning.get("expiry_time", ""),
         "html": body_html,
-        "images": [images.save(png) for png in pngs],
+        "images": [path for path in map(images.save, pngs) if path],
     }
 
 
@@ -459,6 +474,8 @@ def warnings_for(get, geohash, now, images):
     for warning in get("/locations/" + geohash + "/warnings").get("data", []):
         if not is_current(warning, now):
             continue
+        if len(warnings) >= MAX_WARNINGS:
+            break
         wid = (warning.get("id") or "").strip()
         if wid:
             # Without its detail a warning still shows, by its summary's
