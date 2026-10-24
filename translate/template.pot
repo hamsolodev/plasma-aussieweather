@@ -9,7 +9,7 @@ msgstr ""
 "Project-Id-Version: plasma_applet_net.tropism.plasma.aussieweather\n"
 "Report-Msgid-Bugs-To: https://github.com/hamsolodev/plasma-aussieweather/"
 "issues\n"
-"POT-Creation-Date: 2026-10-24 06:10+0000\n"
+"POT-Creation-Date: 2026-10-24 06:36+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -23,40 +23,52 @@ msgstr ""
 msgid "General"
 msgstr ""
 
-#: contents/ui/ConfigPage.qml:72
+#: contents/ui/ConfigPage.qml:76
 msgid "Places:"
 msgstr ""
 
-#: contents/ui/ConfigPage.qml:110
+#: contents/ui/ConfigPage.qml:113 contents/ui/ConfigPage.qml:118
 msgid "Show this place"
 msgstr ""
 
-#: contents/ui/ConfigPage.qml:138 contents/ui/RadarTab.qml:77
+#: contents/ui/ConfigPage.qml:128
+msgid "Place"
+msgstr ""
+
+#: contents/ui/ConfigPage.qml:141
+msgid "Radar station"
+msgstr ""
+
+#: contents/ui/ConfigPage.qml:150
+msgid "Radar range"
+msgstr ""
+
+#: contents/ui/ConfigPage.qml:153 contents/ui/RadarTab.qml:77
 msgid "%1 km"
 msgstr ""
 
-#: contents/ui/ConfigPage.qml:145
+#: contents/ui/ConfigPage.qml:160
 msgid "Remove This Place"
 msgstr ""
 
-#: contents/ui/ConfigPage.qml:149
+#: contents/ui/ConfigPage.qml:164
 msgid "Remove this place"
 msgstr ""
 
-#: contents/ui/ConfigPage.qml:158
+#: contents/ui/ConfigPage.qml:173
 msgid "Add Place"
 msgstr ""
 
-#: contents/ui/ConfigPage.qml:165
+#: contents/ui/ConfigPage.qml:180
 msgid "Update interval:"
 msgstr ""
 
-#: contents/ui/ConfigPage.qml:171
+#: contents/ui/ConfigPage.qml:186
 msgctxt "minutes"
 msgid "%1 min"
 msgstr ""
 
-#: contents/ui/ConfigPage.qml:182
+#: contents/ui/ConfigPage.qml:197
 msgid ""
 "Each place is 'Suburb STATE', e.g. 'Seaford VIC' or 'Sydney NSW', with the "
 "radar station nearest it; smaller ranges show more detail.\n"
@@ -312,24 +324,24 @@ msgstr ""
 msgid "Waiting for data…"
 msgstr ""
 
-#: contents/ui/WeatherTab.qml:139
-msgid "Switch Place"
-msgstr ""
-
-#: contents/ui/WeatherTab.qml:147
+#: contents/ui/WeatherTab.qml:139 contents/ui/WeatherTab.qml:148
 msgid "Choose a place"
 msgstr ""
 
-#: contents/ui/WeatherTab.qml:185
+#: contents/ui/WeatherTab.qml:140
+msgid "Switch to another saved place"
+msgstr ""
+
+#: contents/ui/WeatherTab.qml:191
 msgid "Add or Edit Places…"
 msgstr ""
 
-#: contents/ui/WeatherTab.qml:200
+#: contents/ui/WeatherTab.qml:210
 msgctxt "observation station and its distance"
 msgid "%1 (%2 km)"
 msgstr ""
 
-#: contents/ui/WeatherTab.qml:215
+#: contents/ui/WeatherTab.qml:223
 msgctxt "abbreviation of Bureau of Meteorology"
 msgid "BoM"
 msgstr ""

@@ -122,9 +122,9 @@ web pages open them in your browser.
   (`Seaford VIC`, `Sydney NSW`) with its own radar station, picked by name,
   and range, which offers only what that station publishes. Pick the
   station nearest the place; smaller ranges show more detail. The marked
-  place is shown; the popup switches between them too. The widget looks a
-  place up once via the BoM location search, and again only when it
-  changes.
+  place is shown; the popup switches between them too. The widget looks
+  the place shown up via the BoM location search, and remembers it across
+  restarts; switching to another place looks that one up.
 - **Update interval** — 10–60 minutes (10-minute minimum is also enforced in
   code; BoM observations only update every ~10 minutes, so faster polling
   gains nothing).
@@ -156,6 +156,7 @@ web pages open them in your browser.
 ./scripts/test.sh            # Python tests of contents/code, QML tests of the helpers and model
 ./scripts/check-qml.py       # compile every QML file against the installed Plasma
 ./scripts/render.py OUTDIR   # screenshot each tab offscreen; fails on any QML warning
+./scripts/check-settings.py  # drive the settings page offscreen, as a user would
 ./scripts/docs-screenshots.sh  # retake this README's screenshots from live BoM data
 ./scripts/package.sh         # build net.tropism.plasma.aussieweather-<version>.plasmoid
 ./scripts/make-icons.py      # remake the icon's copies after editing branding/
@@ -169,7 +170,8 @@ Plasma 6's QML modules, and `render.py` PySide6 built against the same Qt
 (Fedora: `python3-pyside6`); CI runs both in a Fedora container. CI fails
 if `template.pot` is out of date, or if the icon's copies were not made
 from today's `branding/` sources (`make-icons.py` needs ImageMagick with
-librsvg, and Pillow; its `--check` only Python).
+librsvg, and Pillow; its `--check` only Python). `check-settings.py` needs
+what `render.py` does, with KCMUtils (Fedora: `kf6-kcmutils`).
 
 This repo is also consumed as a git submodule by a private multi-widget
 repo; the widget package itself is `metadata.json` + `contents/` at the repo

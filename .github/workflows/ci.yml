@@ -85,7 +85,7 @@ jobs:
         run: |
           dnf -y --repo=fedora --setopt=install_weak_deps=False install \
             git python3 python3-pyside6 qt6-qtdeclarative-devel \
-            libplasma plasma5support kf6-kirigami plasma-integration \
+            libplasma plasma5support kf6-kirigami kf6-kcmutils plasma-integration \
             plasma-breeze-common breeze-icon-theme \
             google-noto-sans-fonts google-noto-color-emoji-fonts tzdata
 
@@ -100,6 +100,9 @@ jobs:
         run: |
           python3 -I scripts/render.py screenshots --offline --scheme light
           python3 -I scripts/render.py screenshots --offline --scheme dark
+
+      - name: Drive the settings page
+        run: python3 -I scripts/check-settings.py
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
