@@ -15,12 +15,15 @@ comes from the BoM API. So:
 - library types that draw their own text, as AutoText or with no
   textFormat to set (buttons, tabs, menu items, actions, Kirigami's
   messages and headers), and the attached FormData.label and ToolTip.text,
-  are given only translated string literals, whose only arguments are
-  counts (".length");
-- textFormat is named nowhere else: not in script, an alias, a Binding,
-  a PropertyChanges or a string.
+  are given only constant text: string literals, translated or not, whose
+  only arguments are counts (".length");
+- textFormat is named nowhere else: not in script (nor any .js file), an
+  alias, a Binding, a PropertyChanges or a string;
+- no file holds a template literal substitution, which this check cannot
+  see into.
 
-Types are matched by name alone, whatever module or alias they come from.
+Types are matched by name alone, whatever module or alias they come from,
+so no file of the widget's may be named like one of those types.
 ComboBox models are not checked: the widget's come from its own tables.
 
 Comments and string literals are blanked before checking, so neither can
@@ -45,22 +48,22 @@ TEXT_TYPES = {
 SELF_DRAWN_TYPES = {
     "Button", "TabButton", "ToolButton", "RoundButton", "DelayButton", "CheckBox",
     "RadioButton", "Switch", "ItemDelegate", "CheckDelegate", "RadioDelegate",
-    "SwitchDelegate", "SwipeDelegate", "MenuItem", "Action", "GroupBox",
+    "SwitchDelegate", "SwipeDelegate", "MenuItem", "Action", "GroupBox", "TextField",
     "InlineMessage", "ListSectionHeader", "PlaceholderMessage", "Chip",
 }
-SELF_DRAWN_PROPERTIES = ("text", "title", "explanation")
+SELF_DRAWN_PROPERTIES = ("text", "title", "explanation", "placeholderText")
 # Attached properties drawn as AutoText.
 ATTACHED_TEXT = (r"(?:\w+\.)*FormData\.label", r"(?:\w+\.)*ToolTip\.text")
-# i18n calls on string literals, whose only other arguments are counts.
-_LITERALS = r"S(?:\+S)*"
-_CALL = r"i18n[cp]*\(%s(?:,%s)*(?:,[\w.]+\.length)*\)" % (_LITERALS, _LITERALS)
-TRANSLATED = re.compile(r"%s(?:\+%s)*" % (_CALL, _CALL))
+# String literals, and i18n calls on them whose only other arguments are
+# counts.
+_CALL = r"i18n[cp]*\(S(?:\+S)*(?:,S(?:\+S)*)*(?:,[\w.]+\.length)*\)"
+CONSTANT_TEXT = re.compile(r"(?:%s|S)(?:\+(?:%s|S))*" % (_CALL, _CALL))
 FORMAT_NAMES = re.compile(r"\b(?:textFormat|toolTipTextFormat)\b")
 FORMAT_STRING = re.compile(r"""(["'`])\s*(?:textFormat|toolTipTextFormat)\s*\1""")
 # The one element allowed to render RichText: the warning body, which
-# poll.py's allowlist has already rebuilt.
+# poll.py's allowlist has already rebuilt, and nothing else.
 RICH_TEXT_FILE = "WarningsTab.qml"
-RICH_TEXT_BINDING = "text: modelData.html"
+RICH_TEXT = "modelData.html"
 
 DECLARATION = re.compile(r"(?<![\w.])((?:[A-Za-z_]\w*\.)?[A-Z]\w*)\s*\{")
 
@@ -157,8 +160,8 @@ def binding(bindings, name):
     return next(bound(bindings, re.escape(name)), None)
 
 
-def is_translated(expression):
-    return TRANSLATED.fullmatch(re.sub(r"\s", "", expression)) is not None
+def is_constant(expression):
+    return CONSTANT_TEXT.fullmatch(re.sub(r"\s", "", expression)) is not None
 
 
 def check(ui):
@@ -167,10 +170,17 @@ def check(ui):
     examined = 0
     exemptions = 0
     problems = []
+    for path in sorted(ui.glob("*.js")):
+        if FORMAT_NAMES.search(path.read_text()):
+            problems.append(path.name + " names textFormat")
     for path in sorted(ui.glob("*.qml")):
         source = path.read_text()
         code = blank_comments_and_strings(source)
         formats_bound = 0
+        if path.stem in TEXT_TYPES | SELF_DRAWN_TYPES | {"PlasmoidItem"}:
+            problems.append(path.name + " is named like a library type")
+        if "${" in source:
+            problems.append(path.name + " has a template literal substitution")
         for kind, bindings in declarations(path):
             where = "%s %s" % (path.name, kind)
             text_format = binding(bindings, "textFormat")
@@ -184,7 +194,7 @@ def check(ui):
                 examined += 1
                 if text_format != "Text.PlainText":
                     rich_ok = (text_format == "Text.RichText" and path.name == RICH_TEXT_FILE
-                               and RICH_TEXT_BINDING in bindings)
+                               and binding(bindings, "text") == RICH_TEXT)
                     if rich_ok:
                         exemptions += 1
                     else:
@@ -201,13 +211,13 @@ def check(ui):
                 examined += 1
                 for name in SELF_DRAWN_PROPERTIES:
                     text = binding(bindings, name)
-                    if text is not None and not is_translated(text):
-                        problems.append("%s %s is not translated literals only" % (where, name))
+                    if text is not None and not is_constant(text):
+                        problems.append("%s %s is not constant text" % (where, name))
             for pattern in ATTACHED_TEXT:
                 for text in bound(bindings, pattern):
                     examined += 1
-                    if not is_translated(text):
-                        problems.append(where + " attached text is not translated literals only")
+                    if not is_constant(text):
+                        problems.append(where + " attached text is not constant text")
         if len(FORMAT_NAMES.findall(code)) != formats_bound:
             problems.append(path.name + " names textFormat outside a binding of it")
         if FORMAT_STRING.search(source):
@@ -226,79 +236,140 @@ class TextFormatTest(unittest.TestCase):
 
 class CheckerTest(unittest.TestCase):
     """The checker catches what it is for: each way a string could end up
-    rendered as markup, added to a copy of the real UI."""
+    rendered as markup, added to a copy of the real UI, must be caught by
+    the rule meant for it."""
 
+    # An object added inside an Item in Injected.qml: (QML, the problem it
+    # must cause).
     INJECTED = {
-        "inline delegate":       "Repeater { delegate: PlasmaComponents.Label { text: w.title } }",
-        "styled PlainLabel":     "PlainLabel { textFormat: Text.StyledText; text: w.title }",
-        "AutoText":              "Text { textFormat: Text.AutoText; text: w.title }",
-        "format in a comment":   "Text { /* textFormat: Text.PlainText */ text: w.title }",
-        "format in a string":    "Text { text: \"textFormat: Text.PlainText\" + w.title }",
-        "contentItem":           "Item { property Item contentItem: Text { text: w.title } }",
-        "bare Label":            "Label { text: w.title }",
-        "rich text elsewhere":   "Text { textFormat: Text.RichText; text: w.title }",
-        "message from data":     "Kirigami.InlineMessage { text: w.title }",
+        "inline delegate":       ("Repeater { delegate: PlasmaComponents.Label { text: w.title } }",
+                                  "textFormat is unstated"),
+        "styled PlainLabel":     ("PlainLabel { textFormat: Text.StyledText; text: w.title }",
+                                  "overrides PlainLabel's textFormat"),
+        "AutoText":              ("Text { textFormat: Text.AutoText; text: w.title }",
+                                  "textFormat is Text.AutoText"),
+        "format in a comment":   ("Text { /* textFormat: Text.PlainText */ text: w.title }",
+                                  "textFormat is unstated"),
+        "format in a string":    ("Text { text: \"textFormat: Text.PlainText\" + w.title }",
+                                  "textFormat is unstated"),
+        "contentItem":           ("Item { property Item contentItem: Text { text: w.title } }",
+                                  "textFormat is unstated"),
+        "bare Label":            ("Label { text: w.title }", "textFormat is unstated"),
+        "rich text elsewhere":   ("Text { textFormat: Text.RichText; text: w.title }",
+                                  "textFormat is Text.RichText"),
+        "message from data":     ("Kirigami.InlineMessage { text: w.title }",
+                                  "text is not constant"),
         # The second review's forms.
-        "descriptive label":     "PlasmaExtras.DescriptiveLabel { text: w.title }",
-        "link button":           "Kirigami.LinkButton { text: w.title }",
-        "tooltip area":          "PlasmaCore.ToolTipArea { mainText: w.title }",
-        "form label from data":  "Item { Kirigami.FormData.label: w.title }",
-        "imperative format":     "PlainLabel { Component.onCompleted: textFormat = Text.StyledText }",
-        "Binding":               "Binding { target: x; property: \"textFormat\"; value: Text.AutoText }",
-        "PropertyChanges":       "PropertyChanges { target: x; textFormat: Text.AutoText }",
+        "descriptive label":     ("PlasmaExtras.DescriptiveLabel { text: w.title }",
+                                  "textFormat is unstated"),
+        "link button":           ("Kirigami.LinkButton { text: w.title }", "textFormat is unstated"),
+        "tooltip area":          ("PlasmaCore.ToolTipArea { mainText: w.title }",
+                                  "textFormat is unstated"),
+        "form label from data":  ("Item { Kirigami.FormData.label: w.title }",
+                                  "attached text is not constant"),
+        "imperative format":     ("PlainLabel { Component.onCompleted: textFormat = Text.StyledText }",
+                                  "names textFormat outside a binding"),
+        "Binding":               ("Binding { target: x; property: \"textFormat\"; value: Text.AutoText }",
+                                  "names textFormat in a string"),
+        "PropertyChanges":       ("PropertyChanges { target: x; textFormat: Text.AutoText }",
+                                  "sets textFormat"),
         # The third review's forms.
-        "alias property":        "Item { property alias f: x.textFormat }",
-        "set by name":           "Item { Component.onCompleted: x[\"textFormat\"] = 4 }",
-        "section header":        "Kirigami.ListSectionHeader { text: w.title }",
-        "button with data":      "PlasmaComponents.Button { text: w.title }",
+        "alias property":        ("Item { property alias f: x.textFormat }",
+                                  "names textFormat outside a binding"),
+        "set by name":           ("Item { Component.onCompleted: x[\"textFormat\"] = 4 }",
+                                  "names textFormat in a string"),
+        "section header":        ("Kirigami.ListSectionHeader { text: w.title }",
+                                  "text is not constant"),
+        "button with data":      ("PlasmaComponents.Button { text: w.title }", "text is not constant"),
         # The fourth review's forms.
-        "data as an argument":   "PlasmaComponents.Button { text: i18n(\"%1\", w.title) }",
-        "data added on":         "PlasmaComponents.TabButton { text: i18n(\"x\") + w.title }",
-        "check box":             "QQC2.CheckBox { text: w.title }",
-        "menu item":             "PlasmaComponents.MenuItem { text: w.title }",
-        "action":                "Kirigami.Action { text: w.title }",
-        "group box":             "QQC2.GroupBox { title: w.title }",
-        "attached tooltip":      "Item { QQC2.ToolTip.text: w.title }",
-        "unaliased type":        "Heading { text: w.title }",
-        "placeholder":           "PlasmaExtras.PlaceholderMessage { explanation: w.title }",
-        "Object.assign":         "Item { Component.onCompleted: Object.assign(x, {textFormat: 4}) }",
-        "rich tooltip":          "PlasmoidItem { toolTipTextFormat: Text.RichText }",
-        "unstated tooltip":      "PlasmoidItem { toolTipMainText: w.title }",
-        "format elsewhere":      "Item { property int f: x.toolTipTextFormat }",
+        "data as an argument":   ("PlasmaComponents.Button { text: i18n(\"%1\", w.title) }",
+                                  "text is not constant"),
+        "data added on":         ("PlasmaComponents.TabButton { text: i18n(\"x\") + w.title }",
+                                  "text is not constant"),
+        "check box":             ("QQC2.CheckBox { text: w.title }", "text is not constant"),
+        "menu item":             ("PlasmaComponents.MenuItem { text: w.title }", "text is not constant"),
+        "action":                ("Kirigami.Action { text: w.title }", "text is not constant"),
+        "group box":             ("QQC2.GroupBox { title: w.title }", "title is not constant"),
+        "attached tooltip":      ("Item { QQC2.ToolTip.text: w.title }", "attached text is not constant"),
+        "unaliased type":        ("Heading { text: w.title }", "textFormat is unstated"),
+        "placeholder":           ("PlasmaExtras.PlaceholderMessage { explanation: w.title }",
+                                  "explanation is not constant"),
+        "Object.assign":         ("Item { Component.onCompleted: Object.assign(x, {textFormat: 4}) }",
+                                  "names textFormat outside a binding"),
+        "rich tooltip":          ("PlasmoidItem { toolTipTextFormat: Text.RichText }",
+                                  "toolTipTextFormat is not Text.PlainText"),
+        "unstated tooltip":      ("PlasmoidItem { toolTipMainText: w.title }",
+                                  "toolTipTextFormat is not Text.PlainText"),
+        "format elsewhere":      ("Item { property int f: x.toolTipTextFormat }",
+                                  "names textFormat outside a binding"),
+        # The fifth review's forms.
+        "template literal":      ("Item { Component.onCompleted: `${x.textFormat = 2}` }",
+                                  "template literal substitution"),
+        "placeholder text":      ("QQC2.TextField { placeholderText: w.title }",
+                                  "placeholderText is not constant"),
     }
 
-    # Under an alias the module's types must still be recognised.
-    INJECTED_ALIASED = {
-        "PC.Label": "import org.kde.plasma.components as PC\nItem { PC.Label { text: w.title } }\n",
-        "QQ.Text": "import QtQuick as QQ\nQQ.Item { QQ.Text { text: w.title } }\n",
-        "Basic": "import QtQuick.Controls.Basic as B\nItem { B.Label { text: w.title } }\n",
-        "K.FormData": "import org.kde.kirigami as K\nItem { Item { K.FormData.label: w.title } }\n",
-    }
-
-    # A whole file: a new type built on PlainLabel that undoes it.
+    # Whole files added to the UI: {file name: (source, the problem it must
+    # cause)}.
     INJECTED_FILES = {
-        "type built on PlainLabel": "PlainLabel { textFormat: Text.StyledText }",
+        "type built on PlainLabel": ("Injected.qml", "PlainLabel { textFormat: Text.StyledText }",
+                                     "overrides PlainLabel's textFormat"),
+        "PC.Label": ("Injected.qml",
+                     "import org.kde.plasma.components as PC\nItem { PC.Label { text: w.title } }",
+                     "textFormat is unstated"),
+        "QQ.Text": ("Injected.qml", "import QtQuick as QQ\nQQ.Item { QQ.Text { text: w.title } }",
+                    "textFormat is unstated"),
+        "Basic": ("Injected.qml",
+                  "import QtQuick.Controls.Basic as B\nItem { B.Label { text: w.title } }",
+                  "textFormat is unstated"),
+        "K.FormData": ("Injected.qml",
+                       "import org.kde.kirigami as K\nItem { Item { K.FormData.label: w.title } }",
+                       "attached text is not constant"),
+        "format set in a .js file": ("injected.js", "function f(x) { x.textFormat = 2 }",
+                                     "injected.js names textFormat"),
+        "own type named like a library one": ("Heading.qml", "PlainLabel {}",
+                                              "Heading.qml is named like a library type"),
     }
 
-    def caught(self, source):
+    # Edits to the real UI: {name: (file, text, replacement, the problem it
+    # must cause)}.
+    INJECTED_EDITS = {
+        "data added to the warning body": (
+            "WarningsTab.qml", "text: modelData.html", "text: modelData.html + modelData.title",
+            "textFormat is Text.RichText"),
+    }
+
+    def problems(self, files=(), edit=None):
+        """check()'s problems for a copy of the real UI with FILES (name,
+        source) added and EDIT (file, text, replacement) made."""
         with tempfile.TemporaryDirectory() as tmp:
             ui = pathlib.Path(tmp)
-            for path in UI.glob("*.qml"):
+            for path in [*UI.glob("*.qml"), *UI.glob("*.js")]:
                 (ui / path.name).write_text(path.read_text())
-            (ui / "Injected.qml").write_text(source)
-            _, _, problems = check(ui)
-            return any(p.startswith("Injected.qml") for p in problems)
+            for name, source in files:
+                (ui / name).write_text(source + "\n")
+            if edit:
+                name, text, replacement = edit
+                source = (ui / name).read_text()
+                self.assertEqual(source.count(text), 1, text)
+                (ui / name).write_text(source.replace(text, replacement))
+            return check(ui)[2]
 
-    def test_each_injection_is_caught(self):
-        for name, snippet in self.INJECTED.items():
+    def assertCaught(self, problems, expected):
+        self.assertTrue(any(expected in problem for problem in problems),
+                        "%r not among %r" % (expected, problems))
+
+    def test_each_injection_is_caught_by_its_rule(self):
+        for name, (snippet, expected) in self.INJECTED.items():
             with self.subTest(name):
-                self.assertTrue(self.caught("Item {\n    " + snippet + "\n}\n"), snippet)
-        for name, source in self.INJECTED_FILES.items():
+                problems = self.problems([("Injected.qml", "Item {\n    " + snippet + "\n}")])
+                self.assertCaught([p for p in problems if p.startswith("Injected.qml")], expected)
+        for name, (file_name, source, expected) in self.INJECTED_FILES.items():
             with self.subTest(name):
-                self.assertTrue(self.caught(source + "\n"), source)
-        for name, source in self.INJECTED_ALIASED.items():
+                self.assertCaught(self.problems([(file_name, source)]), expected)
+        for name, (file_name, text, replacement, expected) in self.INJECTED_EDITS.items():
             with self.subTest(name):
-                self.assertTrue(self.caught(source), source)
+                self.assertCaught(self.problems(edit=(file_name, text, replacement)), expected)
 
 
 if __name__ == "__main__":

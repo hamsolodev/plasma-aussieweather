@@ -3,8 +3,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 // The widget's popup in a plain window, fed fixture data, for
-// scripts/render.py. `fixtureJson` and `liveRadar` are context properties
-// set by the script. The fixture is parsed here so the data are plain JS
+// scripts/render.py. `fixtureJson`, `markedFixtureJson` and `liveRadar` are
+// context properties set by the script; setting `marked` puts the marked-up
+// fixture in, as a later poll would. The fixture is parsed here so the data are plain JS
 // objects and arrays, as JSON.parse makes them from poll.py's output in the
 // widget. Without liveRadar the popup counts as closed, so the radar stays
 // inactive and fetches nothing.
@@ -20,6 +21,9 @@ Window {
     id: window
 
     readonly property var fixture: JSON.parse(fixtureJson)
+    property bool marked: false
+    onMarkedChanged: weather.apply(JSON.parse(markedFixtureJson).poll,
+                                   Date.parse(window.fixture.now) - 4 * 60000)
 
     // As wide as Plasma makes the popup.
     width: view.Layout.preferredWidth

@@ -21,6 +21,10 @@ images, so it needs the network and differs from run to run. With
 --offline the radar stays inactive, as in a closed popup, and fetches
 nothing (CI renders this way).
 
+Then it puts the same poll in again with every string from BoM marked up,
+and checks that every text item built shows its text as plain text: this
+is what catches a label that would render BoM's data as markup.
+
 Needs KDE Plasma 6's QML modules and PySide6 built against the same Qt
 (Fedora: python3-pyside6). CI runs it, offline, in a Fedora container.
 """
@@ -41,9 +45,16 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 SCHEMES = {"light": "BreezeLight", "dark": "BreezeDark"}
 # Text.TextFormat's values.
 PLAIN_TEXT, RICH_TEXT, AUTO_TEXT = 0, 1, 2
-# Fewer text items than this means the walk missed some: the fixture
-# builds 108.
+# Fewer text items than these means the walk missed some: the fixture
+# builds 108, 79 of them declared by the widget.
 MIN_TEXT_ITEMS = 100
+MIN_WIDGET_TEXT_ITEMS = 70
+# A poll's fields that are not shown as text: times, icon names, ids, and
+# the warning body, which poll.py has sanitised to RichText.
+NOT_SHOWN_AS_TEXT = {
+    "request", "geohash", "id", "phase", "html", "images", "icon_descriptor", "date",
+    "time", "issue_time", "expiry_time", "sunrise_time", "sunset_time",
+}
 # Each is FullView's <name>Tab index.
 TABS = ["weather", "radar", "warnings"]
 # Logged by the offscreen setup itself, not by the widget: KWindowSystem has
@@ -83,6 +94,20 @@ def warning_map(path, width=580, height=420):
                      + chunk(b"IDAT", zlib.compress(b"".join(rows), 9))
                      + chunk(b"IEND", b""))
     return str(path)
+
+
+def marked(value):
+    """VALUE, a poll or part of one, with every string BoM supplies to be
+    shown wrapped in <b>...</b>. A label that renders it as markup shows
+    bold text rather than the tags."""
+    if isinstance(value, dict):
+        return {key: item if key in NOT_SHOWN_AS_TEXT else marked(item)
+                for key, item in value.items()}
+    if isinstance(value, list):
+        return [marked(item) for item in value]
+    if isinstance(value, str):
+        return "<b>" + value + "</b>"
+    return value
 
 
 def fixture(now, map_path):
@@ -217,7 +242,10 @@ def render(options, config_home):
     engine.rootContext().setContextObject(i18n)
     now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
     map_path = warning_map(pathlib.Path(config_home) / "warning-map.png")
-    engine.rootContext().setContextProperty("fixtureJson", json.dumps(fixture(now, map_path)))
+    shown = fixture(now, map_path)
+    engine.rootContext().setContextProperty("fixtureJson", json.dumps(shown))
+    engine.rootContext().setContextProperty(
+        "markedFixtureJson", json.dumps(dict(shown, poll=marked(shown["poll"]))))
     engine.rootContext().setContextProperty("liveRadar", not options.offline)
     engine.load(str(ROOT / "scripts" / "render.qml"))
     if not engine.rootObjects():
@@ -265,19 +293,22 @@ def render(options, config_home):
     panel.grabWindow().save(str(path))
     print(f"{path}: panel")
 
-    # Every text item, as built, shows its text as plain text, but for the
-    # sanitised warning body. tests/test_qml_text_format.py checks the
-    # source; this catches whatever form it misses. Text items Plasma's
-    # components declare inside themselves (a button's label) render
-    # AutoText, which the widget cannot change: those pass while their text
-    # holds no markup, and the source check gives those components only
-    # translated text.
+    # Every text item, as built from the marked-up poll, shows its text as
+    # plain text, but for the sanitised warning body.
+    # tests/test_qml_text_format.py checks the source; this catches whatever
+    # form it misses. Text items Plasma's components declare inside
+    # themselves (a button's label) render AutoText, which the widget
+    # cannot change: those pass while their text holds no markup, which
+    # AutoText shows as it is, and the source check gives those components
+    # only translated text.
+    window.setProperty("marked", True)
+    settle(1.0)
     rich_text = {"warningBody"}
-    widget_ui = (ROOT / "contents" / "ui").as_uri() + "/"
+    widget_ui = QUrl.fromLocalFile(str(ROOT / "contents" / "ui"))
 
     def declared_by_widget(item):
         context = QQmlEngine.contextForObject(item)
-        return context is not None and context.baseUrl().toString().startswith(widget_ui)
+        return context is not None and widget_ui.isParentOf(context.baseUrl())
 
     def shows_plain_text(item, text_format):
         if item.objectName() in rich_text and declared_by_widget(item):
@@ -285,7 +316,7 @@ def render(options, config_home):
         if text_format == PLAIN_TEXT:
             return True
         return (text_format == AUTO_TEXT and not declared_by_widget(item)
-                and "<" not in str(item.property("text")))
+                and not re.search("[<&]", str(item.property("text"))))
 
     def everything(*roots):
         """Every object under ROOTS, by object tree and by item tree: a
@@ -313,11 +344,15 @@ def render(options, config_home):
             problems.append("%s %r renders format %d: %r" % (item.metaObject().className(),
                                                              item.objectName(), text_format,
                                                              str(item.property("text"))[:60]))
-    print("%d text items checked for plain text, %d of them declared by the widget"
-          % (len(text_items), sum(map(declared_by_widget, text_items))))
-    if len(text_items) < MIN_TEXT_ITEMS:
-        problems.append("only %d text items found to check: is the walk broken?"
-                        % len(text_items))
+    widget_items = sum(map(declared_by_widget, text_items))
+    marked_items = sum("<b>" in str(item.property("text")) for item in text_items)
+    print("%d text items checked for plain text, %d of them declared by the widget,"
+          " %d showing marked-up data" % (len(text_items), widget_items, marked_items))
+    if len(text_items) < MIN_TEXT_ITEMS or widget_items < MIN_WIDGET_TEXT_ITEMS:
+        problems.append("only %d text items found to check, %d of them the widget's:"
+                        " is the walk broken?" % (len(text_items), widget_items))
+    if not marked_items:
+        problems.append("no text item shows the marked-up poll: is it applied?")
 
     unconfigured = window.findChild(QObject, "unconfiguredWeather")
     expected = "No location set. Choose one in the widget's settings."
