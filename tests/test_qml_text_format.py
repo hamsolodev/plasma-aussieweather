@@ -12,7 +12,13 @@ comes from the BoM API. So:
   sanitised warning body (WarningsTab.qml), which is RichText;
 - PlainLabel, and the types built on it, never override its textFormat;
 - Kirigami.InlineMessage, which has no textFormat (it shows its text in a
-  SelectableLabel), is given only translated string literals.
+  SelectableLabel), and Kirigami.FormData.label are given only translated
+  string literals;
+- textFormat is never set any other way: imperatively, or through a
+  Binding or PropertyChanges.
+
+Types are matched under the import names below, whatever alias a file
+gives a module.
 
 Comments and string literals are blanked before checking, so neither can
 satisfy or dodge a rule.
@@ -25,14 +31,27 @@ import unittest
 
 UI = pathlib.Path(__file__).resolve().parent.parent / "contents" / "ui"
 
+# The import name each module's types are matched under.
+MODULE_NAMES = {
+    "QtQuick.Controls": "QQC2",
+    "org.kde.plasma.components": "PlasmaComponents",
+    "org.kde.plasma.extras": "PlasmaExtras",
+    "org.kde.plasma.core": "PlasmaCore",
+    "org.kde.kirigami": "Kirigami",
+}
+IMPORT = re.compile(r"^\s*import\s+([\w.]+)(?:\s+[\d.]+)?\s+as\s+(\w+)", re.MULTILINE)
+
 # Types with a textFormat property that show text.
 TEXT_TYPES = {
     "Text", "TextEdit", "Label", "ToolTip", "TextArea",
     "PlasmaComponents.Label", "PlasmaComponents.ToolTip", "PlasmaComponents.TextArea",
     "QQC2.Label", "QQC2.ToolTip", "QQC2.TextArea",
-    "Kirigami.Heading", "Kirigami.SelectableLabel", "PlasmaExtras.Heading",
+    "Kirigami.Heading", "Kirigami.SelectableLabel", "Kirigami.LinkButton",
+    "Kirigami.UrlButton", "PlasmaExtras.Heading", "PlasmaExtras.DescriptiveLabel",
+    "PlasmaCore.ToolTipArea",
 }
 CONSTANT_TEXT_TYPES = {"Kirigami.InlineMessage", "InlineMessage"}
+TRANSLATED_LITERALS = re.compile(r"(i18nc?\(S(\+S)*(,S(\+S)*)?\)\+?)+")
 # The one element allowed to render RichText: the warning body, which
 # poll.py's allowlist has already rebuilt.
 RICH_TEXT_FILE = "WarningsTab.qml"
@@ -85,11 +104,19 @@ def own_bindings(code, open_brace):
     return "".join(out)
 
 
+def canonical(kind, aliases):
+    """KIND with its import alias replaced by the name in MODULE_NAMES."""
+    prefix, dot, name = kind.rpartition(".")
+    return aliases.get(prefix, prefix) + dot + name if dot else kind
+
+
 def declarations(path):
     """(type, own bindings) for every object declared in PATH."""
-    code = blank_comments_and_strings(path.read_text())
+    source = path.read_text()
+    aliases = {alias: MODULE_NAMES.get(module, alias) for module, alias in IMPORT.findall(source)}
+    code = blank_comments_and_strings(source)
     for match in DECLARATION.finditer(code):
-        yield match.group(1), own_bindings(code, match.end() - 1)
+        yield canonical(match.group(1), aliases), own_bindings(code, match.end() - 1)
 
 
 def root_type(path):
@@ -112,7 +139,7 @@ def plain_label_types(ui):
 def binding(bindings, name):
     """The expression bound to NAME, read on past line ends while brackets
     are open; None if NAME is not bound."""
-    match = re.search(r"(?:^|[;\n])\s*" + name + r"\s*:", bindings)
+    match = re.search(r"(?:^|[;\n])\s*" + re.escape(name) + r"\s*:", bindings)
     if not match:
         return None
     depth = 0
@@ -152,8 +179,21 @@ def check(ui):
             elif kind in CONSTANT_TEXT_TYPES:
                 examined += 1
                 text = re.sub(r"\s", "", binding(bindings, "text") or "")
-                if not re.fullmatch(r"(i18nc?\(S(\+S)*(,S(\+S)*)?\)\+?)+", text):
+                if not TRANSLATED_LITERALS.fullmatch(text):
                     problems.append(where + " text is not translated literals only")
+            elif kind == "PropertyChanges" and text_format is not None:
+                problems.append(where + " sets textFormat")
+            label = binding(bindings, "Kirigami.FormData.label")
+            if label is not None:
+                examined += 1
+                if not TRANSLATED_LITERALS.fullmatch(re.sub(r"\s", "", label)):
+                    problems.append(where + " FormData.label is not translated literals only")
+        source = path.read_text()
+        code = blank_comments_and_strings(source)
+        if re.search(r"textFormat\s*=(?!=)", code):
+            problems.append(path.name + " assigns textFormat in script")
+        if re.search(r"""property\s*:\s*["']textFormat["']""", source):
+            problems.append(path.name + " binds textFormat through a Binding")
     return examined, exemptions, problems
 
 
@@ -180,7 +220,21 @@ class CheckerTest(unittest.TestCase):
         "bare Label":            "Label { text: w.title }",
         "rich text elsewhere":   "Text { textFormat: Text.RichText; text: w.title }",
         "message from data":     "Kirigami.InlineMessage { text: w.title }",
+        # The second review's forms.
+        "descriptive label":     "PlasmaExtras.DescriptiveLabel { text: w.title }",
+        "link button":           "Kirigami.LinkButton { text: w.title }",
+        "tooltip area":          "PlasmaCore.ToolTipArea { mainText: w.title }",
+        "form label from data":  "Item { Kirigami.FormData.label: w.title }",
+        "imperative format":     "PlainLabel { Component.onCompleted: textFormat = Text.StyledText }",
+        "Binding":               "Binding { target: x; property: \"textFormat\"; value: Text.AutoText }",
+        "PropertyChanges":       "PropertyChanges { target: x; textFormat: Text.AutoText }",
     }
+
+    # Under an alias the module's types must still be recognised.
+    INJECTED_ALIASED = (
+        "import org.kde.plasma.components as PC\n"
+        "Item {\n    PC.Label { text: w.title }\n}\n"
+    )
 
     # A whole file: a new type built on PlainLabel that undoes it.
     INJECTED_FILES = {
@@ -203,6 +257,8 @@ class CheckerTest(unittest.TestCase):
         for name, source in self.INJECTED_FILES.items():
             with self.subTest(name):
                 self.assertTrue(self.caught(source + "\n"), source)
+        with self.subTest("aliased import"):
+            self.assertTrue(self.caught(self.INJECTED_ALIASED))
 
 
 if __name__ == "__main__":
