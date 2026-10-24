@@ -45,7 +45,7 @@ import subprocess
 import sys
 import tempfile
 import zlib
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SCHEMES = {"light": "BreezeLight", "dark": "BreezeDark"}
@@ -119,7 +119,7 @@ def marked(value):
 def fixture(now, map_path):
     """A poll of Seaford VIC at NOW (UTC), shaped as poll.py prints it,
     with the moment and the radar station to show it at."""
-    midnight = datetime(now.year, now.month, now.day, 13, tzinfo=timezone.utc)
+    midnight = datetime(now.year, now.month, now.day, 13, tzinfo=UTC)
     if midnight > now:
         midnight -= timedelta(days=1)
     texts = ["Partly cloudy.", "Shower or two.", "Sunny.", "Rain.", "Possible thunderstorm.",
@@ -201,7 +201,7 @@ def live(place, station, now, cache):
                             capture_output=True, text=True, timeout=180, check=True)
     poll = json.loads(result.stdout)
     if not poll.get("ok"):
-        sys.exit("render: BoM's weather for %s: %s %s" % (place, poll.get("error"), poll.get("detail")))
+        sys.exit(f"render: BoM's weather for {place}: {poll.get('error')} {poll.get('detail')}")
     return {"now": iso(now), "station": station, "poll": poll}
 
 
@@ -235,11 +235,11 @@ def render(options, config_home):
                        "QT_QPA_PLATFORMTHEME": "kde", "QT_QUICK_BACKEND": "software",
                        "TZ": "Australia/Melbourne", "QT_SCALE_FACTOR": str(options.scale)})
 
-    from PySide6.QtCore import QMetaObject, QObject, QTimer, QUrl, qInstallMessageHandler, QtMsgType
+    import shiboken6
+    from PySide6.QtCore import QMetaObject, QObject, QTimer, QtMsgType, QUrl, qInstallMessageHandler
     from PySide6.QtGui import QGuiApplication, QWindow
     from PySide6.QtQml import QQmlApplicationEngine, QQmlComponent, QQmlEngine
     from PySide6.QtQuick import QQuickItem, QQuickWindow
-    import shiboken6
 
     problems = []
 
@@ -266,7 +266,7 @@ def render(options, config_home):
         return 1
     QQmlEngine.setObjectOwnership(i18n, QQmlEngine.ObjectOwnership.CppOwnership)
     engine.rootContext().setContextObject(i18n)
-    now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+    now = datetime.now(UTC).replace(second=0, microsecond=0)
     if options.live:
         shown = live(options.live, options.station, now, config_home)
     else:
@@ -369,16 +369,15 @@ def render(options, config_home):
         # Read through the engine: PySide cannot convert the C++ enum.
         text_format = engine.newQObject(item).property("textFormat").toInt()
         if not shows_plain_text(item, text_format):
-            problems.append("%s %r renders format %d: %r" % (item.metaObject().className(),
-                                                             item.objectName(), text_format,
-                                                             str(item.property("text"))[:60]))
+            problems.append(f"{item.metaObject().className()} {item.objectName()!r} renders format "
+                            f"{text_format}: {str(item.property('text'))[:60]!r}")
     widget_items = sum(map(declared_by_widget, text_items))
     marked_items = sum("<b>" in str(item.property("text")) for item in text_items)
-    print("%d text items checked for plain text, %d of them declared by the widget,"
-          " %d showing marked-up data" % (len(text_items), widget_items, marked_items))
+    print(f"{len(text_items)} text items checked for plain text, {widget_items} of them declared"
+          f" by the widget, {marked_items} showing marked-up data")
     if len(text_items) < MIN_TEXT_ITEMS or widget_items < MIN_WIDGET_TEXT_ITEMS:
-        problems.append("only %d text items found to check, %d of them the widget's:"
-                        " is the walk broken?" % (len(text_items), widget_items))
+        problems.append(f"only {len(text_items)} text items found to check, {widget_items} of them"
+                        " the widget's: is the walk broken?")
     if not marked_items:
         problems.append("no text item shows the marked-up poll: is it applied?")
 
@@ -387,8 +386,8 @@ def render(options, config_home):
     place_items = [item for item in everything(window, panel) if item.objectName() == "placeItem"]
     shown_items = [item for item in place_items if item.property("checked")]
     if len(place_items) != 2 or len(shown_items) != 1:
-        problems.append("place menu: %d items, %d checked, not 2 and 1"
-                        % (len(place_items), len(shown_items)))
+        problems.append(f"place menu: {len(place_items)} items, {len(shown_items)} checked,"
+                        " not 2 and 1")
     else:
         QMetaObject.invokeMethod(shown_items[0], "click")
         settle(0.1)
@@ -409,9 +408,9 @@ def render(options, config_home):
             settle(0.1)
         said = weather.property("errorText")
         if said == expected:
-            print("WeatherSource with %s ran poll.py: %s" % (location, said))
+            print(f"WeatherSource with {location} ran poll.py: {said}")
         else:
-            problems.append("WeatherSource with %s said %r, not %r" % (location, said, expected))
+            problems.append(f"WeatherSource with {location} said {said!r}, not {expected!r}")
 
     if network:
         print(f"note: {len(network)} radar image(s) failed to load from BoM", file=sys.stderr)

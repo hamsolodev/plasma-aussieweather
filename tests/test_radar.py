@@ -11,20 +11,20 @@ import subprocess
 import sys
 import time
 import unittest
+from datetime import UTC, datetime
 from unittest import mock
-from datetime import datetime, timezone
 
 from codeloader import load
 
 radar = load("radar")
 TESTS = pathlib.Path(__file__).resolve().parent
 
-NOW = datetime(2026, 10, 24, 1, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 10, 24, 1, 0, tzinfo=UTC)
 
 
 def frame(minute, station="IDR022"):
     """A frame name taken MINUTE minutes past midnight UTC on 2026-10-24."""
-    return "%s.T.20261024%02d%02d.png" % (station, minute // 60, minute % 60)
+    return f"{station}.T.20261024{minute // 60:02d}{minute % 60:02d}.png"
 
 
 class FrameNamesTest(unittest.TestCase):
@@ -78,10 +78,10 @@ def run_main(station, names):
 class MainTest(unittest.TestCase):
 
     def test_frames_are_https_urls_naming_their_station(self):
-        now = datetime.now(timezone.utc).strftime("%Y%m%d%H%M")
-        result = run_main("IDR022", ["IDR022.T.%s.png" % now])
+        now = datetime.now(UTC).strftime("%Y%m%d%H%M")
+        result = run_main("IDR022", [f"IDR022.T.{now}.png"])
         self.assertEqual(result, {"ok": True, "station": "IDR022",
-                                  "frames": ["https://www.bom.gov.au/radar/IDR022.T.%s.png" % now]})
+                                  "frames": [f"https://www.bom.gov.au/radar/IDR022.T.{now}.png"]})
 
     def test_invalid_station_is_permanent_and_lists_nothing(self):
         result = run_main("IDR02;x", AssertionError("listed"))
@@ -134,10 +134,10 @@ class MemoryLimitTest(unittest.TestCase):
 
     def test_scripts_cap_their_own_memory(self):
         for name in ("radar", "poll"):
-            code = ("import resource, sys; sys.path.insert(0, %r)\n"
+            code = (f"import resource, sys; sys.path.insert(0, {str(TESTS)!r})\n"
                     "from codeloader import load\n"
-                    "load(%r).limit_memory()\n"
-                    "print(resource.getrlimit(resource.RLIMIT_AS)[0])" % (str(TESTS), name))
+                    f"load({name!r}).limit_memory()\n"
+                    "print(resource.getrlimit(resource.RLIMIT_AS)[0])")
             out = subprocess.run([sys.executable, "-I", "-B", "-c", code],
                                  capture_output=True, text=True, check=True).stdout
             self.assertEqual(int(out), 512 * 1024 * 1024, name)

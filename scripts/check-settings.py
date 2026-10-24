@@ -42,7 +42,14 @@ EXPECTED_MESSAGES = ("Could not find any platform plugin", "fallback to QtQuick 
 def run(config_home):
     os.environ.update({"XDG_CONFIG_HOME": config_home, "QT_QPA_PLATFORM": "offscreen",
                        "QT_QPA_PLATFORMTHEME": "kde", "QT_QUICK_BACKEND": "software"})
-    from PySide6.QtCore import QMetaObject, QTimer, QUrl, Q_ARG, Q_RETURN_ARG, qInstallMessageHandler
+    from PySide6.QtCore import (
+        Q_ARG,
+        Q_RETURN_ARG,
+        QMetaObject,
+        QTimer,
+        QUrl,
+        qInstallMessageHandler,
+    )
     from PySide6.QtGui import QGuiApplication
     from PySide6.QtQml import QQmlApplicationEngine, QQmlComponent, QQmlEngine
     from PySide6.QtQuick import QQuickWindow  # noqa: F401 (wraps the window as one)
@@ -99,7 +106,7 @@ def run(config_home):
         nonlocal checks
         checks += 1
         if actual != expected:
-            failures.append("%s: %r, not %r" % (what, actual, expected))
+            failures.append(f"{what}: {actual!r}, not {expected!r}")
 
     # A config from before saved places: one place, shown, and nothing saved
     # by opening (Plasma would count the config as changed).
@@ -168,10 +175,10 @@ def run(config_home):
         print("FAIL: no checks ran", file=sys.stderr)
         return 1
     if failures or messages:
-        print("FAIL: %d of %d checks failed, %d QML messages" % (len(failures), checks, len(messages)),
+        print(f"FAIL: {len(failures)} of {checks} checks failed, {len(messages)} QML messages",
               file=sys.stderr)
         return 1
-    print("OK: %d settings page checks" % checks)
+    print(f"OK: {checks} settings page checks")
     return 0
 
 

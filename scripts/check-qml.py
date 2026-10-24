@@ -64,7 +64,7 @@ def main():
         # and an unwritable one makes KConfig pop up a dialog.
         env = dict(os.environ, QT_QPA_PLATFORM="offscreen",
                    XDG_CONFIG_HOME=str(pathlib.Path(tmp) / "config"))
-        result = subprocess.run([runner, "-input", str(test)], env=env,
+        result = subprocess.run([runner, "-input", str(test)], env=env, check=False,
                                 capture_output=True, text=True, timeout=300)
     print(result.stdout + result.stderr)
     passed = sum(line.startswith("PASS   : ") and "::test_compile(" in line

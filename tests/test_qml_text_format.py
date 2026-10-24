@@ -36,6 +36,7 @@ import pathlib
 import re
 import tempfile
 import unittest
+from typing import ClassVar
 
 UI = pathlib.Path(__file__).resolve().parent.parent / "contents" / "ui"
 
@@ -63,7 +64,7 @@ ATTACHED_TEXT = (r"(?:\w+\.)*FormData\.label", r"(?:\w+\.)*ToolTip\.text")
 # String literals, and i18n calls on them whose only other arguments are
 # counts.
 _CALL = r"i18n[cp]*\(S(?:\+S)*(?:,S(?:\+S)*)*(?:,[\w.]+\.length)*\)"
-CONSTANT_TEXT = re.compile(r"(?:%s|S)(?:\+(?:%s|S))*" % (_CALL, _CALL))
+CONSTANT_TEXT = re.compile(rf"(?:{_CALL}|S)(?:\+(?:{_CALL}|S))*")
 FORMAT_NAMES = re.compile(r"\b(?:textFormat|toolTipTextFormat)\b")
 FORMAT_STRING = re.compile(r"""(["'`])\s*(?:textFormat|toolTipTextFormat)\s*\1""")
 # The one element allowed to render RichText: the warning body, which
@@ -188,7 +189,7 @@ def check(ui):
         if "${" in source:
             problems.append(path.name + " has a template literal substitution")
         for kind, bindings in declarations(path):
-            where = "%s %s" % (path.name, kind)
+            where = f"{path.name} {kind}"
             text_format = binding(bindings, "textFormat")
             tooltip_format = binding(bindings, "toolTipTextFormat")
             formats_bound += (text_format is not None) + (tooltip_format is not None)
@@ -204,7 +205,7 @@ def check(ui):
                     if rich_ok:
                         exemptions += 1
                     else:
-                        problems.append("%s textFormat is %s" % (where, text_format or "unstated"))
+                        problems.append(f"{where} textFormat is {text_format or 'unstated'}")
             elif text_format is not None:
                 problems.append(where + " sets textFormat")
             if kind == "PlasmoidItem":
@@ -218,7 +219,7 @@ def check(ui):
                 for name in SELF_DRAWN[kind]:
                     text = binding(bindings, name)
                     if text is not None and not is_constant(text):
-                        problems.append("%s %s is not constant text" % (where, name))
+                        problems.append(f"{where} {name} is not constant text")
             for pattern in ATTACHED_TEXT:
                 for text in bound(bindings, pattern):
                     examined += 1
@@ -247,7 +248,7 @@ class CheckerTest(unittest.TestCase):
 
     # An object added inside an Item in Injected.qml: (QML, the problem it
     # must cause).
-    INJECTED = {
+    INJECTED: ClassVar[dict[str, tuple[str, str]]] = {
         "inline delegate":       ("Repeater { delegate: PlasmaComponents.Label { text: w.title } }",
                                   "textFormat is unstated"),
         "styled PlainLabel":     ("PlainLabel { textFormat: Text.StyledText; text: w.title }",
@@ -317,7 +318,7 @@ class CheckerTest(unittest.TestCase):
 
     # Whole files added to the UI: {file name: (source, the problem it must
     # cause)}.
-    INJECTED_FILES = {
+    INJECTED_FILES: ClassVar[dict[str, tuple[str, str, str]]] = {
         "type built on PlainLabel": ("Injected.qml", "PlainLabel { textFormat: Text.StyledText }",
                                      "overrides PlainLabel's textFormat"),
         "PC.Label": ("Injected.qml",
@@ -339,7 +340,7 @@ class CheckerTest(unittest.TestCase):
 
     # Edits to the real UI: {name: (file, text, replacement, the problem it
     # must cause)}.
-    INJECTED_EDITS = {
+    INJECTED_EDITS: ClassVar[dict[str, tuple[str, str, str, str]]] = {
         "data added to the warning body": (
             "WarningsTab.qml", "text: modelData.html", "text: modelData.html + modelData.title",
             "textFormat is Text.RichText"),
@@ -367,7 +368,7 @@ class CheckerTest(unittest.TestCase):
 
     def assertCaught(self, problems, expected):
         self.assertTrue(any(expected in problem for problem in problems),
-                        "%r not among %r" % (expected, problems))
+                        f"{expected!r} not among {problems!r}")
 
     def test_each_injection_is_caught_by_its_rule(self):
         for name, (snippet, expected) in self.INJECTED.items():

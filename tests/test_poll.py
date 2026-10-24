@@ -3,25 +3,25 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 import base64
-import struct
-import zlib
 import contextlib
-import http.client
+import grp
 import hashlib
+import http.client
+import io
+import json
 import os
 import pathlib
-import tempfile
-import time
-import io
-import grp
-import json
 import pwd
 import re
+import struct
+import tempfile
+import time
 import unittest
-from unittest import mock
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+import zlib
+from datetime import UTC, datetime
+from unittest import mock
 
 from codeloader import load
 
@@ -51,7 +51,7 @@ class FakeApi:
 # Minimal stand-ins shaped like the BoM v1 API's responses.
 SEAFORD_VIC = {"geohash": "r1ppnxx", "name": "Seaford", "state": "VIC"}
 SEAFORD_SA = {"geohash": "r1f93cz", "name": "Seaford", "state": "SA"}
-NOW = datetime(2026, 10, 24, 1, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 10, 24, 1, 0, tzinfo=UTC)
 # Where warning images go in tests that do not look at them.
 _IMAGE_DIR = tempfile.TemporaryDirectory()
 IMAGE_DIR = pathlib.Path(_IMAGE_DIR.name)
@@ -77,7 +77,7 @@ def location_api(geohash, warnings=(), details=None, **overrides):
 
 
 def http_error(code):
-    return urllib.error.HTTPError("https://api.example/x", code, "status %d" % code, {}, io.BytesIO())
+    return urllib.error.HTTPError("https://api.example/x", code, f"status {code}", {}, io.BytesIO())
 
 
 def run_main(api, geohash, query):
@@ -301,7 +301,7 @@ class CollectTest(unittest.TestCase):
         # poll must not prune the other's maps.
         with tempfile.TemporaryDirectory() as tmp:
             cache = pathlib.Path(tmp)
-            warning = {"id": "SA_1", "message": '<img src="%s">' % data_uri("image/png", PNG)}
+            warning = {"id": "SA_1", "message": f'<img src="{data_uri("image/png", PNG)}">'}
             adelaide = location_api("r1f93c", warnings=[warning], details={"SA_1": {}})
             out = poll.collect(adelaide, "r1f93c", "Adelaide SA", NOW, cache)
             [saved] = out["warnings"][0]["images"]
@@ -398,8 +398,8 @@ class CurrentWarningsTest(unittest.TestCase):
         self.assertEqual([w["title"] for w in out["warnings"]], ["Flood", "Wind"])
 
     def test_warnings_are_capped(self):
-        many = [{"id": "W%d" % i, "phase": "new"} for i in range(poll.MAX_WARNINGS + 10)]
-        details = {"W%d" % i: {} for i in range(poll.MAX_WARNINGS + 10)}
+        many = [{"id": f"W{i}", "phase": "new"} for i in range(poll.MAX_WARNINGS + 10)]
+        details = {f"W{i}": {} for i in range(poll.MAX_WARNINGS + 10)}
         api = location_api("r1ppnx", warnings=many, details=details)
         out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW, IMAGE_DIR)
         self.assertEqual(len(out["warnings"]), poll.MAX_WARNINGS)
@@ -455,10 +455,10 @@ class SanitiseHtmlTest(unittest.TestCase):
         # Qt RichText hands a data: image to every image plugin's sniffer
         # (LibRaw claims some PNG-signature data by size alone), so no
         # image stays in the markup; real PNGs are kept aside instead.
-        html = ('<p>a<img alt="map" src="%s">b</p>' % data_uri("image/png", PNG)
+        html = (f'<p>a<img alt="map" src="{data_uri("image/png", PNG)}">b</p>'
                 + '<img src="https://tracker.example/p.png">'
-                + '<img src="%s">' % data_uri("image/png", EPS)
-                + '<img src="%s">' % data_uri("image/svg+xml", b"<svg/>")
+                + f'<img src="{data_uri("image/png", EPS)}">'
+                + f'<img src="{data_uri("image/svg+xml", b"<svg/>")}">'
                 + '<img src="data:image/png;base64,!!!">')
         result = poll.sanitise(html)
         self.assertEqual(result.html, "<p>ab</p>")
@@ -468,16 +468,16 @@ class SanitiseHtmlTest(unittest.TestCase):
         # Qt scales an image to fill its box: a 1×1024 PNG of 89 bytes
         # became a raster of gigabytes inside plasmashell.
         for width, height in ((1, 1024), (1024, 1), (4096, 4096), (0, 10), (2049, 300)):
-            html = '<img src="%s">' % data_uri("image/png", png(width, height))
+            html = f'<img src="{data_uri("image/png", png(width, height))}">'
             self.assertEqual(poll.sanitise(html).images, [], (width, height))
-        self.assertEqual(len(poll.sanitise('<img src="%s">' % data_uri("image/png", png(580, 820))).images), 1)
+        self.assertEqual(len(poll.sanitise(f'<img src="{data_uri("image/png", png(580, 820))}">').images), 1)
 
     def test_png_needs_its_header(self):
         bare_signature = b"\x89PNG\r\n\x1a\n" + b"\0" * 16
-        self.assertEqual(poll.sanitise('<img src="%s">' % data_uri("image/png", bare_signature)).images, [])
+        self.assertEqual(poll.sanitise(f'<img src="{data_uri("image/png", bare_signature)}">').images, [])
 
     def test_images_are_capped(self):
-        html = "".join('<img src="%s">' % data_uri("image/png", PNG + bytes([i]))
+        html = "".join(f'<img src="{data_uri("image/png", PNG + bytes([i]))}">'
                        for i in range(poll.MAX_IMAGES + 3))
         self.assertEqual(len(poll.sanitise(html).images), poll.MAX_IMAGES)
 
@@ -518,7 +518,7 @@ class SanitiseHtmlTest(unittest.TestCase):
         # keep to the same budgets.
         out = poll.linkify("a" * (poll.MAX_TEXT * 10))
         self.assertLessEqual(len(out), poll.MAX_OUTPUT)
-        links = poll.linkify(" ".join(["https://x.example/%d" % i for i in range(5000)]))
+        links = poll.linkify(" ".join([f"https://x.example/{i}" for i in range(5000)]))
         self.assertLessEqual(links.count("<a "), poll.MAX_ELEMENTS)
         self.assertLessEqual(len(links), poll.MAX_OUTPUT + 100)
 
@@ -547,7 +547,7 @@ class SanitiseHtmlTest(unittest.TestCase):
 
     def test_long_links_are_dropped(self):
         href = "https://x.example/" + "a" * 5000
-        self.assertEqual(poll.sanitise('<a href="%s">map</a>' % href).html, "map")
+        self.assertEqual(poll.sanitise(f'<a href="{href}">map</a>').html, "map")
 
     def test_text_is_capped(self):
         out = poll.sanitise("<p>" + "a" * (poll.MAX_TEXT + 500) + "</p><p>tail</p>").html
@@ -761,8 +761,7 @@ class WarningViewTest(unittest.TestCase):
         self.directory.cleanup()
 
     def test_images_are_saved_as_png_files(self):
-        view = poll.warning_view([{"id": "A", "message": '<p>Map:</p><img src="%s">'
-                                  % data_uri("image/png", PNG)}], self.store)
+        view = poll.warning_view([{"id": "A", "message": f'<p>Map:</p><img src="{data_uri("image/png", PNG)}">'}], self.store)
         self.assertEqual(view["html"], "<p>Map:</p>")
         [path] = view["images"]
         self.assertTrue(path.endswith(".png"))

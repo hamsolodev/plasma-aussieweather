@@ -25,7 +25,7 @@ class UrlSchemeTest(unittest.TestCase):
             examined += 1
             for number, line in enumerate(path.read_text().splitlines(), 1):
                 if "http://" in line:
-                    found.append("%s:%d" % (path.relative_to(CONTENTS), number))
+                    found.append(f"{path.relative_to(CONTENTS)}:{number}")
         self.assertGreater(examined, 0, "no files scanned — is the path right?")
         self.assertEqual(found, [])
 

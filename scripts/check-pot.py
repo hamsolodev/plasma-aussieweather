@@ -51,13 +51,13 @@ def main(committed, regenerated):
         return 1
     missing, extra = sorted(want - have), sorted(have - want)
     for entry in missing:
-        print("missing from %s: %r" % (committed, entry), file=sys.stderr)
+        print(f"missing from {committed}: {entry!r}", file=sys.stderr)
     for entry in extra:
-        print("no longer in the code: %r" % (entry,), file=sys.stderr)
+        print(f"no longer in the code: {entry!r}", file=sys.stderr)
     if missing or extra:
         print("FAIL: run translate/merge.sh and commit translate/template.pot", file=sys.stderr)
         return 1
-    print("OK: %d strings, as in the code" % len(want))
+    print(f"OK: {len(want)} strings, as in the code")
     return 0
 
 

@@ -39,7 +39,7 @@ class CheckTest(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.root = pathlib.Path(self.directory.name)
         for key, path in make_icons.SOURCES.items():
-            self.write(path, ('<svg id="%s"/>' % key).encode())
+            self.write(path, (f'<svg id="{key}"/>').encode())
         for path, key in make_icons.SVG_COPIES.items():
             self.write(path, self.source(key))
         for path, (key, edge) in make_icons.PNGS.items():
@@ -73,13 +73,13 @@ class CheckTest(unittest.TestCase):
 
     def test_a_png_made_from_the_other_source(self):
         self.write("contents/screenshot.png", png(256, self.sha("small")))
-        self.assertEqual(self.problems(), ["contents/screenshot.png: made from "
-                                           "branding/icon-small.svg, not today's branding/icon.svg"])
+        self.assertEqual(self.problems(), [("contents/screenshot.png: made from "
+                                            "branding/icon-small.svg, not today's branding/icon.svg")])
 
     def test_a_png_not_made_by_the_script(self):
         self.write("docs/icon.png", png(256))
-        self.assertEqual(self.problems(), ["docs/icon.png: made from an unrecorded source, "
-                                           "not today's branding/icon.svg"])
+        self.assertEqual(self.problems(), [("docs/icon.png: made from an unrecorded source, "
+                                            "not today's branding/icon.svg")])
 
     def test_the_wrong_size(self):
         self.write("contents/screenshot.png", png(128, self.sha("icon")))

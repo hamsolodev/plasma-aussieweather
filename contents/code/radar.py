@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # SPDX-FileCopyrightText: 2026 Mark Hellewell <aussieweather.sandlot200@passinbox.com>
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
@@ -23,7 +21,7 @@ import re
 import resource
 import signal
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 FTP_HOST = "ftp.bom.gov.au"
 FTP_DIR = "/anon/gen/radar"
@@ -151,7 +149,7 @@ def frame_names(names, station, now):
         if not match:
             continue
         try:
-            taken = datetime.strptime(match.group(1), "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
+            taken = datetime.strptime(match.group(1), "%Y%m%d%H%M").replace(tzinfo=UTC)
         except ValueError:
             continue
         if -MAX_CLOCK_SKEW <= now - taken <= MAX_FRAME_AGE:
@@ -187,7 +185,7 @@ def listing(station, now):
 
 def main(argv):
     station = argv[1]
-    result = listing(station, datetime.now(timezone.utc))
+    result = listing(station, datetime.now(UTC))
     # Every result names its station: the widget drops listings for a
     # station it no longer shows.
     result["station"] = station

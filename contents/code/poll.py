@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # SPDX-FileCopyrightText: 2026 Mark Hellewell <aussieweather.sandlot200@passinbox.com>
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
@@ -37,7 +35,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from html.parser import HTMLParser
 
 API = "https://api.weather.bom.gov.au/v1"
@@ -105,10 +103,10 @@ def failure_from(error):
         error.close()  # it holds the response
         # A client error will not change on retry; rate limiting will.
         permanent = 400 <= error.code < 500 and error.code != 429
-        return Failure("http", "HTTP %d %s" % (error.code, error.reason), permanent)
+        return Failure("http", f"HTTP {error.code} {error.reason}", permanent)
     if isinstance(error, OSError):
         return Failure("network", str(getattr(error, "reason", error)))
-    return Failure("bad_response", "%s: %s" % (type(error).__name__, error))
+    return Failure("bad_response", f"{type(error).__name__}: {error}")
 
 
 class HttpsOnlyRedirects(urllib.request.HTTPRedirectHandler):
@@ -137,7 +135,7 @@ def make_get(version):
         with opener.open(request, timeout=15) as response:
             body = response.read(MAX_RESPONSE + 1)
         if len(body) > MAX_RESPONSE:
-            raise Failure("bad_response", "a response over %d bytes" % MAX_RESPONSE)
+            raise Failure("bad_response", f"a response over {MAX_RESPONSE} bytes")
         return json.loads(body)
 
     return get
@@ -358,7 +356,7 @@ class _Sanitiser(HTMLParser):
             href = dict(attrs).get("href") or ""
             if not href.lower().startswith("https://") or len(href) > MAX_HREF:
                 return
-            start = '<a href="%s">' % html.escape(href, quote=True)
+            start = f'<a href="{html.escape(href, quote=True)}">'
         else:
             start = "<" + tag + ">"
         # A tag that does not fit what is left of the output is left out.
@@ -473,7 +471,7 @@ def private_cache(path, create):
         return False
     others = info.st_mode & 0o002 or (info.st_mode & 0o020 and not group_is_private(info.st_gid))
     if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or others:
-        raise PermissionError("%s is not a private directory" % path)
+        raise PermissionError(f"{path} is not a private directory")
     return True
 
 
@@ -492,7 +490,7 @@ def private_directory(path, create):
     except FileNotFoundError:
         return False
     if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
-        raise PermissionError("%s is not a private directory" % path)
+        raise PermissionError(f"{path} is not a private directory")
     if info.st_mode & 0o077:
         path.chmod(0o700)
     return True
@@ -653,7 +651,7 @@ def linkify(text):
             url = url[:trail.start()]
         pieces.append((html.escape(text[last:match.start()], quote=False), False))
         if len(url) <= MAX_HREF:
-            pieces.append(('<a href="%s">%s</a>' % (html.escape(url), html.escape(url, quote=False)),
+            pieces.append((f'<a href="{html.escape(url)}">{html.escape(url, quote=False)}</a>',
                            True))
         else:
             pieces.append((html.escape(url, quote=False), False))
@@ -724,7 +722,7 @@ def warnings_for(get, geohash, now, images):
             try:
                 data = get("/warnings/" + urllib.parse.quote(wid, safe="")).get("data", {})
                 detail = data if isinstance(data, dict) else {}
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 (see above)
                 failure_from(e)  # closes an HTTP error's response
         warnings.append(warning_view([detail, warning], images))
     return warnings
@@ -767,7 +765,7 @@ def collect(get, geohash, query, now, cache):
         # More than the widget shows: it drops slots that have passed
         # before the next poll.
         out["hourly"] = hourly_for(get, geohash)[:12]
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 (see above)
         out["hourly"] = None
         out["hourlyError"] = failure_from(e).detail
     # Each place's images apart, so two widgets for two places do not prune
@@ -775,7 +773,7 @@ def collect(get, geohash, query, now, cache):
     images = ImageStore(cache, CACHE_NAME, "warnings", geohash)
     try:
         out["warnings"] = warnings_for(get, geohash, now, images)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 (see above)
         out["warnings"] = None
         out["warningsError"] = failure_from(e).detail
     else:
@@ -796,9 +794,9 @@ def main(argv):
     previous = signal.signal(signal.SIGALRM, _deadline_passed)
     signal.alarm(POLL_DEADLINE)
     try:
-        result = collect(make_get(version), geohash, query, datetime.now(timezone.utc),
+        result = collect(make_get(version), geohash, query, datetime.now(UTC),
                          user_cache())
-    except (Exception, PollTimedOut) as e:
+    except (Exception, PollTimedOut) as e:  # noqa: BLE001 (every outcome is one JSON object)
         failure = failure_from(e)
         result = {"ok": False, "error": failure.kind, "detail": failure.detail,
                   "permanent": failure.permanent}

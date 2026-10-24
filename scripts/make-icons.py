@@ -54,12 +54,12 @@ def render(svg_path, edge):
     downsampled, as the design was chosen from."""
     from PIL import Image
     png = subprocess.run(["magick", "-background", "none", "-density", "1536", str(svg_path),
-                          "-resize", "%dx%d" % (edge, edge), "png:-"],
+                          "-resize", f"{edge}x{edge}", "png:-"],
                          check=True, capture_output=True).stdout
     image = Image.open(io.BytesIO(png))
     image.load()
     if image.size != (edge, edge):
-        sys.exit("make-icons: magick rendered %s, wanted %dx%d" % (image.size, edge, edge))
+        sys.exit(f"make-icons: magick rendered {image.size}, wanted {edge}x{edge}")
     return image.convert("RGBA")
 
 
@@ -110,7 +110,7 @@ def check(root):
         if not target.is_file():
             problems.append(path + ": missing")
         elif target.read_bytes() != sources[key]:
-            problems.append("%s: differs from %s" % (path, SOURCES[key]))
+            problems.append(f"{path}: differs from {SOURCES[key]}")
     for path, (key, edge) in PNGS.items():
         examined += 1
         target = root / path
@@ -120,14 +120,14 @@ def check(root):
         try:
             width, height, colour, stamp = png_facts(target.read_bytes())
         except (ValueError, struct.error) as e:
-            problems.append("%s: %s" % (path, e))
+            problems.append(f"{path}: {e}")
             continue
         if (width, height) != (edge, edge):
-            problems.append("%s: %dx%d, wants %dx%d" % (path, width, height, edge, edge))
+            problems.append(f"{path}: {width}x{height}, wants {edge}x{edge}")
         if stamp != shas[key]:
             made_from = next((SOURCES[k] for k, sha in shas.items() if sha == stamp),
                              "an unrecorded source")
-            problems.append("%s: made from %s, not today's %s" % (path, made_from, SOURCES[key]))
+            problems.append(f"{path}: made from {made_from}, not today's {SOURCES[key]}")
         if colour not in (4, 6):
             problems.append(path + ": no alpha channel, but the tile has transparent corners")
     return examined, problems
@@ -142,7 +142,7 @@ def report(examined, problems):
     if problems:
         print("FAIL: run scripts/make-icons.py and commit what it writes", file=sys.stderr)
         return 1
-    print("OK: %d icon targets made from today's sources" % examined)
+    print(f"OK: {examined} icon targets made from today's sources")
     return 0
 
 
@@ -155,7 +155,7 @@ def make(root):
         sha = hashlib.sha256(sources[key]).hexdigest()
         data = stamped_png(render(root / SOURCES[key], edge), sha)
         (root / path).write_bytes(data)
-        print("wrote %s (%d bytes)" % (path, len(data)))
+        print(f"wrote {path} ({len(data)} bytes)")
     return report(*check(root))
 
 

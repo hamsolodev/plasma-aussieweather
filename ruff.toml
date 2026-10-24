@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 Mark Hellewell <aussieweather.sandlot200@passinbox.com>
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+# ruff's own default rules. CI checks the lint and the formatting; the
+# formatting itself is done before each commit, by scripts/hooks/pre-commit.
+
+# The fetch scripts run on the user's own python3, so this is the oldest one
+# they support: parse_time needs 3.11's fromisoformat, the first to read
+# BoM's "Z".
+target-version = "py311"
+line-length = 100
