@@ -263,6 +263,8 @@ PlasmoidItem {
     property var radarFrameUrls:    []
     property int radarFrameIdx:     0
     property var _radarLastRefreshMs: 0
+    property string radarError: ""
+    property int _radarRetryCount: 0
     // True only while the Radar tab is on screen — gates all radar network
     // activity: the frame list, the frames and the overlays. Written by a
     // Binding inside the radar tab.
@@ -294,12 +296,26 @@ PlasmoidItem {
     }
 
     onActiveRadarStationChanged: {
-        radarFrameUrls       = []
-        radarFrameIdx        = 0
-        _radarLastRefreshMs  = 0
+        resetRadar()
         if (radarActive) refreshRadarFrames()
     }
-    onRadarActiveChanged: if (!radarActive) radarOverride = ""
+    onRadarActiveChanged: {
+        if (!radarActive) {
+            radarOverride = ""
+            radarRetry.stop()
+        }
+    }
+
+    // Forget the shown station's frames and any failure, so the next fetch
+    // starts afresh.
+    function resetRadar() {
+        radarFrameUrls      = []
+        radarFrameIdx       = 0
+        _radarLastRefreshMs = 0
+        radarError          = ""
+        _radarRetryCount    = 0
+        radarRetry.stop()
+    }
 
     // Minute-resolution clock snapped to wall-clock minute boundaries.
     // currentIcon and any is_night bindings reference this so they re-evaluate on the hour.
@@ -334,19 +350,54 @@ PlasmoidItem {
         connectedSources: []
         onNewData: (sourceName, data) => {
             radarPoller.disconnectSource(sourceName)
-            try {
-                var d = JSON.parse((data["stdout"] || "").trim())
-                if (!Helpers.isRadarFor(d, root.activeRadarStation))
-                    return
-                if (d.ok && d.frames && d.frames.length > 0) {
-                    root._radarLastRefreshMs = Date.now()
-                    if (JSON.stringify(d.frames) !== JSON.stringify(root.radarFrameUrls)) {
-                        root.radarFrameUrls = d.frames
-                        root.radarFrameIdx  = 0
-                    }
-                }
-            } catch(e) {}
+            root._handleRadar(Helpers.scriptResult(data))
         }
+    }
+
+    // A radar failure, as radar.py or scriptResult reports it, worded for
+    // the user.
+    function radarFailureText(d) {
+        switch (d.error) {
+        case "invalid_station": return i18n("Not a radar station: %1", d.detail)
+        case "no_frames":       return i18n("No recent radar images. The station may be offline; try a neighbouring one.")
+        case "network":         return i18n("Cannot reach BoM's radar listing: %1", d.detail)
+        case "script":          return i18n("The radar script failed: %1", d.detail)
+        default:                return i18n("Radar update failed: %1", d.detail || d.error)
+        }
+    }
+
+    function _handleRadar(d) {
+        // Drop a listing for a station no longer shown. Output that names no
+        // station (it did not parse) can only be taken as this one's.
+        if (d.station !== undefined && !Helpers.isRadarFor(d, activeRadarStation))
+            return
+
+        if (!d.ok) {
+            radarError = radarFailureText(d)
+            // While the tab is open, retry with backoff: 30 s doubling to a
+            // 5-minute ceiling. Leaving the tab stops it.
+            if (!d.permanent && radarActive) {
+                radarRetry.interval = Math.min(30000 * Math.pow(2, _radarRetryCount), 300000)
+                _radarRetryCount++
+                radarRetry.restart()
+            }
+            return
+        }
+
+        radarError       = ""
+        _radarRetryCount = 0
+        radarRetry.stop()
+        _radarLastRefreshMs = Date.now()
+        if (JSON.stringify(d.frames) !== JSON.stringify(radarFrameUrls)) {
+            radarFrameUrls = d.frames
+            radarFrameIdx  = 0
+        }
+    }
+
+    Timer {
+        id: radarRetry
+        repeat: false
+        onTriggered: if (root.radarActive) root.refreshRadarFrames()
     }
 
     function refreshRadarFrames() {
@@ -1100,6 +1151,7 @@ PlasmoidItem {
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                     opacity: 0.7
                     text: {
+                        if (root.radarError) return i18n("Update failed")
                         if (!root._radarLastRefreshMs) return i18n("Fetching…")
                         var ageSecs = Math.floor(
                             (root.currentTime.getTime() - root._radarLastRefreshMs) / 1000)
@@ -1216,6 +1268,16 @@ PlasmoidItem {
                 } // square layer container
             }
 
+            PlainLabel {
+                visible: root.radarError !== ""
+                Layout.fillWidth: true
+                Layout.leftMargin:  Kirigami.Units.smallSpacing
+                Layout.rightMargin: Kirigami.Units.smallSpacing
+                wrapMode: Text.WordWrap
+                color: Kirigami.Theme.neutralTextColor
+                text: "⚠  " + root.radarError
+            }
+
             RowLayout {
                 Layout.fillWidth: true
                 Layout.leftMargin:  Kirigami.Units.smallSpacing
@@ -1229,13 +1291,15 @@ PlasmoidItem {
                         ? i18n("Radar: %1  ·  %2 frames",
                                root.activeRadarStation,
                                root.radarFrameUrls.length)
-                        : i18n("Radar: %1  ·  Loading…",
-                               root.activeRadarStation)
+                        : root.radarError
+                            ? i18n("Radar: %1", root.activeRadarStation)
+                            : i18n("Radar: %1  ·  Loading…",
+                                   root.activeRadarStation)
                 }
                 PlasmaComponents.Button {
                     icon.name: "view-refresh-symbolic"
                     onClicked: {
-                        root.radarFrameUrls = []
+                        root.resetRadar()
                         root.refreshRadarFrames()
                     }
                 }

@@ -70,19 +70,31 @@ def frame_names(names, station, now):
     return sorted(frames)[-FRAME_COUNT:]
 
 
+def listing(station, now):
+    """The JSON-ready result for STATION: its frame URLs, or a failure.
+
+    A failure has a kind the widget words for the user: invalid_station
+    (permanent), no_frames (the station is offline or not yet updated) or
+    network (the listing could not be fetched).
+    """
+    if not is_station(station):
+        return {"ok": False, "error": "invalid_station", "detail": station, "permanent": True}
+    try:
+        names = list_names()
+    except (OSError, EOFError, ftplib.Error) as e:
+        return {"ok": False, "error": "network", "detail": str(e), "permanent": False}
+    frames = frame_names(names, station, now)
+    if not frames:
+        return {"ok": False, "error": "no_frames", "detail": station, "permanent": False}
+    return {"ok": True, "frames": [FRAME_URL + n for n in frames]}
+
+
 def main(argv):
     station = argv[1]
+    result = listing(station, datetime.now(timezone.utc))
     # Every result names its station: the widget drops listings for a
     # station it no longer shows.
-    if not is_station(station):
-        result = {"ok": False, "station": station, "error": "Not a radar station: " + station}
-    else:
-        try:
-            now = datetime.now(timezone.utc)
-            frames = [FRAME_URL + n for n in frame_names(list_names(), station, now)]
-            result = {"ok": True, "station": station, "frames": frames}
-        except Exception as e:
-            result = {"ok": False, "station": station, "error": str(e)}
+    result["station"] = station
     print(json.dumps(result))
 
 

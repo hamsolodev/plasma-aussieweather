@@ -45,14 +45,50 @@ class FrameNamesTest(unittest.TestCase):
         self.assertEqual(radar.frame_names(names, "IDR022", NOW), [frame(30)])
 
 
-class MainTest(unittest.TestCase):
+def run_main(station, names):
+    """radar.main's JSON output, with the FTP listing answered by NAMES.
 
-    def test_result_names_the_station_it_answers(self):
+    NAMES may be an exception instance, raised by the listing instead.
+    """
+    def list_names():
+        if isinstance(names, Exception):
+            raise names
+        return names
+
+    original = radar.list_names
+    radar.list_names = list_names
+    try:
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            radar.main(["radar.py", "IDR02;x"])
-        result = json.loads(out.getvalue())
-        self.assertEqual((result["ok"], result["station"]), (False, "IDR02;x"))
+            radar.main(["radar.py", station])
+        return json.loads(out.getvalue())
+    finally:
+        radar.list_names = original
+
+
+class MainTest(unittest.TestCase):
+
+    def test_frames_are_https_urls_naming_their_station(self):
+        now = datetime.now(timezone.utc).strftime("%Y%m%d%H%M")
+        result = run_main("IDR022", ["IDR022.T.%s.png" % now])
+        self.assertEqual(result, {"ok": True, "station": "IDR022",
+                                  "frames": ["https://www.bom.gov.au/radar/IDR022.T.%s.png" % now]})
+
+    def test_invalid_station_is_permanent_and_lists_nothing(self):
+        result = run_main("IDR02;x", AssertionError("listed"))
+        self.assertEqual((result["ok"], result["station"], result["error"], result["permanent"]),
+                         (False, "IDR02;x", "invalid_station", True))
+
+    def test_no_recent_frames_is_a_failure(self):
+        result = run_main("IDR022", ["IDR022.T.202001010000.png"])
+        self.assertEqual((result["ok"], result["error"], result["permanent"]),
+                         (False, "no_frames", False))
+
+    def test_listing_failure_is_a_network_failure(self):
+        result = run_main("IDR022", ConnectionRefusedError(111, "Connection refused"))
+        self.assertEqual((result["ok"], result["error"], result["permanent"]),
+                         (False, "network", False))
+        self.assertIn("Connection refused", result["detail"])
 
 
 class StationTest(unittest.TestCase):
