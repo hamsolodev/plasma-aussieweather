@@ -2,6 +2,9 @@
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
 
+import contextlib
+import io
+import json
 import unittest
 from datetime import datetime, timezone
 
@@ -40,6 +43,16 @@ class FrameNamesTest(unittest.TestCase):
     def test_impossible_and_future_timestamps_are_dropped(self):
         names = [frame(30), "IDR022.T.202613240030.png", "IDR022.T.202610240130.png"]
         self.assertEqual(radar.frame_names(names, "IDR022", NOW), [frame(30)])
+
+
+class MainTest(unittest.TestCase):
+
+    def test_result_names_the_station_it_answers(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            radar.main(["radar.py", "IDR02;x"])
+        result = json.loads(out.getvalue())
+        self.assertEqual((result["ok"], result["station"]), (False, "IDR02;x"))
 
 
 class StationTest(unittest.TestCase):

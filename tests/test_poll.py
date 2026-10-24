@@ -49,8 +49,12 @@ class CollectTest(unittest.TestCase):
         api = location_api("r1ppnx")
         out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW)
         self.assertTrue(out["ok"])
-        self.assertNotIn("geohash", out)
+        self.assertNotIn("locationName", out)
         self.assertFalse(any(p.startswith("/locations?") for p in api.requested))
+
+    def test_result_names_the_request_it_answers(self):
+        out = poll.collect(location_api("r1ppnx"), "r1ppnx", "Seaford VIC", NOW)
+        self.assertEqual((out["query"], out["geohash"]), ("Seaford VIC", "r1ppnx"))
 
     def test_lookup_reports_the_resolved_location(self):
         api = location_api("r1ppnx", **{"/locations?search=Seaford": {"data": [SEAFORD_VIC]}})

@@ -33,5 +33,10 @@ SPDX-License-Identifier: GPL-2.0-or-later
         <entry name="lastLocationName" type="String">
             <default></default>
         </entry>
+        <!-- The locationSearch the cached lookup above answered; the cache
+             is used only while it still matches. -->
+        <entry name="lastLocationSearch" type="String">
+            <default></default>
+        </entry>
     </group>
 </kcfg>

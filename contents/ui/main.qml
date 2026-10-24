@@ -43,21 +43,23 @@ PlasmoidItem {
     property string lastUpdated:  ""
     property string _geohash:     ""
 
-    // Seed from last successful resolve so the widget works across restarts
-    // without waiting for a fresh location lookup.
+    // Seed from the last successful lookup so the widget works across
+    // restarts without waiting for a fresh one — but only if that lookup was
+    // for the location still configured (it may have been edited since).
     Component.onCompleted: {
-        var gh = plasmoid.configuration.lastGeohash
-        var ln = plasmoid.configuration.lastLocationName
-        if (gh) _geohash = gh
-        if (ln) locationName = ln
+        var cfg = plasmoid.configuration
+        if (cfg.lastLocationSearch !== cfg.locationSearch) return
+        if (cfg.lastGeohash) _geohash = cfg.lastGeohash
+        if (cfg.lastLocationName) locationName = cfg.lastLocationName
     }
 
     readonly property string locationSearch: plasmoid.configuration.locationSearch
     onLocationSearchChanged: {
         _geohash     = ""
         locationName = locationSearch
-        plasmoid.configuration.lastGeohash      = ""
-        plasmoid.configuration.lastLocationName = ""
+        plasmoid.configuration.lastGeohash        = ""
+        plasmoid.configuration.lastLocationName   = ""
+        plasmoid.configuration.lastLocationSearch = ""
         observations   = null
         forecast       = []
         warnings       = []
@@ -135,7 +137,12 @@ PlasmoidItem {
         try { d = JSON.parse(out) }
         catch (e) { d = { ok: false, error: i18n("Bad response") } }
 
-        if (!d || !d.ok) {
+        // Drop an answer for a location no longer shown. Output that names no
+        // request (it did not parse) can only be taken as this one's.
+        if (d.query !== undefined && !Helpers.isPollFor(d, locationSearch, _geohash))
+            return
+
+        if (!d.ok) {
             errorText = (d && d.error) ? d.error : i18n("Unreachable")
             // Keep showing the last good data through a transient failure —
             // a missed poll shouldn't blank a working widget.
@@ -155,13 +162,12 @@ PlasmoidItem {
         _retryCount = 0
         retryTimer.stop()
 
-        if (d.geohash) {
-            _geohash = d.geohash
-            plasmoid.configuration.lastGeohash = d.geohash
-        }
         if (d.locationName) {
+            _geohash     = d.geohash
             locationName = d.locationName
-            plasmoid.configuration.lastLocationName = d.locationName
+            plasmoid.configuration.lastGeohash        = d.geohash
+            plasmoid.configuration.lastLocationName   = d.locationName
+            plasmoid.configuration.lastLocationSearch = d.query
         }
         observations    = d.observations || null
         forecast        = d.forecast     || []
@@ -303,6 +309,8 @@ PlasmoidItem {
             radarPoller.disconnectSource(sourceName)
             try {
                 var d = JSON.parse((data["stdout"] || "").trim())
+                if (!Helpers.isRadarFor(d, root.activeRadarStation))
+                    return
                 if (d.ok && d.frames && d.frames.length > 0) {
                     root._radarLastRefreshMs = Date.now()
                     if (JSON.stringify(d.frames) !== JSON.stringify(root.radarFrameUrls)) {

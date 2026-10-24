@@ -201,6 +201,27 @@ TestCase {
                 "/home/u/my widgets/poll.py")
     }
 
+    // ── isPollFor / isRadarFor ────────────────────────────────────────────
+
+    function test_isPollFor_matches_the_current_request() {
+        var result = { query: "Kimba SA", geohash: "r4152n" }
+        verify(Helpers.isPollFor(result, "Kimba SA", "r4152n"))
+        // A lookup in flight: any geohash answers it.
+        verify(Helpers.isPollFor(result, "Kimba SA", ""))
+    }
+
+    function test_isPollFor_rejects_an_overtaken_request() {
+        verify(!Helpers.isPollFor({ query: "Seaford VIC", geohash: "r1ppnx" }, "Kimba SA", ""))
+        verify(!Helpers.isPollFor({ query: "Kimba SA", geohash: "r1ppnx" }, "Kimba SA", "r4152n"))
+        verify(!Helpers.isPollFor({}, "Kimba SA", ""))
+    }
+
+    function test_isRadarFor() {
+        verify(Helpers.isRadarFor({ station: "IDR022" }, "IDR022"))
+        verify(!Helpers.isRadarFor({ station: "IDR023" }, "IDR022"))
+        verify(!Helpers.isRadarFor({}, "IDR022"))
+    }
+
     // ── nextLoadedFrame (radar loop) ──────────────────────────────────────
 
     // Frames as the radar tab sees them: true where the Image has loaded.

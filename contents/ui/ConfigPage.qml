@@ -17,6 +17,16 @@ Kirigami.FormLayout {
     property string cfg_radarStation
     property int    cfg_pollInterval:  plasmoid.configuration.pollInterval
 
+    // Plasma passes the page a title and a cfg_ property for every config
+    // key, and logs a warning for each one the page doesn't declare. These
+    // keys are the widget's own lookup cache, not settings: the page only
+    // hands them back unchanged on Apply (the cache is keyed by
+    // lastLocationSearch, so writing back an old lookup is harmless).
+    property string title
+    property string cfg_lastGeohash
+    property string cfg_lastLocationName
+    property string cfg_lastLocationSearch
+
     // Last applied range in km — survives the range model rebinding (which
     // resets rangeCombo.currentIndex) when the station changes.
     property int _selectedKm: 128

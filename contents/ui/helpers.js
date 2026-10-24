@@ -147,6 +147,20 @@ function moonPhase(date) {
     return {emoji: "🌑", name: "New Moon"}
 }
 
+// Whether a poll result answers the request now wanted. Polls can overlap
+// (the location changed while a lookup was in flight), and a late answer
+// for the old location must not be shown, or cached as the new one's.
+// While a lookup is in flight there is no geohash yet, and any answer for
+// the query will do.
+function isPollFor(result, query, geohash) {
+    return result.query === query && (geohash === "" || result.geohash === geohash)
+}
+
+// Whether a radar listing is for the station now shown.
+function isRadarFor(result, station) {
+    return result.station === station
+}
+
 // The radar loop's next frame after `current`, of `count`: the next one for
 // which isReady(i) is true, wrapping round. Frames load asynchronously, so on
 // a slow connection the first loop would otherwise show the frames still

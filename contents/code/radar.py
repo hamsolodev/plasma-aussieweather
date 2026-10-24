@@ -72,15 +72,17 @@ def frame_names(names, station, now):
 
 def main(argv):
     station = argv[1]
+    # Every result names its station: the widget drops listings for a
+    # station it no longer shows.
     if not is_station(station):
-        print(json.dumps({"ok": False, "error": "Not a radar station: " + station}))
-        return
-    try:
-        now = datetime.now(timezone.utc)
-        frames = [FRAME_URL + n for n in frame_names(list_names(), station, now)]
-        result = {"ok": True, "frames": frames}
-    except Exception as e:
-        result = {"ok": False, "error": str(e)}
+        result = {"ok": False, "station": station, "error": "Not a radar station: " + station}
+    else:
+        try:
+            now = datetime.now(timezone.utc)
+            frames = [FRAME_URL + n for n in frame_names(list_names(), station, now)]
+            result = {"ok": True, "station": station, "frames": frames}
+        except Exception as e:
+            result = {"ok": False, "station": station, "error": str(e)}
     print(json.dumps(result))
 
 

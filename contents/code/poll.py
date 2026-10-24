@@ -243,10 +243,10 @@ def warnings_for(get, geohash, now):
 
 def collect(get, geohash, query, now):
     """Everything the widget shows, as one JSON-ready dict."""
-    out = {"ok": True}
+    out = {"ok": True, "query": query}
     if not geohash:
         geohash, out["locationName"] = resolve(get, query)
-        out["geohash"] = geohash
+    out["geohash"] = geohash
     base = "/locations/" + geohash
     out["observations"] = get(base + "/observations").get("data", {})
     out["forecast"] = get(base + "/forecasts/daily").get("data", [])[:7]
@@ -263,12 +263,15 @@ def collect(get, geohash, query, now):
 
 def main(argv):
     version, geohash, query = argv[1:4]
+    # Every result names the request it answers: polls can overlap, and
+    # the widget drops answers for a location it no longer shows.
+    request = {"query": query, "geohash": geohash}
     try:
         result = collect(make_get(version), geohash, query, datetime.now(timezone.utc))
     except NotFound as e:
-        result = {"ok": False, "permanent": True, "error": str(e)}
+        result = dict(request, ok=False, permanent=True, error=str(e))
     except Exception as e:
-        result = {"ok": False, "error": str(e)}
+        result = dict(request, ok=False, error=str(e))
     print(json.dumps(result))
 
 
