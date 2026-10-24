@@ -110,10 +110,7 @@ function indexOfSite(site) {
 // True for a product ID this table offers: a known site, at a range that
 // site publishes.
 function isKnownId(id) {
-    var p = parseId(id)
-    if (!p) return false
-    var i = indexOfSite(p.site)
-    return i >= 0 && stations[i].ranges.indexOf(p.km) >= 0
+    return locate(id) !== null
 }
 
 // Picker indices for a product ID, {station, range} into stations and that
