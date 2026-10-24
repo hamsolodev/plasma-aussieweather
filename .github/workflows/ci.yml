@@ -44,12 +44,14 @@ jobs:
       - name: Run tests
         run: bash scripts/test.sh
 
-      # template.pot must list every translatable string; source locations
-      # and the creation date are allowed to differ.
+      # template.pot must list exactly the translatable strings in the code.
+      # Order and source locations change whenever code moves between
+      # files, so the strings are compared, not the text.
       - name: Translation template is current
         run: |
+          cp translate/template.pot "$RUNNER_TEMP/committed.pot"
           bash translate/merge.sh
-          git diff --exit-code -I '^#: ' -I '^"POT-Creation-Date: ' translate/template.pot
+          python3 -I scripts/check-pot.py "$RUNNER_TEMP/committed.pot" translate/template.pot
 
       - name: Build .plasmoid
         run: unzip -l "$(bash scripts/package.sh)"

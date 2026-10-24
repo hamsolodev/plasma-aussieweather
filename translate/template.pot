@@ -9,7 +9,7 @@ msgstr ""
 "Project-Id-Version: plasma_applet_net.tropism.plasma.aussieweather\n"
 "Report-Msgid-Bugs-To: https://github.com/hamsolodev/plasma-aussieweather/"
 "issues\n"
-"POT-Creation-Date: 2026-10-24 01:02+0000\n"
+"POT-Creation-Date: 2026-10-24 03:12+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -23,310 +23,310 @@ msgstr ""
 msgid "General"
 msgstr ""
 
-#: contents/ui/ConfigPage.qml:54
+#: contents/ui/ConfigPage.qml:43
 msgid "Location:"
 msgstr ""
 
-#: contents/ui/ConfigPage.qml:61
+#: contents/ui/ConfigPage.qml:50
 msgid "Radar station:"
 msgstr ""
 
-#: contents/ui/ConfigPage.qml:75
+#: contents/ui/ConfigPage.qml:59
 msgid "Radar range:"
 msgstr ""
 
-#: contents/ui/ConfigPage.qml:79 contents/ui/main.qml:1194
+#: contents/ui/ConfigPage.qml:63 contents/ui/RadarTab.qml:76
 msgid "%1 km"
 msgstr ""
 
-#: contents/ui/ConfigPage.qml:86
+#: contents/ui/ConfigPage.qml:70
 msgid "Update interval:"
 msgstr ""
 
-#: contents/ui/ConfigPage.qml:91
+#: contents/ui/ConfigPage.qml:75
 msgctxt "minutes"
 msgid "%1 min"
 msgstr ""
 
-#: contents/ui/ConfigPage.qml:102
+#: contents/ui/ConfigPage.qml:86
 msgid ""
 "Location: use 'Suburb STATE', e.g. 'Seaford VIC' or 'Sydney NSW'.\n"
 "Pick the radar station nearest your location; smaller ranges show more "
 "detail."
 msgstr ""
 
-#: contents/ui/main.qml:154
-msgctxt "BoM is the Bureau of Meteorology; %1 is the location"
-msgid "BoM — %1"
-msgstr ""
-
-#: contents/ui/main.qml:156
-msgid "Connecting…"
-msgstr ""
-
-#: contents/ui/main.qml:159
-msgid "Last updated %1"
-msgstr ""
-
-#: contents/ui/main.qml:183
-msgid "No location set. Choose one in the widget's settings."
-msgstr ""
-
-#: contents/ui/main.qml:184
-msgid "Location not found: %1"
-msgstr ""
-
-#: contents/ui/main.qml:185
-msgid "BoM returned an error: %1"
-msgstr ""
-
-#: contents/ui/main.qml:186
-msgid "Cannot reach BoM: %1"
-msgstr ""
-
-#: contents/ui/main.qml:187
-msgid "Unexpected response from BoM: %1"
-msgstr ""
-
-#: contents/ui/main.qml:188
-msgid "The weather script failed: %1"
-msgstr ""
-
-#: contents/ui/main.qml:189
-msgid "Update failed: %1"
-msgstr ""
-
-#: contents/ui/main.qml:233
-msgid "Warnings could not be updated: %1"
-msgstr ""
-
-#: contents/ui/main.qml:234
-msgid "The hourly forecast could not be updated: %1"
-msgstr ""
-
-#: contents/ui/main.qml:390
-msgid "Not a radar station: %1"
-msgstr ""
-
-#: contents/ui/main.qml:391
-msgid ""
-"No recent radar images. The station may be offline; try a neighbouring one."
-msgstr ""
-
-#: contents/ui/main.qml:392
-msgid "Cannot reach BoM's radar listing: %1"
-msgstr ""
-
-#: contents/ui/main.qml:393
-msgid "The radar script failed: %1"
-msgstr ""
-
-#: contents/ui/main.qml:394
-msgid "Radar update failed: %1"
-msgstr ""
-
-#: contents/ui/main.qml:526
-msgid "Weather"
-msgstr ""
-
-#: contents/ui/main.qml:527
-msgid "Radar"
-msgstr ""
-
-#: contents/ui/main.qml:531
-msgid "⚠ Warnings (%1)"
-msgstr ""
-
-#: contents/ui/main.qml:585 contents/ui/main.qml:1386
-msgid "Warning"
-msgstr ""
-
-#: contents/ui/main.qml:636 contents/ui/main.qml:787
+#: contents/ui/CurrentConditions.qml:52 contents/ui/HourlyStrip.qml:73
 msgid "Feels like %1"
 msgstr ""
 
-#: contents/ui/main.qml:703
+#: contents/ui/CurrentConditions.qml:100
 msgid "%1  (gusts %2)"
 msgstr ""
 
-#: contents/ui/main.qml:712
+#: contents/ui/CurrentConditions.qml:108
 #, javascript-format
 msgctxt "relative humidity"
 msgid "%1% RH"
 msgstr ""
 
-#: contents/ui/main.qml:725
+#: contents/ui/CurrentConditions.qml:118
 msgid "%1 mm since 9 am"
 msgstr ""
 
-#: contents/ui/main.qml:739
-msgid "Next Hour"
-msgid_plural "Next %1 Hours"
-msgstr[0] ""
-msgstr[1] ""
-
-#: contents/ui/main.qml:768
-msgid "Now"
-msgstr ""
-
-#: contents/ui/main.qml:792
-msgid "Wind %1 (gusts %2)"
-msgstr ""
-
-#: contents/ui/main.qml:793
-msgid "Wind %1"
-msgstr ""
-
-#: contents/ui/main.qml:797
-#, javascript-format
-msgid "Humidity %1%"
-msgstr ""
-
-#: contents/ui/main.qml:799
-msgctxt "abbreviated dew point"
-msgid "Dew pt %1"
-msgstr ""
-
-#: contents/ui/main.qml:803
-msgid "UV %1"
-msgstr ""
-
-#: contents/ui/main.qml:806
-msgid "Rain %1–%2 mm"
-msgstr ""
-
-#: contents/ui/main.qml:844
+#: contents/ui/DailyStrip.qml:24
 msgid "1-Day Forecast"
 msgid_plural "%1-Day Forecast"
 msgstr[0] ""
 msgstr[1] ""
 
-#: contents/ui/main.qml:871
+#: contents/ui/DailyStrip.qml:49
 msgid "Today"
 msgstr ""
 
-#: contents/ui/main.qml:942
-msgid "Waiting for data…"
+#: contents/ui/FullView.qml:50
+msgid "Weather"
 msgstr ""
 
-#: contents/ui/main.qml:997
-msgctxt "UV index category"
-msgid "Low"
+#: contents/ui/FullView.qml:51
+msgid "Radar"
 msgstr ""
 
-#: contents/ui/main.qml:998
-msgctxt "UV index category"
-msgid "Moderate"
+#: contents/ui/FullView.qml:55
+msgid "⚠ Warnings (%1)"
 msgstr ""
 
-#: contents/ui/main.qml:999
-msgctxt "UV index category"
-msgid "High"
+#: contents/ui/HourlyStrip.qml:25
+msgid "Next Hour"
+msgid_plural "Next %1 Hours"
+msgstr[0] ""
+msgstr[1] ""
+
+#: contents/ui/HourlyStrip.qml:54
+msgid "Now"
 msgstr ""
 
-#: contents/ui/main.qml:1000
-msgctxt "UV index category"
-msgid "Very High"
+#: contents/ui/HourlyStrip.qml:78
+msgid "Wind %1 (gusts %2)"
 msgstr ""
 
-#: contents/ui/main.qml:1001
-msgctxt "UV index category"
-msgid "Extreme"
+#: contents/ui/HourlyStrip.qml:79
+msgid "Wind %1"
 msgstr ""
 
-#: contents/ui/main.qml:1038
-msgctxt "moon phase"
-msgid "New Moon"
+#: contents/ui/HourlyStrip.qml:83
+#, javascript-format
+msgid "Humidity %1%"
 msgstr ""
 
-#: contents/ui/main.qml:1039
-msgctxt "moon phase"
-msgid "Waxing Crescent"
+#: contents/ui/HourlyStrip.qml:85
+msgctxt "abbreviated dew point"
+msgid "Dew pt %1"
 msgstr ""
 
-#: contents/ui/main.qml:1040
-msgctxt "moon phase"
-msgid "First Quarter"
+#: contents/ui/HourlyStrip.qml:89
+msgid "UV %1"
 msgstr ""
 
-#: contents/ui/main.qml:1041
-msgctxt "moon phase"
-msgid "Waxing Gibbous"
+#: contents/ui/HourlyStrip.qml:92
+msgid "Rain %1–%2 mm"
 msgstr ""
 
-#: contents/ui/main.qml:1042
-msgctxt "moon phase"
-msgid "Full Moon"
+#: contents/ui/RadarSource.qml:73
+msgid "Not a radar station: %1"
 msgstr ""
 
-#: contents/ui/main.qml:1043
-msgctxt "moon phase"
-msgid "Waning Gibbous"
+#: contents/ui/RadarSource.qml:74
+msgid ""
+"No recent radar images. The station may be offline; try a neighbouring one."
 msgstr ""
 
-#: contents/ui/main.qml:1044
-msgctxt "moon phase"
-msgid "Last Quarter"
+#: contents/ui/RadarSource.qml:75
+msgid "Cannot reach BoM's radar listing: %1"
 msgstr ""
 
-#: contents/ui/main.qml:1045
-msgctxt "moon phase"
-msgid "Waning Crescent"
+#: contents/ui/RadarSource.qml:76
+msgid "The radar script failed: %1"
 msgstr ""
 
-#: contents/ui/main.qml:1097
-msgctxt "abbreviation of Bureau of Meteorology"
-msgid "BoM"
+#: contents/ui/RadarSource.qml:77
+msgid "Radar update failed: %1"
 msgstr ""
 
-#: contents/ui/main.qml:1167
+#: contents/ui/RadarTab.qml:55
 msgid "Update failed"
 msgstr ""
 
-#: contents/ui/main.qml:1168
+#: contents/ui/RadarTab.qml:56
 msgid "Fetching…"
 msgstr ""
 
-#: contents/ui/main.qml:1171
+#: contents/ui/RadarTab.qml:58
 msgid "Updated just now"
 msgstr ""
 
-#: contents/ui/main.qml:1172
+#: contents/ui/RadarTab.qml:59
 msgid "Updated a minute ago"
 msgid_plural "Updated %1 minutes ago"
 msgstr[0] ""
 msgstr[1] ""
 
-#: contents/ui/main.qml:1305
+#: contents/ui/RadarTab.qml:107
 msgid "Radar: %2  ·  %1 frame"
 msgid_plural "Radar: %2  ·  %1 frames"
 msgstr[0] ""
 msgstr[1] ""
 
-#: contents/ui/main.qml:1309
+#: contents/ui/RadarTab.qml:110
 msgid "Radar: %1"
 msgstr ""
 
-#: contents/ui/main.qml:1310
+#: contents/ui/RadarTab.qml:111
 msgid "Radar: %1  ·  Loading…"
 msgstr ""
 
-#: contents/ui/main.qml:1334
+#: contents/ui/RadarTab.qml:134
 msgid "Full radar loop"
 msgstr ""
 
-#: contents/ui/main.qml:1342
+#: contents/ui/RadarTab.qml:141
 msgid "Weather maps"
 msgstr ""
 
-#: contents/ui/main.qml:1416
+#: contents/ui/WarningsTab.qml:51 contents/ui/WeatherTab.qml:56
+msgid "Warning"
+msgstr ""
+
+#: contents/ui/WarningsTab.qml:94
 msgid "Final warning"
 msgstr ""
 
-#: contents/ui/main.qml:1418
+#: contents/ui/WarningsTab.qml:96
 msgid "Issued %1"
 msgstr ""
 
-#: contents/ui/main.qml:1421
+#: contents/ui/WarningsTab.qml:98
 msgid "Expires %1"
+msgstr ""
+
+#: contents/ui/WeatherSource.qml:63
+msgid "No location set. Choose one in the widget's settings."
+msgstr ""
+
+#: contents/ui/WeatherSource.qml:64
+msgid "Location not found: %1"
+msgstr ""
+
+#: contents/ui/WeatherSource.qml:65
+msgid "BoM returned an error: %1"
+msgstr ""
+
+#: contents/ui/WeatherSource.qml:66
+msgid "Cannot reach BoM: %1"
+msgstr ""
+
+#: contents/ui/WeatherSource.qml:67
+msgid "Unexpected response from BoM: %1"
+msgstr ""
+
+#: contents/ui/WeatherSource.qml:68
+msgid "The weather script failed: %1"
+msgstr ""
+
+#: contents/ui/WeatherSource.qml:69
+msgid "Update failed: %1"
+msgstr ""
+
+#: contents/ui/WeatherSource.qml:115
+msgid "Warnings could not be updated: %1"
+msgstr ""
+
+#: contents/ui/WeatherSource.qml:117
+msgid "The hourly forecast could not be updated: %1"
+msgstr ""
+
+#: contents/ui/WeatherTab.qml:111
+msgid "Waiting for data…"
+msgstr ""
+
+#: contents/ui/WeatherTab.qml:162
+msgctxt "UV index category"
+msgid "Low"
+msgstr ""
+
+#: contents/ui/WeatherTab.qml:163
+msgctxt "UV index category"
+msgid "Moderate"
+msgstr ""
+
+#: contents/ui/WeatherTab.qml:164
+msgctxt "UV index category"
+msgid "High"
+msgstr ""
+
+#: contents/ui/WeatherTab.qml:165
+msgctxt "UV index category"
+msgid "Very High"
+msgstr ""
+
+#: contents/ui/WeatherTab.qml:166
+msgctxt "UV index category"
+msgid "Extreme"
+msgstr ""
+
+#: contents/ui/WeatherTab.qml:201
+msgctxt "moon phase"
+msgid "New Moon"
+msgstr ""
+
+#: contents/ui/WeatherTab.qml:202
+msgctxt "moon phase"
+msgid "Waxing Crescent"
+msgstr ""
+
+#: contents/ui/WeatherTab.qml:203
+msgctxt "moon phase"
+msgid "First Quarter"
+msgstr ""
+
+#: contents/ui/WeatherTab.qml:204
+msgctxt "moon phase"
+msgid "Waxing Gibbous"
+msgstr ""
+
+#: contents/ui/WeatherTab.qml:205
+msgctxt "moon phase"
+msgid "Full Moon"
+msgstr ""
+
+#: contents/ui/WeatherTab.qml:206
+msgctxt "moon phase"
+msgid "Waning Gibbous"
+msgstr ""
+
+#: contents/ui/WeatherTab.qml:207
+msgctxt "moon phase"
+msgid "Last Quarter"
+msgstr ""
+
+#: contents/ui/WeatherTab.qml:208
+msgctxt "moon phase"
+msgid "Waning Crescent"
+msgstr ""
+
+#: contents/ui/WeatherTab.qml:261
+msgctxt "abbreviation of Bureau of Meteorology"
+msgid "BoM"
+msgstr ""
+
+#: contents/ui/main.qml:61
+msgctxt "BoM is the Bureau of Meteorology; %1 is the location"
+msgid "BoM — %1"
+msgstr ""
+
+#: contents/ui/main.qml:63
+msgid "Connecting…"
+msgstr ""
+
+#: contents/ui/main.qml:67
+msgid "Last updated %1"
 msgstr ""
