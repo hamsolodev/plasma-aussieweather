@@ -201,19 +201,35 @@ TestCase {
                 "/home/u/my widgets/poll.py")
     }
 
+    // ── scriptResult ──────────────────────────────────────────────────────
+
+    function test_scriptResult_parses_the_printed_object() {
+        compare(Helpers.scriptResult({ "stdout": '{"ok": true, "x": 1}\n', "exit code": 0 }),
+                { ok: true, x: 1 })
+    }
+
+    function test_scriptResult_reports_a_script_that_printed_nothing() {
+        compare(Helpers.scriptResult({ "stdout": "", "stderr": "sh: line 1: python3: command not found\n",
+                                       "exit code": 127 }),
+                { ok: false, error: "script", detail: "sh: line 1: python3: command not found" })
+        compare(Helpers.scriptResult({ "stdout": "Traceback", "stderr": "", "exit code": 1 }),
+                { ok: false, error: "script", detail: "exit code 1" })
+        compare(Helpers.scriptResult({ "stdout": "[1]", "exit code": 0 }).error, "script")
+    }
+
     // ── isPollFor / isRadarFor ────────────────────────────────────────────
 
     function test_isPollFor_matches_the_current_request() {
-        var result = { query: "Kimba SA", geohash: "r4152n" }
-        verify(Helpers.isPollFor(result, "Kimba SA", "r4152n"))
-        // A lookup in flight: any geohash answers it.
-        verify(Helpers.isPollFor(result, "Kimba SA", ""))
+        verify(Helpers.isPollFor({ query: "Kimba SA", geohash: "r4152n" }, "Kimba SA", "r4152n"))
+        verify(Helpers.isPollFor({ query: "Kimba SA", geohash: "" }, "Kimba SA", ""))
     }
 
     function test_isPollFor_rejects_an_overtaken_request() {
-        verify(!Helpers.isPollFor({ query: "Seaford VIC", geohash: "r1ppnx" }, "Kimba SA", ""))
-        verify(!Helpers.isPollFor({ query: "Kimba SA", geohash: "r1ppnx" }, "Kimba SA", "r4152n"))
-        verify(!Helpers.isPollFor({}, "Kimba SA", ""))
+        // The location changed while a lookup was in flight.
+        verify(!Helpers.isPollFor({ query: "Seaford VIC", geohash: "" }, "Kimba SA", ""))
+        // A poll of the old cached place, after the cache was reset.
+        verify(!Helpers.isPollFor({ query: "Kimba SA", geohash: "r1ppnx" }, "Kimba SA", ""))
+        verify(!Helpers.isPollFor(undefined, "Kimba SA", ""))
     }
 
     function test_isRadarFor() {

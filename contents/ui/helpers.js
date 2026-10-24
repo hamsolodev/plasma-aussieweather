@@ -147,13 +147,29 @@ function moonPhase(date) {
     return {emoji: "🌑", name: "New Moon"}
 }
 
-// Whether a poll result answers the request now wanted. Polls can overlap
-// (the location changed while a lookup was in flight), and a late answer
-// for the old location must not be shown, or cached as the new one's.
-// While a lookup is in flight there is no geohash yet, and any answer for
-// the query will do.
-function isPollFor(result, query, geohash) {
-    return result.query === query && (geohash === "" || result.geohash === geohash)
+// The JSON object a fetch script printed, from the executable engine's data
+// for its run. Output that isn't one (python3 missing, the script crashed)
+// becomes a failure of kind "script" carrying the last stderr line or the
+// exit code, so it is reported as what it is, not as a network problem.
+function scriptResult(data) {
+    try {
+        var parsed = JSON.parse(String(data["stdout"] || ""))
+        if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed))
+            return parsed
+    } catch (e) {
+        // Not JSON: reported below.
+    }
+    var stderr = String(data["stderr"] || "").trim().split("\n").pop()
+    return { ok: false, error: "script",
+             detail: stderr || ("exit code " + data["exit code"]) }
+}
+
+// Whether a poll answered `request` ({query, geohash}, as poll.py echoes
+// it) is the poll that would be made now. Polls can overlap (the location
+// changed while a lookup was in flight), and a late answer for the old
+// location must not be shown, or cached as the new one's.
+function isPollFor(request, query, geohash) {
+    return !!request && request.query === query && request.geohash === geohash
 }
 
 // Whether a radar listing is for the station now shown.

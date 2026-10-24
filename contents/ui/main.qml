@@ -132,18 +132,27 @@ PlasmoidItem {
         return scriptCommand("poll.py", [_widgetVersion, _geohash, locationSearch])
     }
 
-    function _handlePoll(out) {
-        var d
-        try { d = JSON.parse(out) }
-        catch (e) { d = { ok: false, error: i18n("Bad response") } }
+    // A failure, as poll.py or scriptResult reports it, worded for the user.
+    function failureText(d) {
+        switch (d.error) {
+        case "no_location":  return i18n("No location set. Choose one in the widget's settings.")
+        case "not_found":    return i18n("Location not found: %1", d.detail)
+        case "http":         return i18n("BoM returned an error: %1", d.detail)
+        case "network":      return i18n("Cannot reach BoM: %1", d.detail)
+        case "bad_response": return i18n("Unexpected response from BoM: %1", d.detail)
+        case "script":       return i18n("The weather script failed: %1", d.detail)
+        default:             return i18n("Update failed: %1", d.detail || d.error)
+        }
+    }
 
+    function _handlePoll(d) {
         // Drop an answer for a location no longer shown. Output that names no
         // request (it did not parse) can only be taken as this one's.
-        if (d.query !== undefined && !Helpers.isPollFor(d, locationSearch, _geohash))
+        if (d.request !== undefined && !Helpers.isPollFor(d.request, locationSearch, _geohash))
             return
 
         if (!d.ok) {
-            errorText = (d && d.error) ? d.error : i18n("Unreachable")
+            errorText = failureText(d)
             // Keep showing the last good data through a transient failure —
             // a missed poll shouldn't blank a working widget.
             if (!observations) pollOk = false
@@ -167,14 +176,18 @@ PlasmoidItem {
             locationName = d.locationName
             plasmoid.configuration.lastGeohash        = d.geohash
             plasmoid.configuration.lastLocationName   = d.locationName
-            plasmoid.configuration.lastLocationSearch = d.query
+            plasmoid.configuration.lastLocationSearch = d.request.query
         }
         observations    = d.observations || null
         forecast        = d.forecast     || []
-        warnings        = d.warnings     || []
-        hourlyForecast  = d.hourly       || []
+        // null: that fetch failed. Keep what was shown rather than claim
+        // there are no warnings; the error says why.
+        if (d.warnings !== null) warnings       = d.warnings
+        if (d.hourly   !== null) hourlyForecast = d.hourly
         lastUpdated  = Qt.formatTime(new Date(), "h:mm ap")
-        errorText    = ""
+        errorText    = d.warningsError ? i18n("Warnings could not be updated: %1", d.warningsError)
+                     : d.hourlyError   ? i18n("The hourly forecast could not be updated: %1", d.hourlyError)
+                     : ""
         pollOk       = true
     }
 
@@ -185,7 +198,7 @@ PlasmoidItem {
         connectedSources: []
         onNewData: (sourceName, data) => {
             poller.disconnectSource(sourceName)
-            root._handlePoll((data["stdout"] || "").trim())
+            root._handlePoll(Helpers.scriptResult(data))
         }
     }
 
@@ -863,9 +876,7 @@ PlasmoidItem {
                 wrapMode: Text.WordWrap
                 horizontalAlignment: Text.AlignHCenter
                 opacity: 0.7
-                text: root.errorText
-                    ? i18n("Cannot reach BoM:\n%1", root.errorText)
-                    : i18n("Waiting for data…")
+                text: root.errorText || i18n("Waiting for data…")
             }
 
             Kirigami.Separator {

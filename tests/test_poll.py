@@ -3,7 +3,11 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 import base64
+import contextlib
+import io
+import json
 import unittest
+import urllib.error
 from datetime import datetime, timezone
 
 from codeloader import FakeApi, load
@@ -31,16 +35,96 @@ def location_api(geohash, warnings=(), details=None, **overrides):
     return FakeApi(responses)
 
 
+def http_error(code):
+    return urllib.error.HTTPError("https://api.example/x", code, "status %d" % code, {}, None)
+
+
+def run_main(api, geohash, query):
+    """poll.main's JSON output, with API calls answered by API."""
+    original = poll.make_get
+    poll.make_get = lambda version: api
+    try:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            poll.main(["poll.py", "1.8.0", geohash, query])
+        return json.loads(out.getvalue())
+    finally:
+        poll.make_get = original
+
+
+class SplitStateTest(unittest.TestCase):
+
+    def test_state_suffix_in_any_case(self):
+        self.assertEqual(poll.split_state("Seaford VIC"), ("Seaford", "VIC"))
+        self.assertEqual(poll.split_state("seaford vic"), ("seaford", "VIC"))
+        self.assertEqual(poll.split_state("  Port  Lincoln   Sa "), ("Port Lincoln", "SA"))
+
+    def test_last_word_that_is_not_a_state(self):
+        self.assertEqual(poll.split_state("Port Lincoln"), ("Port Lincoln", None))
+        self.assertEqual(poll.split_state("Mount Isa"), ("Mount Isa", None))
+        self.assertEqual(poll.split_state("WA"), ("WA", None))
+
+
 class ResolveTest(unittest.TestCase):
 
     def test_state_suffix_prefers_that_state(self):
         api = FakeApi({"/locations?search=Seaford": {"data": [SEAFORD_VIC, SEAFORD_SA]}})
         self.assertEqual(poll.resolve(api, "Seaford SA"), ("r1f93c", "Seaford, SA"))
 
+    def test_lowercase_state_is_still_a_state(self):
+        api = FakeApi({"/locations?search=Seaford": {"data": [SEAFORD_VIC, SEAFORD_SA]}})
+        self.assertEqual(poll.resolve(api, "Seaford sa"), ("r1f93c", "Seaford, SA"))
+
+    def test_no_match_in_the_named_state_is_not_found(self):
+        api = FakeApi({"/locations?search=Seaford": {"data": [SEAFORD_VIC, SEAFORD_SA]}})
+        with self.assertRaises(poll.Failure) as caught:
+            poll.resolve(api, "Seaford NSW")
+        self.assertEqual(caught.exception.kind, "not_found")
+
     def test_no_match_is_not_found(self):
         api = FakeApi({"/locations?search=Nowhere": {"data": []}})
-        with self.assertRaises(poll.NotFound):
+        with self.assertRaises(poll.Failure) as caught:
             poll.resolve(api, "Nowhere")
+        self.assertEqual(caught.exception.kind, "not_found")
+
+
+class ErrorKindTest(unittest.TestCase):
+
+    def test_empty_location_is_permanent_and_asks_nothing(self):
+        api = FakeApi({})
+        result = run_main(api, "", "   ")
+        self.assertEqual((result["ok"], result["error"], result["permanent"]),
+                         (False, "no_location", True))
+        self.assertEqual(api.requested, [])
+
+    def test_not_found_is_permanent(self):
+        result = run_main(FakeApi({"/locations?search=Nowhere": {"data": []}}), "", "Nowhere")
+        self.assertEqual((result["error"], result["permanent"], result["detail"]),
+                         ("not_found", True, "Nowhere"))
+
+    def test_client_error_is_permanent(self):
+        result = run_main(location_api("r1ppnx", **{"/locations/r1ppnx/observations": http_error(403)}),
+                          "r1ppnx", "Seaford VIC")
+        self.assertEqual((result["error"], result["permanent"]), ("http", True))
+        self.assertIn("403", result["detail"])
+
+    def test_server_error_and_rate_limit_are_retried(self):
+        for code in (500, 503, 429):
+            api = location_api("r1ppnx", **{"/locations/r1ppnx/observations": http_error(code)})
+            result = run_main(api, "r1ppnx", "Seaford VIC")
+            self.assertEqual((result["error"], result["permanent"]), ("http", False), code)
+
+    def test_network_failure_is_retried(self):
+        api = location_api("r1ppnx", **{"/locations/r1ppnx/observations":
+                                        urllib.error.URLError("Name or service not known")})
+        result = run_main(api, "r1ppnx", "Seaford VIC")
+        self.assertEqual((result["error"], result["permanent"]), ("network", False))
+
+    def test_malformed_cached_geohash_is_looked_up_again(self):
+        api = location_api("r1ppnx", **{"/locations?search=Seaford": {"data": [SEAFORD_VIC]}})
+        result = run_main(api, "r1pp/x", "Seaford VIC")
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["geohash"], "r1ppnx")
 
 
 class CollectTest(unittest.TestCase):
@@ -53,14 +137,29 @@ class CollectTest(unittest.TestCase):
         self.assertFalse(any(p.startswith("/locations?") for p in api.requested))
 
     def test_result_names_the_request_it_answers(self):
-        out = poll.collect(location_api("r1ppnx"), "r1ppnx", "Seaford VIC", NOW)
-        self.assertEqual((out["query"], out["geohash"]), ("Seaford VIC", "r1ppnx"))
+        ok = run_main(location_api("r1ppnx"), "r1ppnx", "Seaford VIC")
+        failed = run_main(FakeApi({"/locations?search=Nowhere": {"data": []}}), "", "Nowhere")
+        self.assertEqual(ok["request"], {"query": "Seaford VIC", "geohash": "r1ppnx"})
+        self.assertEqual(failed["request"], {"query": "Nowhere", "geohash": ""})
 
     def test_lookup_reports_the_resolved_location(self):
         api = location_api("r1ppnx", **{"/locations?search=Seaford": {"data": [SEAFORD_VIC]}})
         out = poll.collect(api, "", "Seaford VIC", NOW)
         self.assertEqual(out["geohash"], "r1ppnx")
         self.assertEqual(out["locationName"], "Seaford, VIC")
+
+    def test_failed_extras_are_unknown_not_empty(self):
+        api = location_api("r1ppnx", **{"/locations/r1ppnx/forecasts/hourly": http_error(503),
+                                        "/locations/r1ppnx/warnings": http_error(503)})
+        out = poll.collect(api, "r1ppnx", "Seaford VIC", NOW)
+        self.assertIsNone(out["hourly"])
+        self.assertIsNone(out["warnings"])
+        self.assertIn("503", out["warningsError"])
+
+    def test_hourly_not_offered_is_empty(self):
+        api = location_api("rd3het", **{"/locations/rd3het/forecasts/hourly": http_error(404)})
+        out = poll.collect(api, "rd3het", "Lord Howe Island NSW", NOW)
+        self.assertEqual(out["hourly"], [])
 
     def test_forecasts_are_trimmed(self):
         out = poll.collect(location_api("r1ppnx"), "r1ppnx", "Seaford VIC", NOW)

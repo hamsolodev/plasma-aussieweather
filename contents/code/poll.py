@@ -21,16 +21,45 @@ import html
 import json
 import re
 import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 
 API = "https://api.weather.bom.gov.au/v1"
+STATES = {"ACT", "NSW", "NT", "QLD", "SA", "TAS", "VIC", "WA"}
+GEOHASH = re.compile(r"[0-9b-hjkmnp-z]{6}")
 
 
-class NotFound(Exception):
-    """A definitive answer that retrying will not change."""
+class Failure(Exception):
+    """A failed poll, of a kind the widget words for the user.
+
+    no_location and not_found mean the configured location needs changing;
+    http that BoM answered with an error status; network that BoM could
+    not be reached; bad_response that its answer was not what this script
+    expects. A permanent failure is not retried: asking again would get
+    the same answer.
+    """
+
+    def __init__(self, kind, detail="", permanent=False):
+        super().__init__(detail)
+        self.kind = kind
+        self.detail = detail
+        self.permanent = permanent
+
+
+def failure_from(error):
+    """ERROR as a Failure."""
+    if isinstance(error, Failure):
+        return error
+    if isinstance(error, urllib.error.HTTPError):
+        # A client error will not change on retry; rate limiting will.
+        permanent = 400 <= error.code < 500 and error.code != 429
+        return Failure("http", "HTTP %d %s" % (error.code, error.reason), permanent)
+    if isinstance(error, OSError):
+        return Failure("network", str(getattr(error, "reason", error)))
+    return Failure("bad_response", "%s: %s" % (type(error).__name__, error))
 
 
 def make_get(version):
@@ -48,20 +77,31 @@ def make_get(version):
     return get
 
 
-def resolve(get, query):
-    """Look QUERY up and return (geohash, display name)."""
-    parts = query.strip().rsplit(None, 1)
-    last = parts[-1] if len(parts) > 1 else ""
-    state = last if last.isalpha() and last.isupper() and 2 <= len(last) <= 3 else None
-    term = parts[0].strip() if state else query.strip()
+def split_state(query):
+    """QUERY as (place, state), the state None unless the last word is one.
 
-    locations = get("/locations?search=" + urllib.parse.quote(term)).get("data", [])
-    if not locations:
-        raise NotFound("Location not found: " + query)
+    The state may be written in any case: "seaford vic" is Seaford, VIC.
+    """
+    words = query.split()
+    if len(words) > 1 and words[-1].upper() in STATES:
+        return " ".join(words[:-1]), words[-1].upper()
+    return " ".join(words), None
+
+
+def resolve(get, query):
+    """Look QUERY up and return (geohash, display name).
+
+    When QUERY names a state, only places in that state match: "Seaford
+    NSW" is not found rather than quietly becoming Seaford, VIC.
+    """
+    place, state = split_state(query)
+    if not place:
+        raise Failure("no_location", permanent=True)
+    locations = get("/locations?search=" + urllib.parse.quote(place)).get("data", [])
     if state:
-        preferred = [l for l in locations if l.get("state", "").upper() == state.upper()]
-        if preferred:
-            locations = preferred
+        locations = [l for l in locations if (l.get("state") or "").upper() == state]
+    if not locations:
+        raise Failure("not_found", query.strip(), permanent=True)
     location = locations[0]
     return (location.get("geohash", "")[:6],
             location.get("name", "") + ", " + location.get("state", ""))
@@ -241,37 +281,58 @@ def warnings_for(get, geohash, now):
     return warnings
 
 
+def hourly_for(get, geohash):
+    """The hourly forecast; empty where BoM offers none.
+
+    BoM answers 404 for the external territories (Lord Howe, Norfolk,
+    Christmas and Cocos Islands), which have daily forecasts only.
+    """
+    try:
+        return get("/locations/" + geohash + "/forecasts/hourly").get("data", [])
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return []
+        raise
+
+
 def collect(get, geohash, query, now):
     """Everything the widget shows, as one JSON-ready dict."""
-    out = {"ok": True, "query": query}
+    out = {"ok": True}
+    if not GEOHASH.fullmatch(geohash):
+        geohash = ""
     if not geohash:
         geohash, out["locationName"] = resolve(get, query)
     out["geohash"] = geohash
     base = "/locations/" + geohash
     out["observations"] = get(base + "/observations").get("data", {})
     out["forecast"] = get(base + "/forecasts/daily").get("data", [])[:7]
+    # The hourly forecast and warnings are extras: if one fails, the rest is
+    # still worth showing. None means unknown, so the widget keeps what it
+    # had; an empty list would mean there are none.
     try:
-        out["hourly"] = get(base + "/forecasts/hourly").get("data", [])[:8]
-    except Exception:
-        out["hourly"] = []
+        out["hourly"] = hourly_for(get, geohash)[:8]
+    except Exception as e:
+        out["hourly"] = None
+        out["hourlyError"] = failure_from(e).detail
     try:
         out["warnings"] = warnings_for(get, geohash, now)
-    except Exception:
-        out["warnings"] = []
+    except Exception as e:
+        out["warnings"] = None
+        out["warningsError"] = failure_from(e).detail
     return out
 
 
 def main(argv):
     version, geohash, query = argv[1:4]
-    # Every result names the request it answers: polls can overlap, and
-    # the widget drops answers for a location it no longer shows.
-    request = {"query": query, "geohash": geohash}
     try:
         result = collect(make_get(version), geohash, query, datetime.now(timezone.utc))
-    except NotFound as e:
-        result = dict(request, ok=False, permanent=True, error=str(e))
     except Exception as e:
-        result = dict(request, ok=False, error=str(e))
+        failure = failure_from(e)
+        result = {"ok": False, "error": failure.kind, "detail": failure.detail,
+                  "permanent": failure.permanent}
+    # Every result names the request it answers: polls can overlap, and
+    # the widget drops answers to a request it would no longer make.
+    result["request"] = {"query": query, "geohash": geohash}
     print(json.dumps(result))
 
 
