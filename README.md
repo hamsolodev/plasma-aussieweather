@@ -20,8 +20,8 @@ UV index, severe weather warnings, and an animated rain radar loop.
 
 - **Panel:** condition icon (day/night switches at actual sunset/sunrise,
   to the minute) + current temperature
-- **Weather tab:** current conditions with feels-like, wind/gusts, humidity,
-  pressure tendency, rain since 9 am, dew point and cloud cover; next 8 hours
+- **Weather tab:** current conditions with feels-like, wind/gusts, humidity
+  and rain since 9 am; next 8 hours
   (hover an hour for feels-like, wind, humidity, UV and rain detail); 7-day
   forecast (hover a day for the meteorologist's extended text); today's
   extended forecast; UV index with category colouring; sunrise/sunset times

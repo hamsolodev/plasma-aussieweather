@@ -91,24 +91,6 @@ TestCase {
         compare(Helpers.windStr(undefined, "N"), "—")
     }
 
-    // ── pressureStr ───────────────────────────────────────────────────────
-
-    function test_pressureStr_tendency_arrows() {
-        compare(Helpers.pressureStr(1013.2, "rising"), "1013 hPa ↑")
-        compare(Helpers.pressureStr(1013.2, "falling"), "1013 hPa ↓")
-        compare(Helpers.pressureStr(1013.2, "steady"), "1013 hPa →")
-        compare(Helpers.pressureStr(1013.2, "rising_slowly"), "1013 hPa ↗")
-    }
-
-    function test_pressureStr_no_tendency() {
-        compare(Helpers.pressureStr(998.6, null), "999 hPa")
-        compare(Helpers.pressureStr(998.6, "unknown"), "999 hPa")
-    }
-
-    function test_pressureStr_invalid() {
-        compare(Helpers.pressureStr(null, "rising"), "—")
-    }
-
     // ── forecastWeekday / titleCase ───────────────────────────────────────
 
     // BoM dates a daily forecast by the location's local midnight, in UTC.

@@ -662,7 +662,8 @@ PlasmoidItem {
                 }
             }
 
-            // Detail stats — row 1: wind (left) | filler | humidity · pressure (right)
+            // Detail stats — row 1: wind (left) | filler | humidity (right). BoM's
+            // observations carry no pressure, dew point or cloud cover.
             RowLayout {
                 visible: root.pollOk && root.observations !== null
                 Layout.fillWidth: true
@@ -691,50 +692,17 @@ PlasmoidItem {
                                          Math.round(root.observations.humidity || 0))
                         : ""
                 }
-                PlainLabel {
-                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
-                    visible: root.observations && root.observations.pressure !== undefined
-                    text: root.observations
-                        ? ("⬤  " + Helpers.pressureStr(root.observations.pressure,
-                                                        root.observations.pressure_tendency))
-                        : ""
-                }
             }
 
-            // Detail stats — row 2: rain (left) | filler | dew point / cloud (right)
-            RowLayout {
+            // Detail stats — row 2: rain since 9 am
+            PlainLabel {
                 visible: root.pollOk && root.observations !== null
-                         && (root.observations.rain_since_9am !== undefined
-                             || root.observations.dew_point !== undefined
-                             || root.observations.cloud)
-                Layout.fillWidth: true
-                Layout.leftMargin:  Kirigami.Units.smallSpacing
-                Layout.rightMargin: Kirigami.Units.smallSpacing
-                spacing: Kirigami.Units.smallSpacing
-
-                PlainLabel {
-                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
-                    visible: !!root.observations && root.observations.rain_since_9am !== undefined
-                    text: root.observations
-                        ? "🌧  " + i18n("%1 mm since 9 am", root.observations.rain_since_9am || 0)
-                        : ""
-                }
-                Item { Layout.fillWidth: true }
-                PlainLabel {
-                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
-                    opacity: 0.65
-                    visible: !!root.observations
-                             && (root.observations.dew_point !== undefined || !!root.observations.cloud)
-                    text: {
-                        if (!root.observations) return ""
-                        var parts = []
-                        if (root.observations.dew_point !== undefined)
-                            parts.push(i18nc("abbreviated dew point", "Dew pt %1",
-                                             Helpers.formatTemp(root.observations.dew_point)))
-                        if (root.observations.cloud) parts.push(root.observations.cloud)
-                        return parts.join("  ·  ")
-                    }
-                }
+                         && root.observations.rain_since_9am !== undefined
+                Layout.leftMargin: Kirigami.Units.smallSpacing
+                font.pointSize: Kirigami.Theme.defaultFont.pointSize
+                text: root.observations
+                    ? "🌧  " + i18n("%1 mm since 9 am", root.observations.rain_since_9am || 0)
+                    : ""
             }
 
             Kirigami.Separator {

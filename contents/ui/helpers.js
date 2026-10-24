@@ -89,14 +89,6 @@ function windStr(speed, dir) {
     return dir ? (dir + " " + s + " km/h") : (s + " km/h")
 }
 
-function pressureStr(hpa, tendency) {
-    var n = Number(hpa)
-    if (hpa === null || hpa === undefined || isNaN(n)) return "—"
-    var arrow = { rising: " ↑", falling: " ↓", steady: " →",
-                  rising_slowly: " ↗", falling_slowly: " ↘" }
-    return Math.round(n) + " hPa" + (arrow[String(tendency || "").toLowerCase()] || "")
-}
-
 // The weekday (0 = Sunday) of a daily forecast, where it is forecast for.
 // BoM dates each day by the location's local midnight, given in UTC (VIC in
 // daylight time: 13:00Z the day before), so the system time zone's weekday
