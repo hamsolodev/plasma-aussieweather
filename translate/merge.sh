@@ -16,7 +16,8 @@ PROJECT_NAME="plasma_applet_${PLASMOID_NAME}"
 BUG_ADDRESS="$(python3 -I "$DIR/../scripts/metadata.py" BugReportUrl)"
 
 cd "$PACKAGE_ROOT"
-find contents -name '*.qml' -o -name '*.js' | sort > "$DIR/infiles.list"
+# The C locale: sort's order follows the locale, and with it the template's.
+find contents -name '*.qml' -o -name '*.js' | LC_ALL=C sort > "$DIR/infiles.list"
 
 xgettext \
     --files-from="$DIR/infiles.list" \
