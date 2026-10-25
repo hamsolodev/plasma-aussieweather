@@ -52,7 +52,7 @@ SCHEMES = {"light": "BreezeLight", "dark": "BreezeDark"}
 # Text.TextFormat's values.
 PLAIN_TEXT, RICH_TEXT, AUTO_TEXT = 0, 1, 2
 # Fewer text items than these means the walk missed some: the fixture
-# builds 114, 82 of them declared by the widget.
+# builds 115, 82 of them declared by the widget.
 MIN_TEXT_ITEMS = 100
 MIN_WIDGET_TEXT_ITEMS = 70
 # A poll's fields that are not shown as text: times, icon names, ids, and

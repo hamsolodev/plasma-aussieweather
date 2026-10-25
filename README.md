@@ -44,7 +44,8 @@ Live BoM data for Seaford VIC and the Melbourne radar, taken with
   (hover an hour for feels-like, wind, humidity, UV and rain detail); 7-day
   forecast (hover a day for the meteorologist's extended text); today's
   extended forecast; UV index with category colouring; sunrise/sunset times
-  and moon phase (a moon replaces the UV reading at night)
+  (hover them for tomorrow's) and moon phase (a moon replaces the UV
+  reading at night)
 - **Radar tab:** animated rain radar composited from BoM's transparency
   layers, with a frame counter and quick station/range switching — the
   place's own station stays the sticky default. Nothing radar-related is
