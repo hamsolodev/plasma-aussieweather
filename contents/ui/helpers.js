@@ -288,6 +288,18 @@ function todayIndex(forecast, nowMs) {
     return today
 }
 
+// A daily entry's sunrise and sunset as Dates, or null unless BoM gave both.
+// A null time must not become new Date(null), the Unix epoch, which shows
+// as a time of day like any other.
+function sunTimes(day) {
+    var a = day ? day.astronomical : null
+    if (!a) return null
+    var sunrise = Date.parse(a.sunrise_time)
+    var sunset  = Date.parse(a.sunset_time)
+    if (isNaN(sunrise) || isNaN(sunset)) return null
+    return { sunrise: new Date(sunrise), sunset: new Date(sunset) }
+}
+
 // The wait before retry number count (0 first): baseMs, doubling each time,
 // no longer than capMs.
 function backoffMs(count, baseMs, capMs) {

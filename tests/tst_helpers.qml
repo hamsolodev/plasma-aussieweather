@@ -330,6 +330,27 @@ TestCase {
         compare(Helpers.todayIndex([], Date.parse("2026-10-24T00:00:00Z")), 0)
     }
 
+    // ── sunTimes ──────────────────────────────────────────────────────────
+
+    function test_sunTimes_parses_both_times() {
+        var sun = Helpers.sunTimes({ astronomical: { sunrise_time: "2026-10-24T19:02:33Z",
+                                                     sunset_time: "2026-10-25T08:16:39Z" } })
+        compare(sun.sunrise.getTime(), Date.parse("2026-10-24T19:02:33Z"))
+        compare(sun.sunset.getTime(), Date.parse("2026-10-25T08:16:39Z"))
+    }
+
+    // Without both, there are none: never the epoch in place of a null.
+    function test_sunTimes_needs_both_times() {
+        var sunrise = "2026-10-24T19:02:33Z"
+        compare(Helpers.sunTimes({ astronomical: { sunrise_time: null, sunset_time: null } }), null)
+        compare(Helpers.sunTimes({ astronomical: { sunrise_time: sunrise, sunset_time: null } }), null)
+        compare(Helpers.sunTimes({ astronomical: { sunrise_time: sunrise } }), null)
+        compare(Helpers.sunTimes({ astronomical: { sunrise_time: sunrise, sunset_time: "" } }), null)
+        compare(Helpers.sunTimes({ astronomical: null }), null)
+        compare(Helpers.sunTimes({}), null)
+        compare(Helpers.sunTimes(null), null)
+    }
+
     // ── clockFormat ───────────────────────────────────────────────────────
 
     function test_clockFormat_follows_the_locales_clock() {

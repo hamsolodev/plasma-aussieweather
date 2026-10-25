@@ -84,11 +84,8 @@ QtObject {
     // start, so it moves the switch to the hour mark, up to 59 minutes after
     // sunset: the sun times come first.
     readonly property bool isNight: {
-        if (today && today.astronomical) {
-            var sunrise = new Date(today.astronomical.sunrise_time)
-            var sunset  = new Date(today.astronomical.sunset_time)
-            return now < sunrise || now >= sunset
-        }
+        var sun = Helpers.sunTimes(today)
+        if (sun) return now < sun.sunrise || now >= sun.sunset
         return !!nowSlot && !!nowSlot.is_night
     }
 

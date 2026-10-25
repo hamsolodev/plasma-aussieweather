@@ -165,6 +165,16 @@ TestCase {
         compare(m.currentIcon, "weather-clear-night")
     }
 
+    // Null times are no times: the slot's flag decides, not a sunset at
+    // the Unix epoch, which would make every hour night.
+    function test_night_ignores_null_sun_times() {
+        var today = day("2026-10-23", "sunny")
+        today.astronomical = { sunrise_time: null, sunset_time: null }
+        var m = model({ forecast: [today] })
+        verify(!m.isNight)
+        compare(m.currentIcon, "weather-showers")
+    }
+
     function test_no_warnings() {
         verify(!model({ warnings: [] }).hasWarnings)
         verify(!model({ warnings: [{ title: "Gone", expiry_time: "2026-10-24T00:00:00Z" }] }).hasWarnings)

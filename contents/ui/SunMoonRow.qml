@@ -54,14 +54,12 @@ RowLayout {
     Item { Layout.fillWidth: true }
 
     PlainLabel {
-        visible: row.weather.today !== null && !!row.weather.today.astronomical
+        readonly property var sun: Helpers.sunTimes(row.weather.today)
+        visible: sun !== null
         opacity: 0.65
-        text: {
-            if (!row.weather.today || !row.weather.today.astronomical) return ""
-            var a = row.weather.today.astronomical
-            return "🌅 " + row.clock.timeText(new Date(a.sunrise_time))
-                   + "  ·  🌇 " + row.clock.timeText(new Date(a.sunset_time))
-        }
+        text: sun ? "🌅 " + row.clock.timeText(sun.sunrise)
+                    + "  ·  🌇 " + row.clock.timeText(sun.sunset)
+                  : ""
 
         // After sunset, the next sunrise is tomorrow's: hovering today's
         // times shows tomorrow's.
@@ -71,12 +69,12 @@ RowLayout {
             textFormat: Text.PlainText
             delay: Kirigami.Units.toolTipDelay
             text: {
-                var t = row.weather.tomorrow
-                if (!t || !t.astronomical) return ""
+                var sun = Helpers.sunTimes(row.weather.tomorrow)
+                if (!sun) return ""
                 return i18nc("%1 and %2 are tomorrow's sunrise and sunset times",
                              "Tomorrow: sunrise %1, sunset %2",
-                             row.clock.timeText(new Date(t.astronomical.sunrise_time)),
-                             row.clock.timeText(new Date(t.astronomical.sunset_time)))
+                             row.clock.timeText(sun.sunrise),
+                             row.clock.timeText(sun.sunset))
             }
         }
     }
