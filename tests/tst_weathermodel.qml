@@ -103,6 +103,11 @@ TestCase {
     function test_tomorrow_is_the_day_after_today() {
         compare(model({}).tomorrow.date, "2026-10-24T13:00:00Z")
         compare(model({ now: new Date("2026-10-24T13:05:00Z") }).tomorrow, null)
+        // Just after local midnight, BoM still lists the day that ended.
+        var m = model({ forecast: [day("2026-10-23", "sunny"), day("2026-10-24", "sunny"),
+                                   day("2026-10-25", "sunny"), day("2026-10-26", "sunny")],
+                        now: new Date("2026-10-24T13:05:00Z") })
+        compare(m.tomorrow.date, "2026-10-25T13:00:00Z")
     }
 
     function test_stale_after_two_missed_polls() {
