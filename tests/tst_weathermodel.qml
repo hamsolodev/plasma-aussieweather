@@ -98,6 +98,13 @@ TestCase {
         compare(m.days.length, 1)
     }
 
+    // Tomorrow is the day after today, not BoM's second entry; on the last
+    // day BoM lists there is none.
+    function test_tomorrow_is_the_day_after_today() {
+        compare(model({}).tomorrow.date, "2026-10-24T13:00:00Z")
+        compare(model({ now: new Date("2026-10-24T13:05:00Z") }).tomorrow, null)
+    }
+
     function test_stale_after_two_missed_polls() {
         var now = Date.parse("2026-10-24T00:30:00Z")
         var tenMinutes = 600000

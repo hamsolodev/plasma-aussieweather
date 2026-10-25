@@ -9,7 +9,7 @@ msgstr ""
 "Project-Id-Version: plasma_applet_net.tropism.plasma.aussieweather\n"
 "Report-Msgid-Bugs-To: https://github.com/hamsolodev/plasma-aussieweather/"
 "issues\n"
-"POT-Creation-Date: 2026-10-24 06:36+0000\n"
+"POT-Creation-Date: 2026-10-25 14:53+1100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -199,67 +199,72 @@ msgstr ""
 msgid "Weather maps"
 msgstr ""
 
-#: contents/ui/SunMoonRow.qml:42
+#: contents/ui/SunMoonRow.qml:43
 msgctxt "UV index category"
 msgid "Low"
 msgstr ""
 
-#: contents/ui/SunMoonRow.qml:43
+#: contents/ui/SunMoonRow.qml:44
 msgctxt "UV index category"
 msgid "Moderate"
 msgstr ""
 
-#: contents/ui/SunMoonRow.qml:44
+#: contents/ui/SunMoonRow.qml:45
 msgctxt "UV index category"
 msgid "High"
 msgstr ""
 
-#: contents/ui/SunMoonRow.qml:45
+#: contents/ui/SunMoonRow.qml:46
 msgctxt "UV index category"
 msgid "Very High"
 msgstr ""
 
-#: contents/ui/SunMoonRow.qml:46
+#: contents/ui/SunMoonRow.qml:47
 msgctxt "UV index category"
 msgid "Extreme"
 msgstr ""
 
-#: contents/ui/SunMoonRow.qml:72
+#: contents/ui/SunMoonRow.qml:77
+msgctxt "%1 and %2 are tomorrow's sunrise and sunset times"
+msgid "Tomorrow: sunrise %1, sunset %2"
+msgstr ""
+
+#: contents/ui/SunMoonRow.qml:90
 msgctxt "moon phase"
 msgid "New Moon"
 msgstr ""
 
-#: contents/ui/SunMoonRow.qml:73
+#: contents/ui/SunMoonRow.qml:91
 msgctxt "moon phase"
 msgid "Waxing Crescent"
 msgstr ""
 
-#: contents/ui/SunMoonRow.qml:74
+#: contents/ui/SunMoonRow.qml:92
 msgctxt "moon phase"
 msgid "First Quarter"
 msgstr ""
 
-#: contents/ui/SunMoonRow.qml:75
+#: contents/ui/SunMoonRow.qml:93
 msgctxt "moon phase"
 msgid "Waxing Gibbous"
 msgstr ""
 
-#: contents/ui/SunMoonRow.qml:76
+#: contents/ui/SunMoonRow.qml:94
 msgctxt "moon phase"
 msgid "Full Moon"
 msgstr ""
 
-#: contents/ui/SunMoonRow.qml:77
+#: contents/ui/SunMoonRow.qml:95
 msgctxt "moon phase"
 msgid "Waning Gibbous"
 msgstr ""
 
-#: contents/ui/SunMoonRow.qml:78
+#: contents/ui/SunMoonRow.qml:96
 msgctxt "moon phase"
 msgid "Last Quarter"
 msgstr ""
 
-#: contents/ui/SunMoonRow.qml:79
+#: contents/ui/SunMoonRow.qml:97
 msgctxt "moon phase"
 msgid "Waning Crescent"
 msgstr ""

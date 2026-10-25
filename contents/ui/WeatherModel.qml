@@ -71,6 +71,9 @@ QtObject {
     readonly property int todayIdx: Helpers.todayIndex(forecast, nowMs)
     readonly property var days: forecast.slice(todayIdx, todayIdx + 7)
     readonly property var today: days.length > 0 ? days[0] : null
+    // Tomorrow's entry, for its sunrise and sunset; null on the last day
+    // BoM lists.
+    readonly property var tomorrow: days.length > 1 ? days[1] : null
 
     // Today's UV category (Helpers.uvKey), "" when BoM gave none.
     readonly property string todayUvKey:

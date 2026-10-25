@@ -4,12 +4,13 @@
 
 import QtQuick
 import QtQuick.Layouts
+import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
 
 import "helpers.js" as Helpers
 
-// Today's UV (a moon at night, when UV is nil), sunrise and sunset, and the
-// moon's phase.
+// Today's UV (a moon at night, when UV is nil), sunrise and sunset (with
+// tomorrow's on hover), and the moon's phase.
 RowLayout {
     id: row
 
@@ -60,6 +61,23 @@ RowLayout {
             var a = row.weather.today.astronomical
             return "🌅 " + row.clock.timeText(new Date(a.sunrise_time))
                    + "  ·  🌇 " + row.clock.timeText(new Date(a.sunset_time))
+        }
+
+        // After sunset, the next sunrise is tomorrow's: hovering today's
+        // times shows tomorrow's.
+        HoverHandler { id: sunHover }
+        PlasmaComponents.ToolTip {
+            visible: sunHover.hovered && text !== ""
+            textFormat: Text.PlainText
+            delay: Kirigami.Units.toolTipDelay
+            text: {
+                var t = row.weather.tomorrow
+                if (!t || !t.astronomical) return ""
+                return i18nc("%1 and %2 are tomorrow's sunrise and sunset times",
+                             "Tomorrow: sunrise %1, sunset %2",
+                             row.clock.timeText(new Date(t.astronomical.sunrise_time)),
+                             row.clock.timeText(new Date(t.astronomical.sunset_time)))
+            }
         }
     }
 
