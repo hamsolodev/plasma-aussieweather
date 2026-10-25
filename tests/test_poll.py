@@ -209,13 +209,13 @@ class ResolveTest(unittest.TestCase):
 
     def test_too_short_to_search_is_not_found(self):
         # BoM answers a search of fewer than three characters with 403,
-        # which would be reported as a failure rather than "not found".
-        api = FakeApi(
-            {"/locations?search=Pt%20Fairy": {"data": []}, "/locations?search=Pt": http_error(403)}
-        )
+        # which would be reported as a failure rather than "not found", so
+        # "Pt" is never searched for.
+        api = FakeApi({"/locations?search=Pt%20Fairy": {"data": []}})
         with self.assertRaises(poll.Failure) as caught:
             poll.resolve(api, "Pt Fairy")
         self.assertEqual((caught.exception.kind, caught.exception.permanent), ("not_found", True))
+        self.assertEqual(api.requested, ["/locations?search=Pt%20Fairy"])
 
     def test_api_geohash_is_checked(self):
         bogus = {"geohash": "../../x", "name": "Seaford", "state": "VIC"}
